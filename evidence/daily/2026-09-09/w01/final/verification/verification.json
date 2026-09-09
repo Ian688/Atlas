@@ -1,0 +1,183 @@
+{
+  "schema": "atlas.verification.v2",
+  "label": "w01-final",
+  "time_utc": "2026-09-08T19:26:50.374204+00:00",
+  "platform": "macOS-15.7.9-x86_64-i386-64bit-Mach-O",
+  "cwd": "/Users/yinsijie/CodeRepo/Atlas",
+  "out_dir": "evidence/daily/2026-09-09/w01/final/verification",
+  "commands": [
+    {
+      "name": "rust-format",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.727,
+      "log": "rust-format.log"
+    },
+    {
+      "name": "rust-clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 1.73,
+      "log": "rust-clippy.log"
+    },
+    {
+      "name": "rust-tests",
+      "argv": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "seconds": 5.736,
+      "log": "rust-tests.log"
+    },
+    {
+      "name": "rust-build",
+      "argv": [
+        "cargo",
+        "build",
+        "--workspace",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "seconds": 8.475,
+      "log": "rust-build.log"
+    },
+    {
+      "name": "worker-tests",
+      "argv": [
+        "npm",
+        "test",
+        "--prefix",
+        "workers/typescript"
+      ],
+      "exit_code": 0,
+      "seconds": 2.954,
+      "log": "worker-tests.log"
+    },
+    {
+      "name": "integration",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_integration.py"
+      ],
+      "exit_code": 0,
+      "seconds": 44.424,
+      "log": "integration.log"
+    },
+    {
+      "name": "calculator",
+      "argv": [
+        "node",
+        "examples/calculator/demo.mjs"
+      ],
+      "exit_code": 0,
+      "seconds": 0.185,
+      "log": "calculator.log"
+    },
+    {
+      "name": "web-syntax",
+      "argv": [
+        "node",
+        "--check",
+        "web/app.js"
+      ],
+      "exit_code": 0,
+      "seconds": 0.178,
+      "log": "web-syntax.log"
+    },
+    {
+      "name": "whitespace",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.022,
+      "log": "whitespace.log"
+    }
+  ],
+  "qualification": "scoped to the checks listed; not full AL/ET/GE/MT/HI/DV or mature Atlas acceptance",
+  "rustc": "rustc 1.96.1 (31fca3adb 2026-06-26) (Homebrew)",
+  "cargo": "cargo 1.96.1 (356927216 2026-06-26) (Homebrew)",
+  "node": "v26.5.1",
+  "npm": "12.0.2",
+  "python": "Python 3.14.7",
+  "git": {
+    "head_exists": false,
+    "head": null,
+    "whitespace_check_scope": "git diff --check covers tracked/index diffs only; with no commits it inspects almost nothing, so a PASS here is not a whitespace audit of untracked files"
+  },
+  "source_hashes": {
+    "crates/.DS_Store": "ab817580395f07864e750d0a7a4d4f2d82b405b3215d707d48601f7487c7a9cf",
+    "crates/atlas-app/Cargo.toml": "b6ded5f1c3fbfff067a5fd8210376608f97616a7ad8e3f270c44ce258a31087a",
+    "crates/atlas-app/src/main.rs": "65c9cf30347d6b07683d57911270e4030925dd2f973716020fa92a60644ae5c3",
+    "crates/atlas-app/src/server.rs": "5fd0fd1135636d418fa71880874bfe2b7b20e3b45c8dfa5a486e2fcd07db04ce",
+    "crates/atlas-app/src/worker.rs": "3889622cd64df2c86b3ac441f796481e426ed301f3eae57de61d3f3dd84c92ab",
+    "crates/atlas-contract/Cargo.toml": "04d5fed2ea665298fc0d439e2a219ea1a660fb90441a64bf3773c0526f779a41",
+    "crates/atlas-contract/src/flow.rs": "7e568e5f7df777764916844e1bc52e272ef7ed9a372cea3d85b049fd104efca8",
+    "crates/atlas-contract/src/lib.rs": "79203a41498f8689a081b436b15a6d1ddfacf348acea1cd48f90fd05c2e2c6a7",
+    "crates/atlas-engine/Cargo.toml": "1f2641756f5c0c70621884572f6020297960e15ce6263fb29952537b1c7f1be3",
+    "crates/atlas-engine/src/analyze.rs": "dc10a0f0c9d46a2e7751651441d635ed3cc533585c6c1a32acc4dc3840e4f570",
+    "crates/atlas-engine/src/facts.rs": "bf7356eadc992b188003913ab35329e393cb9f5a8cc730db3f737d387cab4a18",
+    "crates/atlas-engine/src/flow.rs": "8767b09aead9fb9adf3950290ce26d8baaf85a5fc99c2c6c17eed3083f8999d7",
+    "crates/atlas-engine/src/inter.rs": "c5b73e4e85d3848f2e38c91ba391bb7315721d79275366e3feac2ae8568bd8b9",
+    "crates/atlas-engine/src/lib.rs": "cd8cfc66bf8deb2fa5c9fb1eb68bd0e513d85b175143071f50571459f679ba47",
+    "crates/atlas-engine/src/query.rs": "b9c0949603b1d9467b64420a5fb8f63b0aac59bcc6b7d0ff63065e9c715c2f84",
+    "crates/atlas-engine/src/scan.rs": "24d8b9bfe31f4fee1a42db97d0cd817468908b7308a8cd2dae20bf09d1a3536d",
+    "crates/atlas-engine/src/solve.rs": "88614099a3b7115386ad41909b37de9c8711f8fe789fe54087082b57a199804a",
+    "crates/atlas-engine/src/store.rs": "c15ad8630daf41f5f4c8b7439c155eb67509477cb487a7b8658f112985f2c2b5",
+    "crates/atlas-engine/tests/flow_semantics.rs": "aaaeb2135fdbe4a5e73cd3663f0c05e97a41e48404cf7e17c152d5cafef6cee8",
+    "crates/atlas-engine/tests/foundation.rs": "b40512a0191c67908e15bc1cf01096d4424b5c970a3ad1248148b6acc164554a",
+    "workers/typescript/package-lock.json": "de737e95cf5db78a99014f6a9cafcc663aca8e0fe7e217e388ffba0a098af4cf",
+    "workers/typescript/package.json": "b24b7d09a5b158a0e9e5ec3cf17be3ef759ab71c2f2a9c93ae27a43ec9f036b7",
+    "workers/typescript/src/flow.mjs": "c3a3b050f935fe0d75964c705a1d633d6e60f44e33c7165902b508ddf53cf5c9",
+    "workers/typescript/src/parse.mjs": "862f158ba58be958fa64c9dcda713a2045006a563af3afc8ca957c1b8f3c9181",
+    "workers/typescript/tests/flow.test.mjs": "c1dfed2b9b18e86d26ee6c09507aa3eb66480648b43b4c29447102772f3481d1",
+    "workers/typescript/tests/parse.test.mjs": "4680f555e21a7d9153045f0bac4599d8365c07eccad224d66abe85b624d81807",
+    "workers/typescript/worker.mjs": "076c4ef9fc5237bddbceaf791ce9ddcde8cd175ca0b3a8bd3e5af34ed6f3a586",
+    "web/app.js": "e1fe0bc0323b648b4a882cbe9ee2d92037781e977b3cec5676b4f6b109430c7e",
+    "web/index.html": "ccefbbdedb32d929c083a4b3c2d22b0138ca3d244459a4055cd28563db4c1da8",
+    "web/style.css": "f631a3fd1f0bdcaebe0e43cda03209bf718a3ee74d9f2421e54818e205586aaf",
+    "examples/calculator/.gitignore": "48a5d69ced95acba3b51635040c664e84e79d6ec7f91d7c02927065fc3dc9e2a",
+    "examples/calculator/README.md": "061b16d98c700007e588b69f2494ca2e509d3d332ac8cf795cba3cb7fed6994a",
+    "examples/calculator/demo.mjs": "cff0c35934621b282893bfa1a773dfef9269ca797dcc59cfeee11faa16eee170",
+    "examples/calculator/package.json": "c2abd626db4f519925ad38b72892cfe5d8c8c3535b3498fdbbad6067a2fb04d9",
+    "examples/calculator/src/calculator.js": "0afcaff7359a56df83327eef88d07ee970f0e4146ffdd747668bac38ab202bcf",
+    "examples/calculator/src/input.js": "2772513957918467a339c49809266743b5d67a77d573510c2a4fc8ec61d8d277",
+    "examples/calculator/src/math.js": "fb7e55d09f200ba621a410e03568c2673bf133de5eced1c41d9dbc0ec53f4f9d",
+    "examples/flow-lab/README.md": "0e34296db5addd3c8bb19f26824588c3ae298cdcd2f451d61d177fc8f7ff8e65",
+    "examples/flow-lab/src/pipeline.js": "c9646d0007c7d09955cf6f40a10f9ef1021cdc0354cafbc6a06e900a50c774c9",
+    "scripts/demo.py": "25c6d6862c3f404ede40951bf65fe6fd882aae8b58483d19f5a4e8a33fcb1fd4",
+    "scripts/test_integration.py": "acb15cd9a25de1e940e520a0ff7c0636e691e382f7accecf0ebcd47e43e411d6",
+    "scripts/verify.py": "d7649275007108a8f7f5784ff4260fb721f86a525ceebe4578ecb892a80a5360",
+    "Cargo.toml": "79776f36dc675c16f978e32dcb1ae8a4a342ccec008d614a25b62ec4565a98c9",
+    "Cargo.lock": "d0ccb687b56f03af218e892b1e3936507f5db8b82b0c5e36f5a012405e18837f",
+    "AGENTS.md": "b4b7f3b7285397745460cf33d365e3e9c8045459ee74758d34f4acb0095c1fe9",
+    "README.md": "f3a8b6a22c274e99ed2a8891e17a9fc07023136949ab982207582357e0c26533"
+  },
+  "modus_protected_files": {
+    "checked": false
+  },
+  "current_document_links": {
+    "errors": [],
+    "scope": "new current entry docs only; original imported requirement links retain Modus context"
+  },
+  "status": "PASS"
+}

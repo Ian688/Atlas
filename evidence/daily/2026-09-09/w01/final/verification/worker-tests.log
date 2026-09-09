@@ -1,0 +1,30 @@
+✔ flow IR carries version, profile and per-function anchors (71.680408ms)
+✔ block shadowing produces distinct binding ids (D01) (12.966235ms)
+✔ TDZ use-before-declare still resolves to the real binding (D01) (44.26751ms)
+✔ short-circuit and conditional operators become structured control (D02) (3.855515ms)
+✔ try/catch/finally lowers with catch param binding and anchors (D03/D04) (5.243883ms)
+✔ labeled break/continue keep labels (D05) (6.303165ms)
+✔ unsupported constructs are explicit unknowns with reasons (profile boundary) (8.431224ms)
+✔ module peers resolve to bindings and are recorded as captures (D14 setup) (3.422388ms)
+✔ object and array literals keep field names and element anchors (5.964188ms)
+✔ destructuring declarations become explicit unknowns, not silent copies (profile) (5.55331ms)
+✔ alpha-renaming preserves flow structure modulo identity (D21) (15.203091ms)
+✔ cross-file alias and re-export resolve using captured sources (120.435682ms)
+✔ lexical shadowing does not bind to a global namesake (5.572131ms)
+✔ reassigned function declarations are marked; indirect and constructor calls stay unknown (19.923734ms)
+✔ duplicate script declarations are ambiguous, not first-declaration wins (3.21134ms)
+✔ UTF-8 byte spans retain Chinese and emoji source anchors (8.322807ms)
+✔ nested calls with identical start offsets have distinct full-span IDs (3.372741ms)
+✔ compiler host never falls back to ambient source or config reads (7.98582ms)
+✔ syntax failures and dynamic language features are explicit (5.178336ms)
+✔ request isolation rejects traversal and duplicates; source is never evaluated (7.105887ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1190.925894
+npm notice run @atlas/typescript-worker@0.1.0 test
+npm notice run node --test tests/*.test.mjs

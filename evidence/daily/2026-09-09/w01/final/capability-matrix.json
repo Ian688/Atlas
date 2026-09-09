@@ -1,0 +1,158 @@
+{
+  "schema": "atlas.capability-matrix.v1",
+  "window": "2026-09-09/w01",
+  "generated_utc": "2026-09-09T03:20:00+08:00",
+  "status_semantics": {
+    "implementation": "NOT_IMPLEMENTED | PARTIAL | IMPLEMENTED",
+    "automated_checks": "NOT_RUN | PASS | FAIL | BLOCKED (scoped to the named command)",
+    "qualification": "NOT_QUALIFIED | QUALIFIED_WITHIN_PROFILE",
+    "review_status": "NOT_REQUESTED | NEEDS_INDEPENDENT_REVIEW | ACCEPTED | CHANGES_REQUIRED"
+  },
+  "capabilities": [
+    {
+      "id": "W00-baseline-and-evidence-isolation",
+      "implementation": "IMPLEMENTED",
+      "automated_checks": "PASS",
+      "check_scope": "python3 scripts/verify.py --label w01-final --out evidence/daily/2026-09-09/w01/final/verification (9/9 exit 0); baseline run identical before changes",
+      "qualification": "QUALIFIED_WITHIN_PROFILE",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "evidence": [
+        "evidence/daily/2026-09-09/w01/baseline/source-manifest.json (54 files, foundation 35 hashes all match)",
+        "evidence/daily/2026-09-09/w01/baseline/verification/verification.json",
+        "scripts/verify.py"
+      ],
+      "limits": [
+        "Modus protection check is optional and reports cannot-verify without a baseline; it asserts nothing by default",
+        "With no git HEAD, git diff --check inspects almost nothing; recorded, not hidden"
+      ]
+    },
+    {
+      "id": "W01-worker-flow-ir",
+      "implementation": "IMPLEMENTED",
+      "automated_checks": "PASS",
+      "check_scope": "npm test --prefix workers/typescript (20/20)",
+      "qualification": "QUALIFIED_WITHIN_PROFILE",
+      "profile": "atlas.flow-ir.v1 / js-structured-control.v1 / typescript/5.9.3;worker/0.2.0",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "evidence": [
+        "workers/typescript/src/flow.mjs",
+        "crates/atlas-contract/src/flow.rs",
+        "crates/atlas-engine/src/flow.rs (validate_flow)",
+        "workers/typescript/tests/flow.test.mjs"
+      ],
+      "limits": [
+        "Profile-external constructs (for-of/in, destructuring, async/await, generators, class bodies, with, delete, spread, element access, template substitution, regex values, logical assignment) are explicit unknowns with anchors/reasons",
+        "Module-level mutable state is not tracked; references from functions are captures with unknown values",
+        "Budgets: <=20k statements/function; block/op overruns reject the whole function"
+      ]
+    },
+    {
+      "id": "W02-cfg-completion-semantics",
+      "implementation": "IMPLEMENTED",
+      "automated_checks": "PASS",
+      "check_scope": "cargo test --workspace --locked (flow_semantics 14/14) + flow-lab integration assertions",
+      "qualification": "QUALIFIED_WITHIN_PROFILE",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "evidence": [
+        "crates/atlas-engine/src/flow.rs (build_cfg)",
+        "crates/atlas-engine/tests/flow_semantics.rs D02/D03/D04/D05",
+        "examples/flow-lab/src/pipeline.js"
+      ],
+      "limits": [
+        "finally uses one shared completion dispatch keyed by per-path pending completion",
+        "await/yield suspend edges are NOT modeled (profile-external)",
+        "Exception edges are static may-throw classifications, not value-dependent"
+      ]
+    },
+    {
+      "id": "W03-local-abstract-interpretation",
+      "implementation": "IMPLEMENTED",
+      "automated_checks": "PASS",
+      "check_scope": "cargo test --workspace --locked (flow_semantics D01/D05/D07/D08/D09/D10/D12/D18)",
+      "qualification": "QUALIFIED_WITHIN_PROFILE",
+      "profile": "atlas-local-absint 0.1.0; caps constants=8 targets=64 origins=8 heap=32; budgets transfers<=300k, block visits<=256",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "evidence": [
+        "crates/atlas-engine/src/solve.rs",
+        "crates/atlas-engine/tests/flow_semantics.rs"
+      ],
+      "limits": [
+        "Heap is flat (site, field) with wildcard merging; no nested field paths, arrays unmodeled",
+        "Constant folding covers only the declared operator set; bitwise and most ToPrimitive paths stay Top with reasons",
+        "Number-to-string folds only for integral |n| < 1e21; other numerics in concatenation stay unknown",
+        "TDZ reads are may-throw with reasons; init states join through branches"
+      ]
+    },
+    {
+      "id": "W04-interprocedural-summaries",
+      "implementation": "IMPLEMENTED",
+      "automated_checks": "PASS",
+      "check_scope": "cargo test --workspace --locked (flow_semantics d13/d14/d15/d17) + flow-lab indirect integration assertion",
+      "qualification": "QUALIFIED_WITHIN_PROFILE",
+      "profile": "symbolic per-function summaries; Parameter origins re-based per callsite; SCC condensation, callee-first; <=32 rounds per cyclic SCC",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "evidence": [
+        "crates/atlas-engine/src/inter.rs",
+        "crates/atlas-engine/tests/flow_semantics.rs",
+        "examples/flow-lab/src/pipeline.js (indirect)"
+      ],
+      "limits": [
+        "k=0 context pooling with per-callsite re-basing; k=1 contexts not implemented",
+        "Capture origins are not re-substituted at callsites (declared limitation)",
+        "Unknown callees keep Top plus unknown_call effects; callee summaries pending are never read as no-return/no-throw",
+        "Called functions' effects join the caller state; receiver/property-call targets stay unknown"
+      ]
+    },
+    {
+      "id": "W05-storage-query-panel",
+      "implementation": "IMPLEMENTED",
+      "automated_checks": "PASS",
+      "check_scope": "python3 scripts/test_integration.py (12/12; includes D22 full pipeline, HTTP flow endpoints, old-version isolation, invented-symbol rejection, getter non-execution, external-call effects, finally-nesting linearity, alpha-renaming equivalence, corrupted-blob recovery, multi-project isolation with concurrent duplicate index)",
+      "qualification": "QUALIFIED_WITHIN_PROFILE",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "evidence": [
+        "crates/atlas-engine/src/store.rs (facts table, publish_analysis_with_flow, flow_fact)",
+        "crates/atlas-engine/src/query.rs (flow_symbols)",
+        "crates/atlas-app/src/main.rs (flows/flow)",
+        "crates/atlas-app/src/server.rs (/api/flow, /api/flows)",
+        "web/app.js renderFlow + evidence/daily/2026-09-09/w01/final/artifacts/flow-panel-branchpick.png, flow-panel-interproc.png"
+      ],
+      "limits": [
+        "flow fact JSON bounded by solver budgets and MAX_LISTED_BINDINGS=64",
+        "Panel consumes the same served facts; no UI-only derivation",
+        "No large-project qualification: 13-function fixture plus prior synthetic samples"
+      ]
+    },
+    {
+      "id": "W06-jobs-and-resources",
+      "implementation": "PARTIAL",
+      "automated_checks": "PASS",
+      "check_scope": "cargo test (scan deadline units) + test_multi_project_store_isolation",
+      "qualification": "NOT_QUALIFIED (full job system out of scope this window)",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "evidence": [
+        "crates/atlas-engine/src/scan.rs (scan deadline: refuse + zero publication, unit-tested)",
+        "crates/atlas-app/src/main.rs (--scan-deadline-seconds, default 300, max 3600)",
+        "scripts/test_integration.py test_multi_project_store_isolation (cross-analysis queries rejected, concurrent duplicate index reaches identical terminal state)",
+        "crates/atlas-app/src/main.rs (--index-deadline-seconds default 600: remaining pipeline budget is min()ed into each stage)"
+      ],
+      "limits": [
+        "No cancel API/job queue/leases; SIGINT kills the process tree via kill_on_drop only",
+        "Blob fsync durability and database GC unchanged from foundation",
+        "Worker stage keeps its 1-600s deadline and output caps"
+      ]
+    },
+    {
+      "id": "W07-incremental / W08-execution / W09-views-agents / W10-modus",
+      "implementation": "NOT_IMPLEMENTED",
+      "automated_checks": "NOT_RUN",
+      "qualification": "NOT_QUALIFIED",
+      "review_status": "NOT_REQUESTED",
+      "evidence": [],
+      "limits": [
+        "Untouched this window; queue in docs/implementation/progress.json"
+      ]
+    }
+  ],
+  "d_family": "see docs/implementation/progress.json d_family_coverage: D01-D05,D07-D13,D14,D15,D17,D18,D20,D22 covered with named tests; D06/D11 covered at integration level; D16/D19(partial)/D21(worker-level) as noted; nothing deleted from the required table"
+}

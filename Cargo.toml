@@ -1,0 +1,25 @@
+[workspace]
+resolver = "3"
+members = ["crates/atlas-contract", "crates/atlas-engine", "crates/atlas-app"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[workspace.dependencies]
+atlas-contract = { path = "crates/atlas-contract" }
+atlas-engine = { path = "crates/atlas-engine" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+thiserror = "2"
+rusqlite = { version = "0.37", features = ["bundled"] }
+cap-std = "4.0.3"
+ignore = "0.4"
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "process", "io-util", "time", "net", "signal", "sync"] }
+axum = "0.8"
+clap = { version = "4", features = ["derive"] }
+uuid = { version = "1", features = ["v4"] }
+libc = "0.2"

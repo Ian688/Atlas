@@ -1,0 +1,32 @@
+{
+  "status": "PASS",
+  "kind": "interactive_browser_verification",
+  "time_utc": "2026-09-08T15:52:50.084403+00:00",
+  "analysis_id": "fd5cc9cc9cdb29b98ae4db43a3f361198f3d92ead603ae2c26d35eaee297d291",
+  "observations": {
+    "inventory_objects": 19,
+    "files": 7,
+    "functions": 10,
+    "call_sites": 28,
+    "calculate_related_nodes": 7,
+    "calculate_highlighted_edges": 7,
+    "calculate_dimmed_functions": 3,
+    "calculate_unresolved_calls": 8,
+    "source_matches_snapshot": true,
+    "context_visible_and_parsed_from_dom": true,
+    "context_matches_cli_selection_id": "fd171a3d3f25c5e466ef3eaf1cbaa2f0c5d885eba47580a46c086942fe271d49",
+    "reset_clears_highlight_and_disables_export": true,
+    "direct_svg_parseInput_selection": true,
+    "console_errors_or_warnings": []
+  },
+  "limits": [
+    "Browser completion of file downloads and clipboard copying not qualified. Context JSON is visible, machine-readable and independently reproduced through CLI.",
+    "Single desktop viewport inspected; responsive/device qualification pending.",
+    "Static candidate visualization, not runtime or 3D qualification."
+  ],
+  "web_hashes": {
+    "web/app.js": "0aaac48f1c893e1f5956ffaf251c9cb141a7ba64aeaf7d22402aaa19d76925d0",
+    "web/index.html": "94ee74e62dc334d4b8cea3309ba17161fdface72c4ecad2b6fddc43c55e48cae",
+    "web/style.css": "23925f602a5ae38a3887a441317b5eb41cc33630adb2416a693233505365ab56"
+  }
+}

@@ -1,0 +1,284 @@
+{
+  "context": {
+    "analysis_id": "fd5cc9cc9cdb29b98ae4db43a3f361198f3d92ead603ae2c26d35eaee297d291",
+    "disclosure": "local_only_until_explicitly_shared",
+    "entity_id": "symbol:src/calculator.js:80:258",
+    "evidence_kind": "static_candidates",
+    "limitations": [
+      "Lexical declaration candidates, not a complete runtime call graph or execution trace.",
+      "No CFG, abstract interpretation, heap/alias flow, framework models or runtime execution in this slice.",
+      "Snapshot captures files over an interval; it is not an atomic filesystem transaction.",
+      "Only captured UTF-8 JS/TS inputs; external dependencies, standard library and project tsconfig are not loaded.",
+      "Ignored directories are explicit boundaries; their unvisited descendants are not counted."
+    ],
+    "relations": {
+      "analysis_id": "fd5cc9cc9cdb29b98ae4db43a3f361198f3d92ead603ae2c26d35eaee297d291",
+      "direction": "out",
+      "edges": [
+        {
+          "basis": "lexical_declaration_candidate",
+          "end": 174,
+          "id": "call:src/calculator.js:154:174",
+          "kind": "call_candidate",
+          "label": "parseInput",
+          "path": "src/calculator.js",
+          "source": "symbol:src/calculator.js:80:258",
+          "start": 154,
+          "target": "symbol:src/input.js:138:289"
+        },
+        {
+          "basis": "lexical_declaration_candidate",
+          "end": 213,
+          "id": "call:src/calculator.js:192:213",
+          "kind": "call_candidate",
+          "label": "parseInput",
+          "path": "src/calculator.js",
+          "source": "symbol:src/calculator.js:80:258",
+          "start": 192,
+          "target": "symbol:src/input.js:138:289"
+        },
+        {
+          "basis": "lexical_declaration_candidate",
+          "end": 255,
+          "id": "call:src/calculator.js:224:255",
+          "kind": "call_candidate",
+          "label": "evaluate",
+          "path": "src/calculator.js",
+          "source": "symbol:src/calculator.js:80:258",
+          "start": 224,
+          "target": "symbol:src/math.js:241:497"
+        },
+        {
+          "basis": "lexical_declaration_candidate",
+          "end": 286,
+          "id": "call:src/input.js:258:286",
+          "kind": "call_candidate",
+          "label": "validateNumber",
+          "path": "src/input.js",
+          "source": "symbol:src/input.js:138:289",
+          "start": 258,
+          "target": "symbol:src/input.js:0:136"
+        },
+        {
+          "basis": "lexical_declaration_candidate",
+          "end": 350,
+          "id": "call:src/math.js:334:350",
+          "kind": "call_candidate",
+          "label": "add",
+          "path": "src/math.js",
+          "source": "symbol:src/math.js:241:497",
+          "start": 334,
+          "target": "symbol:src/math.js:0:57"
+        },
+        {
+          "basis": "lexical_declaration_candidate",
+          "end": 394,
+          "id": "call:src/math.js:373:394",
+          "kind": "call_candidate",
+          "label": "subtract",
+          "path": "src/math.js",
+          "source": "symbol:src/math.js:241:497",
+          "start": 373,
+          "target": "symbol:src/math.js:58:120"
+        },
+        {
+          "basis": "lexical_declaration_candidate",
+          "end": 436,
+          "id": "call:src/math.js:417:436",
+          "kind": "call_candidate",
+          "label": "divide",
+          "path": "src/math.js",
+          "source": "symbol:src/math.js:241:497",
+          "start": 417,
+          "target": "symbol:src/math.js:121:239"
+        }
+      ],
+      "frontier": [],
+      "nodes": [
+        {
+          "disposition": "syntax_extracted",
+          "end": 258,
+          "function_count": 0,
+          "id": "symbol:src/calculator.js:80:258",
+          "kind": "function",
+          "name": "calculate",
+          "parent": "file:src/calculator.js",
+          "path": "src/calculator.js",
+          "start": 80
+        },
+        {
+          "disposition": "syntax_extracted",
+          "end": 136,
+          "function_count": 0,
+          "id": "symbol:src/input.js:0:136",
+          "kind": "function",
+          "name": "validateNumber",
+          "parent": "file:src/input.js",
+          "path": "src/input.js",
+          "start": 0
+        },
+        {
+          "disposition": "syntax_extracted",
+          "end": 289,
+          "function_count": 0,
+          "id": "symbol:src/input.js:138:289",
+          "kind": "function",
+          "name": "parseInput",
+          "parent": "file:src/input.js",
+          "path": "src/input.js",
+          "start": 138
+        },
+        {
+          "disposition": "syntax_extracted",
+          "end": 57,
+          "function_count": 0,
+          "id": "symbol:src/math.js:0:57",
+          "kind": "function",
+          "name": "add",
+          "parent": "file:src/math.js",
+          "path": "src/math.js",
+          "start": 0
+        },
+        {
+          "disposition": "syntax_extracted",
+          "end": 239,
+          "function_count": 0,
+          "id": "symbol:src/math.js:121:239",
+          "kind": "function",
+          "name": "divide",
+          "parent": "file:src/math.js",
+          "path": "src/math.js",
+          "start": 121
+        },
+        {
+          "disposition": "syntax_extracted",
+          "end": 497,
+          "function_count": 0,
+          "id": "symbol:src/math.js:241:497",
+          "kind": "function",
+          "name": "evaluate",
+          "parent": "file:src/math.js",
+          "path": "src/math.js",
+          "start": 241
+        },
+        {
+          "disposition": "syntax_extracted",
+          "end": 120,
+          "function_count": 0,
+          "id": "symbol:src/math.js:58:120",
+          "kind": "function",
+          "name": "subtract",
+          "parent": "file:src/math.js",
+          "path": "src/math.js",
+          "start": 58
+        }
+      ],
+      "root": "symbol:src/calculator.js:80:258",
+      "semantics": "transitive lexical candidate reachability; not runtime paths; inbound unresolved callers cannot be enumerated",
+      "truncated": false,
+      "unresolved": [
+        {
+          "basis": "dynamic_external_or_missing_binding",
+          "end": 191,
+          "id": "call:src/input.js:179:191",
+          "kind": "call_candidate",
+          "label": "String",
+          "path": "src/input.js",
+          "source": "symbol:src/input.js:138:289",
+          "start": 179,
+          "target": null
+        },
+        {
+          "basis": "dynamic_external_or_missing_binding",
+          "end": 198,
+          "id": "call:src/input.js:179:198",
+          "kind": "call_candidate",
+          "label": "String(text).trim",
+          "path": "src/input.js",
+          "source": "symbol:src/input.js:138:289",
+          "start": 179,
+          "target": null
+        },
+        {
+          "basis": "dynamic_external_or_missing_binding",
+          "end": 247,
+          "id": "call:src/input.js:213:247",
+          "kind": "call_candidate",
+          "label": "Error",
+          "path": "src/input.js",
+          "source": "symbol:src/input.js:138:289",
+          "start": 213,
+          "target": null
+        },
+        {
+          "basis": "dynamic_external_or_missing_binding",
+          "end": 285,
+          "id": "call:src/input.js:273:285",
+          "kind": "call_candidate",
+          "label": "Number",
+          "path": "src/input.js",
+          "source": "symbol:src/input.js:138:289",
+          "start": 273,
+          "target": null
+        },
+        {
+          "basis": "dynamic_external_or_missing_binding",
+          "end": 490,
+          "id": "call:src/math.js:457:490",
+          "kind": "call_candidate",
+          "label": "Error",
+          "path": "src/math.js",
+          "source": "symbol:src/math.js:241:497",
+          "start": 457,
+          "target": null
+        },
+        {
+          "basis": "dynamic_external_or_missing_binding",
+          "end": 69,
+          "id": "call:src/input.js:47:69",
+          "kind": "call_candidate",
+          "label": "Number.isFinite",
+          "path": "src/input.js",
+          "source": "symbol:src/input.js:0:136",
+          "start": 47,
+          "target": null
+        },
+        {
+          "basis": "dynamic_external_or_missing_binding",
+          "end": 117,
+          "id": "call:src/input.js:77:117",
+          "kind": "call_candidate",
+          "label": "Error",
+          "path": "src/input.js",
+          "source": "symbol:src/input.js:0:136",
+          "start": 77,
+          "target": null
+        },
+        {
+          "basis": "dynamic_external_or_missing_binding",
+          "end": 213,
+          "id": "call:src/math.js:184:213",
+          "kind": "call_candidate",
+          "label": "Error",
+          "path": "src/math.js",
+          "source": "symbol:src/math.js:121:239",
+          "start": 184,
+          "target": null
+        }
+      ]
+    },
+    "schema": "atlas.selection-context.v1",
+    "source": {
+      "analysis_id": "fd5cc9cc9cdb29b98ae4db43a3f361198f3d92ead603ae2c26d35eaee297d291",
+      "blob": "0afcaff7359a56df83327eef88d07ee970f0e4146ffdd747668bac38ab202bcf",
+      "content": "export function calculate(leftText, operator, rightText) {\n  const left = parseInput(leftText);\n  const right = parseInput(rightText);\n  return evaluate(operator, left, right);\n}",
+      "end": 258,
+      "entity_id": "symbol:src/calculator.js:80:258",
+      "path": "src/calculator.js",
+      "snapshot_id": "d7c9a2ce10e70d2e0ab02c67fdb012e22246c9ebd7669e7a73eba87ffd3de7b6",
+      "start": 80,
+      "truncated": false
+    }
+  },
+  "selection_id": "fd171a3d3f25c5e466ef3eaf1cbaa2f0c5d885eba47580a46c086942fe271d49"
+}

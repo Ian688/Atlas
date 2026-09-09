@@ -1,0 +1,93 @@
+{
+  "schema": "atlas.review-requests.v1",
+  "window": "2026-09-09/w01",
+  "reviewer_entry": "Re-run: python3 scripts/verify.py --label review --out evidence/daily/<date>/review; then the commands below. All conclusions below are implementer-self-tested only and are NOT independent acceptance.",
+  "requests": [
+    {
+      "id": "R1-finally-completion-semantics",
+      "claim": "finally 保留原 completion 与环境修改;finally 自身 return/throw 覆盖;空 finally 不恢复被覆盖的绑定(D03/D04,原 AL-05/ET-12)",
+      "where": "crates/atlas-engine/src/flow.rs lower_try + Term::Dispatch; crates/atlas-engine/src/solve.rs propagate(Dispatch)",
+      "minimal_cases": [
+        "let g = fastPath; try { g = slowPath; } finally {} return g;  → 仅 slowPath",
+        "try { return 1; } finally {}  → 返回 1",
+        "try { return 1; } finally { return 2; }  → 仅返回 2,无 dispatch 残留"
+      ],
+      "replay": "cargo test -p atlas-engine --test flow_semantics; python3 scripts/test_integration.py Integration.test_flow_facts_through_real_worker_store_cli_and_http",
+      "risk": "Dispatch 边与 completion Multiple 状态的组合;嵌套 finally 链(clearcase 路由表 captured_breaks/continues)只有单元级覆盖,无嵌套 finally 集成样例"
+    },
+    {
+      "id": "R2-short-circuit-path-sensitivity",
+      "claim": "false && 与 'x' ?? 的 RHS 副作用不可达且被剪枝记录;'??' 分支方向为 nullish→RHS(D02)",
+      "where": "crates/atlas-engine/src/flow.rs eval_expr ShortCircuit arm(路径内临时变量方案)",
+      "minimal_cases": [
+        "const never = false && effect(); const always = 'x' ?? effect();  → effect 无 unknown_call,pruned_edges>0,返回 false"
+      ],
+      "replay": "python3 scripts/test_integration.py Integration.test_flow_facts_through_real_worker_store_cli_and_http",
+      "risk": "实现历史中曾出现 ?? 方向反置与 JoinValues 伪路径合并两个已修复 bug;建议复审者特别扰动该 arm"
+    },
+    {
+      "id": "R3-loop-fixpoint-and-loop-heap-weakening",
+      "claim": "循环合流收敛到不动点;循环内分配点强制弱更新,不因分配点唯一而强更新(D05/ET-18)",
+      "where": "crates/atlas-engine/src/solve.rs (worklist, looping_blocks 用法)",
+      "minimal_cases": [
+        "countdown: while 循环累计后退出值 join 初值与循环值,状态 complete_within_profile",
+        "循环内 obj={} 再写字段 → 后续读取不得声称唯一对象强更新(当前由 looping_blocks 弱化)"
+      ],
+      "replay": "cargo test -p atlas-engine --test flow_semantics d05; python3 scripts/test_integration.py(含 countdown 断言)",
+      "risk": "无专项的循环内分配+字段写单测;looping_blocks 弱化逻辑只被代码路径覆盖,没有直接反例"
+    },
+    {
+      "id": "R4-worker-boundary-honesty",
+      "claim": "声明 profile 外构造均为显式 unknown(带原因与锚点);worker 不执行被分析代码;校验拒绝外来/重复/越界 ID(D06/D20/ET-37 方向)",
+      "where": "workers/typescript/src/flow.mjs;crates/atlas-engine/src/flow.rs validate_flow;analyze.rs 接线",
+      "minimal_cases": [
+        "for (const h of handlers) h();  → unknown_stmt for_in_of_iteration + FLOW_UNKNOWN_REGION 诊断进入 analysis.diagnostics",
+        "构造重复 binding id / 未知 capture / 越界锚点的 FlowFacts JSON → validate_flow 拒绝"
+      ],
+      "replay": "npm test --prefix workers/typescript;以及手工向 store 提交被篡改 facts 的负例(当前 validate_flow 负例只有单元级,建议复审者自行构造 JSON)",
+      "risk": "validate_flow 的负例覆盖主要靠代码审查;集成层只有查询侧负例"
+    },
+    {
+      "id": "R5-analysis-identity-binds-derived-facts",
+      "claim": "flow_digest 把派生事实内容绑定到 analysis id;旧分析在新索引后 facts 仍可读且不变(D20/AL-12)",
+      "where": "crates/atlas-engine/src/analyze.rs (flow_digest);store.publish_analysis_with_flow",
+      "minimal_cases": [
+        "修改源码重索引 → 新 analysis id;旧 id 的 flow fact 仍返回 Parameter(0) 等原值",
+        "同 id 重发布幂等"
+      ],
+      "replay": "python3 scripts/test_integration.py Integration.test_flow_facts_through_real_worker_store_cli_and_http",
+      "risk": "已知缺口:同 producer/engine 版本但 worker 降级逻辑变化时,analysis id 不变而 facts 内容可能不同——当前通过确定性(worker 输入→输出)缓解,未从合同上封死;建议下一窗口把 worker flow IR 的 hash 也纳入 flow_digest 输入"
+    },
+    {
+      "id": "R6-interprocedural-summary-soundness",
+      "claim": "符号摘要按调用点代回:不同 caller 实参/返回不串线;互递归 SCC 有限轮收敛,pending 不充当 no-return 证明;call 边与 forwarded 数据 origin 分开(D13/D14/D15/D17)",
+      "where": "crates/atlas-engine/src/inter.rs + solve.rs Call arm(apply_summary_value)",
+      "minimal_cases": [
+        "identity(5) 与 identity(g) 两个 caller 各取回自身 origin",
+        "chain0..chain5 五层转发后 Constant 仍在 entry 返回",
+        "isEven/isOdd 互递归收敛,返回含 true/false 基例,无 no_return_observed",
+        "compute(i)=parse(i) 返回 Parameter(0)(forwarded),callsite.targets=[parse]"
+      ],
+      "replay": "cargo test -p atlas-engine --test flow_semantics;python3 scripts/test_integration.py Integration.test_flow_facts_through_real_worker_store_cli_and_http",
+      "risk": "k=0 上下文池化+调用点重代回是声明的精度选择;Capture origin 不重代入;未做 k=1。复审者可用更深的链或分支参数构造扰动"
+    },
+    {
+      "id": "R7-scan-deadline-and-isolation",
+      "claim": "扫描阶段整体 deadline 超限零发布;多项目同库隔离且跨 analysis 查询被拒;并发重复 index 幂等同终态(W06 部分)",
+      "where": "crates/atlas-engine/src/scan.rs;scripts/test_integration.py test_multi_project_store_isolation",
+      "minimal_cases": [
+        "scan(deadline=0) → scan_deadline_exceeded 且 snapshots 表为空",
+        "两项目一库:flow/source 跨 analysis 查询非零退出",
+        "并发两个 index 同项目 → 同 analysis id"
+      ],
+      "replay": "cargo test -p atlas-engine --lib scan::tests;python3 scripts/test_integration.py Integration.test_multi_project_store_isolation",
+      "risk": "取消信号/作业队列/租约未实现;SIGINT 依赖 kill_on_drop"
+    }
+  ],
+  "known_gaps_for_reviewer_attention": [
+    "k=1 上下文敏感摘要未实现(声明 k=0+调用点重代回);不要把 callee_summary 当作上下文敏感结果",
+    "面板显示是同一 facts 的投影;HTTP 200/DOM 文本单独不证明图正确(集成断言检查具体值)",
+    "examples/flow-lab 的断言先于输出从 JS 语义写出,但仍是实现者编写;复审者应选择未参与的扰动输入",
+    "D16/D19(高扇出深链专项)/D21(Rust 层)仍缺专项反例;D21 目前只有 worker 层结构等价测试"
+  ]
+}

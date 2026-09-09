@@ -1,0 +1,46 @@
+
+running 1 test
+test worker::tests::deadline_kills_worker_and_output_cap_is_effective ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 8 tests
+test concurrent_blob_publication_is_immutable_and_corruption_fails_closed ... ok
+test reject_incomplete_worker_results_and_invalid_anchors_without_publication ... ok
+test symlinks_never_import_external_contents_and_targets_affect_identity ... ok
+test nested_ignore_rules_and_budgets_keep_explicit_boundaries ... ok
+test immutable_snapshots_survive_source_and_catalog_changes ... ok
+test byte_windows_never_split_utf8_and_unparseable_bytes_are_reported ... ok
+test scc_handles_deep_graph_without_recursion_and_reports_cycles ... ok
+test reachability_is_transitive_bounded_and_revision_bound ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.90s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.29s
+     Running unittests src/main.rs (target/debug/deps/atlas-83a0f6268007fac6)
+     Running unittests src/lib.rs (target/debug/deps/atlas_contract-08b7b5180930da26)
+     Running unittests src/lib.rs (target/debug/deps/atlas_engine-78c5033868acd335)
+     Running tests/foundation.rs (target/debug/deps/foundation-153e4859a447242c)
+   Doc-tests atlas_contract
+   Doc-tests atlas_engine

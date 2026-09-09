@@ -1,0 +1,57 @@
+{
+  "schema": "atlas.daily-changes.v2",
+  "window": "2026-09-09/w02",
+  "generated_utc": "2026-09-09T00:15:22.104129+00:00",
+  "baseline": {
+    "w01_final_manifest": "evidence/daily/2026-09-09/w01/final/source-manifest.json (62 files)",
+    "review_bound_hashes": "evidence/reviews/2026-09-09-w01/review-verification.json (46 product source files)"
+  },
+  "modified": [
+    "crates/atlas-app/src/main.rs",
+    "crates/atlas-engine/src/analyze.rs",
+    "crates/atlas-engine/src/facts.rs",
+    "crates/atlas-engine/src/flow.rs",
+    "crates/atlas-engine/src/inter.rs",
+    "crates/atlas-engine/src/solve.rs",
+    "crates/atlas-engine/tests/flow_semantics.rs",
+    "crates/atlas-engine/tests/foundation.rs",
+    "docs/implementation/progress.json",
+    "examples/flow-lab/src/pipeline.js",
+    "scripts/test_integration.py"
+  ],
+  "added": [],
+  "deleted": [],
+  "renamed": [],
+  "counts": {
+    "modified": 11,
+    "added": 0,
+    "deleted": 0
+  },
+  "review_bound_files_changed": [
+    "crates/.DS_Store",
+    "crates/atlas-app/src/main.rs",
+    "crates/atlas-engine/src/analyze.rs",
+    "crates/atlas-engine/src/facts.rs",
+    "crates/atlas-engine/src/flow.rs",
+    "crates/atlas-engine/src/inter.rs",
+    "crates/atlas-engine/src/solve.rs",
+    "crates/atlas-engine/tests/flow_semantics.rs",
+    "crates/atlas-engine/tests/foundation.rs",
+    "examples/flow-lab/src/pipeline.js",
+    "scripts/test_integration.py"
+  ],
+  "note": "w01 evidence is immutable history; this window's changes are measured against the w01 final manifest and the review-bound hashes.",
+  "reasons": {
+    "R1": "solve.rs 操作级异常前置状态 + flow.rs Term::Throw 带 handler(抛出值携带)",
+    "R2": "solve.rs Summary.written 堆写摘要/param 键控写/未知调用 clobber/may_call 累计",
+    "R3": "solve.rs PropertyRead 按候选对象合并:已知缺失=undefined,未知形状=Top",
+    "R4": "solve.rs fold_add/primitive 语义(true+1=2, null+1=1, NaN 传播, 拼接仅限字符串参与)",
+    "R5": "solve/inter/analyze 全阶段 deadline + MAX_TOTAL_TRANSFERS 生效 + 发布前终态核对",
+    "R6": "flow.rs validate:重复 binding 拒绝/悬空引用拒绝/FunctionRef 校验/逐函数覆盖对账",
+    "R7": "flow.rs 无绑定 catch 允许(校验+lowering)",
+    "M1": "solve.rs apply_summary_value 全维度代入(constants/targets);inter.rs 调用图重调度外层轮",
+    "M2": "solve.rs typed_constants 侧车 + Dispatch 按 completion 分派(多余不可达路径消除)",
+    "M3": "progress.json d_family_coverage 按子能力拆分,消除 covered/not_implemented 重复矛盾,D18 登记",
+    "tests": "flow_semantics.rs 新增 r2/r4/r1扰动/r5 共 5 条;test_integration.py 新增 worker IR 注入 3 例 + R7 断言"
+  }
+}

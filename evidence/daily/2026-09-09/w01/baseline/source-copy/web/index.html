@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Atlas · Local code workbench</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<header><div class="brand"><span class="mark">A</span><div><strong>ATLAS</strong><small>LOCAL CODE WORKBENCH</small></div></div><div class="head-right"><span class="pill">本地解析 · 无 LLM</span><span class="version">FOUNDATION / 01</span></div></header>
+<section id="connect" class="connect"><label for="token">本地会话令牌</label><input id="token" type="password" autocomplete="off" placeholder="从启动命令返回的 session_file 读取"><button id="connect-button">连接工作台</button><span id="status" role="status">等待连接</span></section>
+<section class="intro"><div><p class="eyebrow">UNDERSTAND BEFORE YOU CHANGE</p><h1>把代码的结构，放在眼前。</h1><p class="subtitle">从文件进入函数，沿静态调用候选探索。每个对象，都可以回到被解析时的源码。</p></div><div id="metrics" class="metrics"><div><b>—</b><span>文件</span></div><div><b>—</b><span>函数</span></div><div><b>—</b><span>调用点</span></div></div></section>
+<main>
+<aside class="explorer"><div class="section-title">项目清单 <span id="node-count">0 / 0</span></div><input id="search" type="search" aria-label="过滤已加载对象" placeholder="过滤已加载的文件与函数…"><div id="tree"></div><button id="more" hidden>加载下一页对象</button></aside>
+<section class="workbench"><div class="toolbar"><div><strong>关系工作台</strong><span class="subtle">2D / 静态候选</span></div><button id="reset">清除焦点</button></div><div class="legend"><span class="dot blue"></span>词法调用候选 <span class="dot amber"></span>未解析目标 <span id="graph-status">尚未加载</span></div><div class="canvas"><svg id="graph" viewBox="0 0 850 580" aria-label="文件与函数调用候选图" role="img"></svg><div id="empty">连接后展示本地解析结果</div></div><div class="canvas-footer"><span id="revision">固定分析版本</span><span>线条不代表实际执行或完整数据流</span></div><button id="more-edges" hidden>加载下一页关系</button></section>
+<aside class="inspector"><p class="eyebrow">INSPECT / EVIDENCE</p><h2 id="selection-name">选择一个函数</h2><p id="selection-path" class="subtle">文件、函数与关系来自同一份不可变分析。</p><div id="selection-facts" class="facts">点击图中的函数层或左侧对象，查看固定快照源码与关联候选。</div><div class="inspector-actions"><button id="export" disabled>导出选区上下文</button></div><p class="source-label">快照源码 <span>UTF-8 字节定位</span></p><pre id="source"><code>尚未选择对象</code></pre><div id="source-status" class="subtle"></div><details id="context-panel" hidden><summary>固定选区上下文 JSON</summary><textarea id="context-json" aria-label="固定选区上下文 JSON" readonly></textarea><div class="context-actions"><button id="context-copy">复制 JSON</button><a id="context-download">下载 JSON</a></div></details></aside>
+</main>
+<footer><span>结构来自本地算法。业务含义由人或后续 LLM 解释。</span><span>INDEX → SNAPSHOT → FACTS → GRAPH → CONTEXT</span></footer>
+<script src="/app.js" defer></script>
+</body></html>

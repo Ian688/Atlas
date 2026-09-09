@@ -1,0 +1,19 @@
+✔ cross-file alias and re-export resolve using captured sources (48.587429ms)
+✔ lexical shadowing does not bind to a global namesake (2.23245ms)
+✔ reassigned function declarations are marked; indirect and constructor calls stay unknown (5.898171ms)
+✔ duplicate script declarations are ambiguous, not first-declaration wins (1.660484ms)
+✔ UTF-8 byte spans retain Chinese and emoji source anchors (4.753557ms)
+✔ nested calls with identical start offsets have distinct full-span IDs (1.333973ms)
+✔ compiler host never falls back to ambient source or config reads (2.064216ms)
+✔ syntax failures and dynamic language features are explicit (2.023448ms)
+✔ request isolation rejects traversal and duplicates; source is never evaluated (3.619657ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 513.993732
+npm notice run @atlas/typescript-worker@0.1.0 test
+npm notice run node --test tests/*.test.mjs

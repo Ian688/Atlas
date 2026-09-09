@@ -1,0 +1,63 @@
+{
+  "schema": "atlas.daily-changes.v1",
+  "window": "2026-09-09/w01",
+  "generated_utc": "2026-09-08T19:28:16.276604+00:00",
+  "baseline_manifest": "evidence/daily/2026-09-09/w01/baseline/source-manifest.json",
+  "note": "baseline copy excluded .git/node_modules/target/local-state/evidence before the window; same exclusions apply here. All files were untracked at start (no HEAD), so 'modified' is measured against the controlled baseline copy.",
+  "added": [
+    "crates/atlas-contract/src/flow.rs",
+    "crates/atlas-engine/src/facts.rs",
+    "crates/atlas-engine/src/flow.rs",
+    "crates/atlas-engine/src/inter.rs",
+    "crates/atlas-engine/src/solve.rs",
+    "crates/atlas-engine/tests/flow_semantics.rs",
+    "examples/flow-lab/README.md",
+    "examples/flow-lab/src/pipeline.js",
+    "workers/typescript/src/flow.mjs",
+    "workers/typescript/tests/flow.test.mjs"
+  ],
+  "modified": [
+    "README.md",
+    "crates/atlas-app/src/main.rs",
+    "crates/atlas-app/src/server.rs",
+    "crates/atlas-app/src/worker.rs",
+    "crates/atlas-contract/src/lib.rs",
+    "crates/atlas-engine/src/analyze.rs",
+    "crates/atlas-engine/src/lib.rs",
+    "crates/atlas-engine/src/query.rs",
+    "crates/atlas-engine/src/scan.rs",
+    "crates/atlas-engine/src/store.rs",
+    "crates/atlas-engine/tests/foundation.rs",
+    "docs/ARCHITECTURE.md",
+    "docs/HANDOFF.md",
+    "docs/implementation/progress.json",
+    "scripts/test_integration.py",
+    "scripts/verify.py",
+    "web/app.js",
+    "web/index.html",
+    "web/style.css",
+    "workers/typescript/src/parse.mjs"
+  ],
+  "deleted": [
+    ".DS_Store",
+    "crates/.DS_Store"
+  ],
+  "renamed": [],
+  "counts": {
+    "added": 10,
+    "modified": 20,
+    "deleted": 2
+  },
+  "deleted_note": "deleted entries are only .DS_Store noise excluded from the controlled comparison; no source file was removed",
+  "reasons": {
+    "W00": "scripts/verify.py 参数化输出与可选 Modus 检查、失败后 not_run 记录",
+    "W01": "atlas-contract/src/flow.rs(新合同)、workers/typescript/src/flow.mjs(新降级器)、parse.mjs 接线与 producer 0.2.0、lib.rs 导出、LanguageFacts.flow",
+    "W02": "atlas-engine/src/flow.rs(新)CFG 构建、validate_flow",
+    "W03": "atlas-engine/src/solve.rs(新)局部抽象解释与 def-use",
+    "W04": "atlas-engine/src/inter.rs(新)跨过程符号摘要与 SCC 驱动;solve.rs 摘要应用/调用点观测",
+    "W05": "atlas-engine/src/facts.rs(新)、store facts 表与原子发布、query flow_symbols、CLI flows/flow、HTTP /api/flow(±s)、web 面板",
+    "W06-partial": "scan.rs 扫描整体 deadline;main.rs 索引管线 deadline 按剩余预算分配到各阶段",
+    "tests": "tests/flow_semantics.rs(14)、workers tests/flow.test.mjs(11)、examples/flow-lab、test_integration.py 新增 7 条测试(D06/D11/D19/D20/D21/多项目隔离/D22)",
+    "docs": "README/ARCHITECTURE/HANDOFF/progress.json 如实更新能力边界与限制"
+  }
+}

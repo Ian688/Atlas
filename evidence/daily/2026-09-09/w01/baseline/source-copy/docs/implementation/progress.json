@@ -1,0 +1,222 @@
+{
+  "schema": "atlas.daily-development-progress.v1",
+  "work_order_version": "1.0",
+  "prepared_on": "2026-09-09",
+  "timezone": "Asia/Shanghai",
+  "repository": "/Users/yinsijie/CodeRepo/Atlas",
+  "mode": "external_agent_daily_window",
+  "window_limit_hours": 10,
+  "active_window": null,
+  "windows": [],
+  "next_work_item": "W00",
+  "next_action": "Read DAILY_DEVELOPMENT_WORK_ORDER.md, capture actual start time and controlled source baseline, parameterize verification output, then start the real local-semantics pipeline.",
+  "baseline": {
+    "foundation_evidence": "../../evidence/foundation/verification.json",
+    "status": "REFERENCE_ONLY",
+    "dispatch_inspection": "35 recorded source/config hashes matched; no HEAD at dispatch; no product tests rerun for preparing this work order."
+  },
+  "dependency_semantics": "Prerequisites are entry conditions, not proof that all subfeatures are ready. W05 consumes each algorithm only after its corresponding semantics are verified. Runtime-dependent W09 features additionally require the relevant W08 capability. Existing Foundation is preserved; NOT_IMPLEMENTED describes each W target as a whole.",
+  "items": [
+    {
+      "id": "W00",
+      "title": "开工基线与证据隔离",
+      "prerequisites": [],
+      "contract_refs": [
+        "AL-00",
+        "AL-14",
+        "AL-15"
+      ],
+      "implementation": "NOT_IMPLEMENTED",
+      "automated_checks": "NOT_RUN",
+      "qualification": "NOT_QUALIFIED",
+      "review_status": "NOT_REQUESTED",
+      "features": [],
+      "evidence": [],
+      "blockers": []
+    },
+    {
+      "id": "W01",
+      "title": "语言材料与版本化 Flow IR",
+      "prerequisites": [
+        "W00"
+      ],
+      "contract_refs": [
+        "AL-01",
+        "AL-02",
+        "AL-04"
+      ],
+      "implementation": "NOT_IMPLEMENTED",
+      "automated_checks": "NOT_RUN",
+      "qualification": "NOT_QUALIFIED",
+      "review_status": "NOT_REQUESTED",
+      "features": [],
+      "evidence": [],
+      "blockers": []
+    },
+    {
+      "id": "W02",
+      "title": "CFG 与完成语义",
+      "prerequisites": [
+        "W01"
+      ],
+      "contract_refs": [
+        "AL-05"
+      ],
+      "implementation": "NOT_IMPLEMENTED",
+      "automated_checks": "NOT_RUN",
+      "qualification": "NOT_QUALIFIED",
+      "review_status": "NOT_REQUESTED",
+      "features": [],
+      "evidence": [],
+      "blockers": []
+    },
+    {
+      "id": "W03",
+      "title": "局部抽象解释与数据来源",
+      "prerequisites": [
+        "W02"
+      ],
+      "contract_refs": [
+        "AL-06"
+      ],
+      "implementation": "NOT_IMPLEMENTED",
+      "automated_checks": "NOT_RUN",
+      "qualification": "NOT_QUALIFIED",
+      "review_status": "NOT_REQUESTED",
+      "features": [],
+      "evidence": [],
+      "blockers": []
+    },
+    {
+      "id": "W04",
+      "title": "调用点与跨过程摘要",
+      "prerequisites": [
+        "W03"
+      ],
+      "contract_refs": [
+        "AL-07",
+        "AL-08"
+      ],
+      "implementation": "NOT_IMPLEMENTED",
+      "automated_checks": "NOT_RUN",
+      "qualification": "NOT_QUALIFIED",
+      "review_status": "NOT_REQUESTED",
+      "features": [],
+      "evidence": [],
+      "blockers": []
+    },
+    {
+      "id": "W05",
+      "title": "不可变存储、查询与真实函数面板",
+      "prerequisites": [
+        "W01"
+      ],
+      "contract_refs": [
+        "AL-12",
+        "AL-14"
+      ],
+      "implementation": "NOT_IMPLEMENTED",
+      "automated_checks": "NOT_RUN",
+      "qualification": "NOT_QUALIFIED",
+      "review_status": "NOT_REQUESTED",
+      "features": [],
+      "evidence": [],
+      "blockers": []
+    },
+    {
+      "id": "W06",
+      "title": "作业所有权、取消恢复与资源边界",
+      "prerequisites": [
+        "W05"
+      ],
+      "contract_refs": [
+        "AL-15"
+      ],
+      "implementation": "NOT_IMPLEMENTED",
+      "automated_checks": "NOT_RUN",
+      "qualification": "NOT_QUALIFIED",
+      "review_status": "NOT_REQUESTED",
+      "features": [],
+      "evidence": [],
+      "blockers": []
+    },
+    {
+      "id": "W07",
+      "title": "增量失效、事实撤回与真实项目规模",
+      "prerequisites": [
+        "W04",
+        "W06"
+      ],
+      "contract_refs": [
+        "AL-11",
+        "GE-2",
+        "GE-3"
+      ],
+      "implementation": "NOT_IMPLEMENTED",
+      "automated_checks": "NOT_RUN",
+      "qualification": "NOT_QUALIFIED",
+      "review_status": "NOT_REQUESTED",
+      "features": [],
+      "evidence": [],
+      "blockers": []
+    },
+    {
+      "id": "W08",
+      "title": "执行画像与受控函数/场景测试",
+      "prerequisites": [
+        "W04",
+        "W06"
+      ],
+      "contract_refs": [
+        "AL-16",
+        "AL-13"
+      ],
+      "implementation": "NOT_IMPLEMENTED",
+      "automated_checks": "NOT_RUN",
+      "qualification": "NOT_QUALIFIED",
+      "review_status": "NOT_REQUESTED",
+      "features": [],
+      "evidence": [],
+      "blockers": []
+    },
+    {
+      "id": "W09",
+      "title": "正式双视图与 Agent/AI Coding",
+      "prerequisites": [
+        "W05",
+        "W06"
+      ],
+      "contract_refs": [
+        "DV",
+        "HI",
+        "MT"
+      ],
+      "implementation": "NOT_IMPLEMENTED",
+      "automated_checks": "NOT_RUN",
+      "qualification": "NOT_QUALIFIED",
+      "review_status": "NOT_REQUESTED",
+      "features": [],
+      "evidence": [],
+      "blockers": []
+    },
+    {
+      "id": "W10",
+      "title": "Modus 接缝与旧实现退役",
+      "prerequisites": [
+        "W06",
+        "W09"
+      ],
+      "contract_refs": [
+        "HI"
+      ],
+      "implementation": "NOT_IMPLEMENTED",
+      "automated_checks": "NOT_RUN",
+      "qualification": "NOT_QUALIFIED",
+      "review_status": "NOT_REQUESTED",
+      "features": [],
+      "evidence": [],
+      "blockers": []
+    }
+  ],
+  "independent_reviews": []
+}

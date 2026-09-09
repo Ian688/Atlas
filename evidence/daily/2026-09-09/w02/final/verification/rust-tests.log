@@ -1,0 +1,73 @@
+
+running 1 test
+test worker::tests::deadline_kills_worker_and_output_cap_is_effective ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test scan::tests::scan_deadline_refuses_and_publishes_nothing ... ok
+test scan::tests::scan_within_deadline_publishes_snapshot ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+
+running 19 tests
+test d01_tdz_read_is_reported ... ok
+test d02_short_circuit_rhs_reachability ... ok
+test d04_finally_preserves_completion_but_not_old_env ... ok
+test d03_finally_completion_preserve_and_override ... ok
+test d09_alias_and_wildcard_heap_updates ... ok
+test d12_identity_preserves_parameter_origin ... ok
+test d07_d08_candidate_sets_and_strong_update ... ok
+test d18_branch_conditions_stay_possible_without_execution_claims ... ok
+test d05_loop_fixpoint_and_carried_update ... ok
+test r1_perturbation_throw_ordering_keeps_partial_state ... ok
+test d17_forwarding_keeps_call_and_data_edges_distinct ... ok
+test r4_primitive_addition_matrix ... ok
+test r2_known_setter_write_rebases_to_caller_object ... ok
+test d13_caller_isolation_through_summary ... ok
+test r2_unknown_call_clobbers_escaped_objects ... ok
+test d10_cap_overflow_becomes_top_with_reason ... ok
+test r5_expired_deadline_aborts_derivation ... ok
+test d15_mutual_recursion_converges_without_negative_proof ... ok
+test d14_five_layer_chain_propagates_origin ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 8 tests
+test concurrent_blob_publication_is_immutable_and_corruption_fails_closed ... ok
+test reject_incomplete_worker_results_and_invalid_anchors_without_publication ... ok
+test symlinks_never_import_external_contents_and_targets_affect_identity ... ok
+test nested_ignore_rules_and_budgets_keep_explicit_boundaries ... ok
+test immutable_snapshots_survive_source_and_catalog_changes ... ok
+test byte_windows_never_split_utf8_and_unparseable_bytes_are_reported ... ok
+test scc_handles_deep_graph_without_recursion_and_reports_cycles ... ok
+test reachability_is_transitive_bounded_and_revision_bound ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.86s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.29s
+     Running unittests src/main.rs (target/debug/deps/atlas-83a0f6268007fac6)
+     Running unittests src/lib.rs (target/debug/deps/atlas_contract-08b7b5180930da26)
+     Running unittests src/lib.rs (target/debug/deps/atlas_engine-78c5033868acd335)
+     Running tests/flow_semantics.rs (target/debug/deps/flow_semantics-30b871632a50cba8)
+     Running tests/foundation.rs (target/debug/deps/foundation-153e4859a447242c)
+   Doc-tests atlas_contract
+   Doc-tests atlas_engine

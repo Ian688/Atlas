@@ -1,0 +1,540 @@
+import ts from 'typescript';
+
+/**
+ * Lowers parsed function bodies into the versioned Flow IR
+ * (atlas.flow-ir.v1, profile js-structured-control.v1).
+ *
+ * Evaluation order is encoded by tree order and flattened deterministically by
+ * the Rust engine. Constructs outside the declared profile become explicit
+ * unknowns with source anchors and reasons; they never silently disappear.
+ * This module only reads compiler structures — it never executes analyzed code.
+ */
+
+const SHORT_CIRCUIT = new Set([
+  ts.SyntaxKind.AmpersandAmpersandToken,
+  ts.SyntaxKind.BarBarToken,
+  ts.SyntaxKind.QuestionQuestionToken,
+]);
+const LOGICAL_ASSIGN = new Set([
+  ts.SyntaxKind.AmpersandAmpersandEqualsToken,
+  ts.SyntaxKind.BarBarEqualsToken,
+  ts.SyntaxKind.QuestionQuestionEqualsToken,
+]);
+const ASSIGNMENT_OPS = new Map([
+  [ts.SyntaxKind.EqualsToken, '='],
+  [ts.SyntaxKind.PlusEqualsToken, '+='],
+  [ts.SyntaxKind.MinusEqualsToken, '-='],
+  [ts.SyntaxKind.AsteriskEqualsToken, '*='],
+  [ts.SyntaxKind.SlashEqualsToken, '/='],
+  [ts.SyntaxKind.PercentEqualsToken, '%='],
+  [ts.SyntaxKind.AsteriskAsteriskEqualsToken, '**='],
+]);
+const UNARY_OPS = new Set([
+  ts.SyntaxKind.ExclamationToken,
+  ts.SyntaxKind.TildeToken,
+  ts.SyntaxKind.MinusToken,
+  ts.SyntaxKind.PlusToken,
+  ts.SyntaxKind.TypeOfKeyword,
+  ts.SyntaxKind.VoidKeyword,
+]);
+const VAR_KEYWORDS = new Map([
+  [ts.SyntaxKind.LetKeyword, 'let'],
+  [ts.SyntaxKind.ConstKeyword, 'const'],
+  [ts.SyntaxKind.VarKeyword, 'var'],
+]);
+
+export function buildFlow(context) {
+  const flow = {
+    schema: 'atlas.flow-ir.v1',
+    snapshot_id: context.snapshotId,
+    producer: `typescript/${ts.version};worker/0.2.0`,
+    profile: 'js-structured-control.v1',
+    functions: [],
+    diagnostics: [],
+  };
+  for (const [, fileContext] of context.files) {
+    new FileBuilder(fileContext, context, flow).buildFile();
+  }
+  flow.functions.sort((a, b) => a.symbol.localeCompare(b.symbol, 'en'));
+  flow.diagnostics.sort((a, b) => a.path.localeCompare(b.path, 'en') || a.code.localeCompare(b.code, 'en'));
+  return flow;
+}
+
+class FileBuilder {
+  constructor(fileContext, context, flow) {
+    this.sf = fileContext.sf;
+    this.offsets = fileContext.offsets;
+    this.path = fileContext.path;
+    this.checker = context.checker;
+    this.context = context;
+    this.flow = flow;
+    this.symbolBindings = new Map(); // ts.Symbol -> binding id
+    this.declaringFunction = new Map(); // binding id -> owning symbol record id (null = module level)
+    this.scopesByStart = new Map(); // `${kind}:${u8start}` -> scope (pre-created)
+    this.currentFunction = null;
+  }
+
+  u8(node) {
+    return [this.offsets[node.getStart(this.sf)], this.offsets[node.end]];
+  }
+
+  noteUnknown(start, end, reason) {
+    this.flow.diagnostics.push({ path: this.path, code: 'FLOW_UNKNOWN_REGION', detail: `${reason} [${start},${end})` });
+  }
+
+  unknownStmt(node, reason) {
+    const [start, end] = this.u8(node);
+    return { start, end, stmt: 'unknown', reason };
+  }
+
+  unknownExprAt(node, reason) {
+    const [start, end] = this.u8(node);
+    return { start, end, expr: 'unknown', reason };
+  }
+
+  recordForName(nameNode) {
+    const record = this.context.recordsByFile.get(this.sf) || [];
+    return record.find((r) => r.node.name === nameNode);
+  }
+
+  newScope(fn, kind, parent, startOffset) {
+    const scope = {
+      id: `s:${this.path}:${this.fnStart}:${fn.scopes.length}:${kind}`,
+      kind,
+      parent: parent ? parent.id : null,
+      bindings: [],
+    };
+    fn.scopes.push(scope);
+    if (startOffset !== undefined) this.scopesByStart.set(`${kind}:${startOffset}`, scope);
+    return scope;
+  }
+
+  register(symbol, nameNode, kind, scope, opts = {}) {
+    if (!symbol) return undefined;
+    const existing = this.symbolBindings.get(symbol);
+    if (existing) return existing;
+    const [ds, de] = this.u8(nameNode);
+    const id = `b:${this.path}:${ds}:${nameNode.getText(this.sf).slice(0, 64)}`;
+    const binding = {
+      id,
+      name: nameNode.getText(this.sf).slice(0, 128),
+      kind,
+      scope: scope.id,
+      decl_start: ds,
+      decl_end: de,
+      hoisted: Boolean(opts.hoisted),
+    };
+    if (opts.function_symbol) binding.function_symbol = opts.function_symbol;
+    this.symbolBindings.set(symbol, id);
+    scope.bindings.push(id);
+    this.currentFunction.bindings.push(binding);
+    this.declaringFunction.set(id, opts.module ? null : this.currentFunction.symbol);
+    return id;
+  }
+
+  buildFile() {
+    // Pass 0: register module-level declaration names so hoisted, recursive and
+    // mutual references between functions resolve to real bindings.
+    const moduleNames = [];
+    const walkModule = (node) => {
+      // Module scope only: never descend into function/class bodies, whose
+      // locals belong to their own functions.
+      if (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) {
+        if (node.name) moduleNames.push(node.name);
+        return;
+      }
+      if (ts.isVariableStatement(node)) {
+        for (const decl of node.declarationList.declarations) {
+          if (ts.isIdentifier(decl.name)) moduleNames.push(decl.name);
+        }
+        return;
+      }
+      ts.forEachChild(node, walkModule);
+    };
+    for (const stmt of this.sf.statements) walkModule(stmt);
+    const records = this.context.recordsByFile.get(this.sf) || [];
+    // Pass 1: build every function body (preorder; outer before inner).
+    for (const record of records) this.buildFunction(record, moduleNames);
+  }
+
+  buildFunction(record, moduleNames) {
+    const node = record.node;
+    const [fnStart, fnEnd] = this.u8(node);
+    const fn = {
+      symbol: record.id,
+      name: String(record.name || '<anonymous>').slice(0, 256),
+      path: this.path,
+      start: fnStart,
+      end: fnEnd,
+      params: [],
+      scopes: [],
+      bindings: [],
+      body: [],
+      captures: [],
+      unknown_regions: [],
+    };
+    this.currentFunction = fn;
+    this.fnStart = fnStart;
+    this.captured = new Set();
+    const fnScope = this.newScope(fn, 'function', null);
+    for (const nameNode of moduleNames) {
+      const sym = this.checker.getSymbolAtLocation(nameNode);
+      const isFn = ts.isFunctionDeclaration(nameNode.parent);
+      const nested = isFn ? this.recordForName(nameNode) : undefined;
+      if (sym) this.register(sym, nameNode, isFn ? 'function' : 'let', fnScope, { module: true, hoisted: isFn, function_symbol: nested && nested.id });
+    }
+    if (node.name && !ts.isArrowFunction(node) && !ts.isFunctionExpression(node) && !ts.isMethodDeclaration(node)) {
+      const sym = this.checker.getSymbolAtLocation(node.name);
+      if (sym) this.register(sym, node.name, 'function', fnScope, { hoisted: true, function_symbol: record.id });
+    }
+    // Register every parameter first so parameter default expressions can
+    // reference earlier parameters.
+    const defaultInitializers = [];
+    for (const param of node.parameters) {
+      if (param.dotDotDotToken) {
+        const [ds, de] = this.u8(param);
+        fn.unknown_regions.push({ start: ds, end: de, reason: 'rest_parameter' });
+        this.noteUnknown(ds, de, 'rest_parameter');
+        continue;
+      }
+      if (!ts.isIdentifier(param.name)) {
+        const [ds, de] = this.u8(param.name);
+        fn.unknown_regions.push({ start: ds, end: de, reason: 'destructuring_parameter' });
+        this.noteUnknown(ds, de, 'destructuring_parameter');
+        continue;
+      }
+      const sym = this.checker.getSymbolAtLocation(param.name);
+      const id = this.register(sym, param.name, 'param', fnScope);
+      if (id) fn.params.push(id);
+      if (id && param.initializer) defaultInitializers.push([id, param.initializer]);
+    }
+    for (const [id, initializer] of defaultInitializers) {
+      const value = this.lower(initializer, fn, this.captured);
+      const binding = fn.bindings.find((b) => b.id === id);
+      if (binding) binding.default_value = value;
+    }
+    if (node.body) {
+      const isBlock = ts.isBlock(node.body);
+      if (isBlock) this.collectDeclarations(node.body, fn, fnScope);
+      if (isBlock) {
+        fn.body = node.body.statements.map((stmt) => this.lowerStmt(stmt, fn, fnScope));
+      } else {
+        // Expression-bodied arrow: `() => expr` behaves as `return expr`.
+        const [bs, be] = this.u8(node.body);
+        fn.body = [{ start: bs, end: be, stmt: 'return', value: this.lower(node.body, fn, this.captured) }];
+      }
+    }
+    fn.captures = [...this.captured].sort();
+    fn.bindings = fn.bindings.filter((b) => fn.scopes.some((s) => s.id === b.scope));
+    this.flow.functions.push(fn);
+    this.currentFunction = null;
+  }
+
+  // Pre-walk collecting declarations so use-before-declare (TDZ) still binds.
+  collectDeclarations(root, fn, fnScope) {
+    const enter = (node, scope) => {
+      let childScope = scope;
+      if (ts.isVariableDeclaration(node)) {
+        if (ts.isIdentifier(node.name)) {
+          const sym = this.checker.getSymbolAtLocation(node.name);
+          const list = node.parent;
+          const keyword = VAR_KEYWORDS.get(list.getChildAt(0).kind) || 'let';
+          if (sym) this.register(sym, node.name, keyword === 'var' ? 'var' : keyword, keyword === 'var' ? fnScope : scope, { hoisted: keyword === 'var' });
+        } else {
+          const [ds, de] = this.u8(node.name);
+          fn.unknown_regions.push({ start: ds, end: de, reason: 'destructuring_declaration' });
+          for (const el of node.name.elements) {
+            if (ts.isBindingElement(el) && ts.isIdentifier(el.name)) {
+              const sym = this.checker.getSymbolAtLocation(el.name);
+              if (sym) this.register(sym, el.name, 'let', scope);
+            }
+          }
+        }
+      } else if (ts.isFunctionDeclaration(node) && node.name) {
+        const sym = this.checker.getSymbolAtLocation(node.name);
+        const nested = this.recordForName(node.name);
+        if (sym) this.register(sym, node.name, 'function', fnScope, { hoisted: true, function_symbol: nested && nested.id });
+      } else if (ts.isClassDeclaration(node) && node.name) {
+        const sym = this.checker.getSymbolAtLocation(node.name);
+        if (sym) this.register(sym, node.name, 'let', scope);
+      } else if (ts.isBlock(node) || ts.isForStatement(node) || ts.isForOfStatement(node) || ts.isForInStatement(node)) {
+        childScope = this.newScope(fn, ts.isBlock(node) ? 'block' : 'for', scope, this.offsets[node.getStart(this.sf)]);
+      } else if (ts.isSwitchStatement(node)) {
+        childScope = this.newScope(fn, 'switch', scope, this.offsets[node.getStart(this.sf)]);
+      } else if (ts.isCatchClause(node)) {
+        childScope = this.newScope(fn, 'catch', scope, this.offsets[node.getStart(this.sf)]);
+        if (node.variableDeclaration && ts.isIdentifier(node.variableDeclaration.name)) {
+          const sym = this.checker.getSymbolAtLocation(node.variableDeclaration.name);
+          if (sym) this.register(sym, node.variableDeclaration.name, 'catch', childScope);
+        }
+      }
+      ts.forEachChild(node, (child) => enter(child, childScope));
+    };
+    enter(root, fnScope);
+  }
+
+  scopeFor(kind, startOffset, fallback) {
+    return this.scopesByStart.get(`${kind}:${startOffset}`) || fallback;
+  }
+
+  lowerStmt(node, fn, scope) {
+    try {
+      return this.lowerStmtInner(node, fn, scope);
+    } catch (error) {
+      const [start, end] = this.u8(node);
+      this.noteUnknown(start, end, `internal_lowering_failure:${error && error.message}`);
+      return { start, end, stmt: 'unknown', reason: `internal_lowering_failure:${error && error.message}` };
+    }
+  }
+
+  lowerStmtInner(node, fn, scope) {
+    const [start, end] = this.u8(node);
+    if (ts.isVariableStatement(node)) {
+      return { ...this.lowerVarList(node.declarationList, fn, scope), start, end };
+    }
+    if (ts.isExpressionStatement(node)) {
+      return { start, end, stmt: 'expression', expr: this.lower(node.expression, fn) };
+    }
+    if (ts.isIfStatement(node)) {
+      return {
+        start,
+        end,
+        stmt: 'if',
+        cond: this.lower(node.expression, fn),
+        then_body: [this.lowerStmt(node.thenStatement, fn, scope)],
+        else_body: node.elseStatement ? [this.lowerStmt(node.elseStatement, fn, scope)] : [],
+      };
+    }
+    if (ts.isWhileStatement(node)) {
+      return { start, end, stmt: 'while', cond: this.lower(node.expression, fn), body: [this.lowerStmt(node.statement, fn, scope)] };
+    }
+    if (ts.isDoStatement(node)) {
+      return { start, end, stmt: 'do_while', body: [this.lowerStmt(node.statement, fn, scope)], cond: this.lower(node.expression, fn) };
+    }
+    if (ts.isForStatement(node)) {
+      const forScope = this.scopeFor('for', start, scope);
+      const init = node.initializer
+        ? ts.isVariableDeclarationList(node.initializer)
+          ? { ...this.lowerVarList(node.initializer, fn, forScope), start: this.offsets[node.initializer.getStart(this.sf)], end: this.offsets[node.initializer.end] }
+          : { start: this.offsets[node.initializer.getStart(this.sf)], end: this.offsets[node.initializer.end], stmt: 'expression', expr: this.lower(node.initializer, fn) }
+        : undefined;
+      return {
+        start,
+        end,
+        stmt: 'for',
+        init,
+        cond: node.condition ? this.lower(node.condition, fn) : undefined,
+        update: node.incrementor ? this.lower(node.incrementor, fn) : undefined,
+        body: [this.lowerStmt(node.statement, fn, forScope)],
+      };
+    }
+    if (ts.isForInStatement(node) || ts.isForOfStatement(node)) {
+      this.noteUnknown(start, end, 'for_in_of_iteration');
+      return { start, end, stmt: 'unknown', reason: 'for_in_of_iteration' };
+    }
+    if (ts.isSwitchStatement(node)) {
+      const switchScope = this.scopeFor('switch', start, scope);
+      const cases = node.caseBlock.clauses.map((clause) => ({
+        test: clause.expression ? this.lower(clause.expression, fn) : undefined,
+        body: clause.statements.map((s) => this.lowerStmt(s, fn, switchScope)),
+      }));
+      return { start, end, stmt: 'switch', discriminant: this.lower(node.expression, fn), cases };
+    }
+    if (ts.isReturnStatement(node)) {
+      return { start, end, stmt: 'return', value: node.expression ? this.lower(node.expression, fn) : undefined };
+    }
+    if (ts.isThrowStatement(node)) {
+      return { start, end, stmt: 'throw', expr: this.lower(node.expression, fn) };
+    }
+    if (ts.isBreakStatement(node)) {
+      return { start, end, stmt: 'break', label: node.label ? node.label.text : undefined };
+    }
+    if (ts.isContinueStatement(node)) {
+      return { start, end, stmt: 'continue', label: node.label ? node.label.text : undefined };
+    }
+    if (ts.isTryStatement(node)) {
+      const catchClause = node.catchClause;
+      const catchScope = catchClause ? this.scopeFor('catch', this.offsets[catchClause.getStart(this.sf)], scope) : scope;
+      return {
+        start,
+        end,
+        stmt: 'try',
+        body: node.tryBlock.statements.map((s) => this.lowerStmt(s, fn, scope)),
+        catch_param: catchClause && catchScope.bindings[0] ? catchScope.bindings[0] : undefined,
+        catch_body: catchClause ? catchClause.block.statements.map((s) => this.lowerStmt(s, fn, catchScope)) : undefined,
+        finally_body: node.finallyBlock ? node.finallyBlock.statements.map((s) => this.lowerStmt(s, fn, scope)) : undefined,
+      };
+    }
+    if (ts.isLabeledStatement(node)) {
+      return { start, end, stmt: 'labeled', label: node.label.text, body: this.lowerStmt(node.statement, fn, scope) };
+    }
+    if (ts.isBlock(node)) {
+      const blockScope = this.scopeFor('block', start, scope);
+      return { start, end, stmt: 'block', body: node.statements.map((s) => this.lowerStmt(s, fn, blockScope)) };
+    }
+    if (ts.isFunctionDeclaration(node)) {
+      // Hoisted: its binding is seeded with the function value at scope entry.
+      return { start, end, stmt: 'empty' };
+    }
+    if (ts.isClassDeclaration(node)) {
+      this.noteUnknown(start, end, 'class_declaration');
+      return { start, end, stmt: 'unknown', reason: 'class_declaration' };
+    }
+    if (ts.isWithStatement(node)) {
+      this.noteUnknown(start, end, 'with_statement');
+      return { start, end, stmt: 'unknown', reason: 'with_statement' };
+    }
+    if (ts.isEmptyStatement(node)) return { start, end, stmt: 'empty' };
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node) || ts.isExportAssignment(node)) {
+      return { start, end, stmt: 'empty' };
+    }
+    this.noteUnknown(start, end, `unsupported_statement:${ts.SyntaxKind[node.kind]}`);
+    return { start, end, stmt: 'unknown', reason: `unsupported_statement:${ts.SyntaxKind[node.kind]}` };
+  }
+
+  lowerVarList(list, fn, scope) {
+    const keyword = VAR_KEYWORDS.get(list.getChildAt(0).kind) || 'let';
+    const declarators = [];
+    for (const decl of list.declarations) {
+      if (!ts.isIdentifier(decl.name)) return { stmt: 'unknown', reason: 'destructuring_declaration' };
+      const id = this.symbolBindings.get(this.checker.getSymbolAtLocation(decl.name));
+      if (!id) return { stmt: 'unknown', reason: 'unresolved_declaration_symbol' };
+      declarators.push({ binding: id, init: decl.initializer ? this.lower(decl.initializer, fn) : undefined });
+    }
+    return { stmt: 'var_decl', keyword, declarators };
+  }
+
+  lower(node, fn) {
+    const [start, end] = this.u8(node);
+    try {
+      return this.lowerExpr(node, fn);
+    } catch (error) {
+      this.noteUnknown(start, end, `internal_lowering_failure:${error && error.message}`);
+      return { start, end, expr: 'unknown', reason: `internal_lowering_failure:${error && error.message}` };
+    }
+  }
+
+  lowerExpr(node, fn) {
+    const [start, end] = this.u8(node);
+    if (ts.isNumericLiteral(node)) return { start, end, expr: 'const', value: { const: 'num', value: Number(node.text) } };
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return { start, end, expr: 'const', value: { const: 'str', value: node.text } };
+    if (ts.isRegularExpressionLiteral(node)) return { start, end, expr: 'unknown', reason: 'regex_literal' };
+    if (node.kind === ts.SyntaxKind.TrueKeyword) return { start, end, expr: 'const', value: { const: 'bool', value: true } };
+    if (node.kind === ts.SyntaxKind.FalseKeyword) return { start, end, expr: 'const', value: { const: 'bool', value: false } };
+    if (node.kind === ts.SyntaxKind.NullKeyword) return { start, end, expr: 'const', value: { const: 'null' } };
+    if (ts.isIdentifier(node)) {
+      if (node.text === 'undefined') return { start, end, expr: 'const', value: { const: 'undefined' } };
+      const symbol = this.checker.getSymbolAtLocation(node);
+      const bindingId = symbol && this.symbolBindings.get(symbol);
+      if (bindingId) {
+        if (this.declaringFunction.get(bindingId) !== (this.currentFunction && this.currentFunction.symbol)) this.captured.add(bindingId);
+        return { start, end, expr: 'local', binding: bindingId };
+      }
+      return { start, end, expr: 'external', name: node.text };
+    }
+    if (node.kind === ts.SyntaxKind.ThisKeyword) return { start, end, expr: 'this' };
+    if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
+      const record = this.context.functions.get(node);
+      if (!record) return { start, end, expr: 'unknown', reason: 'nested_function_without_symbol' };
+      return { start, end, expr: 'function_ref', symbol: record.id };
+    }
+    if (ts.isBinaryExpression(node)) {
+      const opKind = node.operatorToken.kind;
+      if (SHORT_CIRCUIT.has(opKind)) {
+        return {
+          start,
+          end,
+          expr: 'short_circuit',
+          op: opKind === ts.SyntaxKind.AmpersandAmpersandToken ? '&&' : opKind === ts.SyntaxKind.BarBarToken ? '||' : '??',
+          left: this.lower(node.left, fn),
+          right: this.lower(node.right, fn),
+        };
+      }
+      if (LOGICAL_ASSIGN.has(opKind)) return { start, end, expr: 'unknown', reason: 'logical_assignment_operator' };
+      const assignOp = ASSIGNMENT_OPS.get(opKind);
+      if (assignOp) {
+        return { start, end, expr: 'assign', op: assignOp, target: this.assignTarget(node.left, fn), value: this.lower(node.right, fn) };
+      }
+      return { start, end, expr: 'binary', op: ts.tokenToString(opKind) || 'unknown_operator', left: this.lower(node.left, fn), right: this.lower(node.right, fn) };
+    }
+    if (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) {
+      if (node.operator === ts.SyntaxKind.PlusPlusToken || node.operator === ts.SyntaxKind.MinusMinusToken) {
+        return {
+          start,
+          end,
+          expr: 'assign',
+          op: node.operator === ts.SyntaxKind.PlusPlusToken ? '++' : '--',
+          target: this.assignTarget(node.operand, fn),
+          value: { start, end, expr: 'unknown', reason: 'increment_result_unknown' },
+        };
+      }
+      if (node.kind === ts.SyntaxKind.DeleteExpression) return { start, end, expr: 'unknown', reason: 'delete_expression' };
+      if (!UNARY_OPS.has(node.operator)) return { start, end, expr: 'unknown', reason: `unsupported_unary:${ts.tokenToString(node.operator) || node.operator}` };
+      return { start, end, expr: 'unary', op: ts.tokenToString(node.operator), operand: this.lower(node.operand, fn) };
+    }
+    if (ts.isConditionalExpression(node)) {
+      return { start, end, expr: 'conditional', cond: this.lower(node.condition, fn), then_value: this.lower(node.whenTrue, fn), else_value: this.lower(node.whenFalse, fn) };
+    }
+    if (ts.isCallExpression(node)) {
+      return {
+        start,
+        end,
+        expr: 'call',
+        callee: this.lower(node.expression, fn),
+        args: node.arguments.map((a) => (ts.isSpreadElement(a) ? { start: this.offsets[a.getStart(this.sf)], end: this.offsets[a.end], expr: 'unknown', reason: 'spread_argument' } : this.lower(a, fn))),
+        optional: Boolean(node.questionDotToken),
+      };
+    }
+    if (ts.isNewExpression(node)) {
+      return { start, end, expr: 'new', callee: this.lower(node.expression, fn), args: (node.arguments || []).map((a) => this.lower(a, fn)) };
+    }
+    if (ts.isPropertyAccessExpression(node)) {
+      return { start, end, expr: 'property_read', object: this.lower(node.expression, fn), name: node.name.text, optional: Boolean(node.questionDotToken) };
+    }
+    if (ts.isElementAccessExpression(node)) return { start, end, expr: 'unknown', reason: 'element_access' };
+    if (ts.isObjectLiteralExpression(node)) {
+      const fields = [];
+      for (const prop of node.properties) {
+        if (ts.isPropertyAssignment(prop)) {
+          fields.push({ name: prop.name.getText(this.sf).replace(/^['"]|['"]$/g, ''), value: this.lower(prop.initializer, fn) });
+        } else if (ts.isShorthandPropertyAssignment(prop)) {
+          fields.push({ name: prop.name.text, value: this.lower(prop.name, fn) });
+        } else {
+          return { start, end, expr: 'unknown', reason: `unsupported_object_member:${ts.SyntaxKind[prop.kind]}` };
+        }
+      }
+      return { start, end, expr: 'object_literal', fields };
+    }
+    if (ts.isArrayLiteralExpression(node)) {
+      for (const el of node.elements) {
+        if (ts.isSpreadElement(el) || el.kind === ts.SyntaxKind.OmittedExpression) return { start, end, expr: 'unknown', reason: 'array_spread_or_hole' };
+      }
+      return { start, end, expr: 'array_literal', elements: node.elements.map((el) => this.lower(el, fn)) };
+    }
+    if (ts.isTemplateExpression(node)) return { start, end, expr: 'unknown', reason: 'template_substitution' };
+    if (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node) || ts.isParenthesizedExpression(node) || ts.isSatisfiesExpression(node)) {
+      return this.lower(node.expression, fn);
+    }
+    if (ts.isAwaitExpression(node) || ts.isYieldExpression(node)) return { start, end, expr: 'unknown', reason: 'await_or_yield' };
+    if (ts.isTaggedTemplateExpression(node)) return { start, end, expr: 'unknown', reason: 'tagged_template' };
+    if (node.kind === ts.SyntaxKind.SuperKeyword) return { start, end, expr: 'unknown', reason: 'super_reference' };
+    if (String(ts.SyntaxKind[node.kind]).startsWith('Jsx')) return { start, end, expr: 'unknown', reason: 'jsx_expression' };
+    return { start, end, expr: 'unknown', reason: `unsupported_expression:${ts.SyntaxKind[node.kind]}` };
+  }
+
+  assignTarget(node, fn) {
+    if (ts.isIdentifier(node)) {
+      const symbol = this.checker.getSymbolAtLocation(node);
+      const bindingId = symbol && this.symbolBindings.get(symbol);
+      if (bindingId) {
+        if (this.declaringFunction.get(bindingId) !== (this.currentFunction && this.currentFunction.symbol)) this.captured.add(bindingId);
+        return { target: 'binding', binding: bindingId };
+      }
+      return { target: 'unknown' };
+    }
+    if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.name)) {
+      return { target: 'property', object: this.lower(node.expression, fn), name: node.name.text };
+    }
+    return { target: 'unknown' };
+  }
+}

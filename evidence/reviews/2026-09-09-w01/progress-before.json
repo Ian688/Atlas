@@ -1,0 +1,349 @@
+{
+  "schema": "atlas.daily-development-progress.v1",
+  "work_order_version": "1.0",
+  "prepared_on": "2026-09-09",
+  "timezone": "Asia/Shanghai",
+  "repository": "/Users/yinsijie/CodeRepo/Atlas",
+  "mode": "external_agent_daily_window",
+  "window_limit_hours": 10,
+  "active_window": {
+    "window": "2026-09-09/w01",
+    "started_local": "2026-09-09T00:29:44+08:00",
+    "started_utc": "2026-09-08T16:29:44Z",
+    "status": "DELIVERED",
+    "note": "First execution window delivered at 2026-09-09T03:28+08:00 (~3h wall clock). Verify final PASS 9/9. See evidence/daily/2026-09-09/w01/final/daily-report.md."
+  },
+  "windows": [
+    {
+      "id": "2026-09-09/w01",
+      "started_local": "2026-09-09T00:29:44+08:00",
+      "started_utc": "2026-09-08T16:29:44Z",
+      "status": "DELIVERED",
+      "work_items": [
+        "W00",
+        "W01",
+        "W02",
+        "W03",
+        "W04",
+        "W05",
+        "W06(部分)"
+      ],
+      "report": "evidence/daily/2026-09-09/w01/final/daily-report.md",
+      "verification": "evidence/daily/2026-09-09/w01/final/verification/verification.json",
+      "ended_local": "2026-09-09T03:28:00+08:00"
+    }
+  ],
+  "next_work_item": "W06",
+  "next_action": "W06 剩余:扫描全链 deadline、作业取消/回收、幂等终态服务端语义、worker 崩溃恢复矩阵;多项目隔离已有集成证据(test_multi_project_store_isolation)。或按复审反馈先修 CHANGES_REQUIRED。",
+  "baseline": {
+    "foundation_evidence": "../../evidence/foundation/verification.json",
+    "status": "REFERENCE_ONLY",
+    "daily_baseline": "evidence/daily/2026-09-09/w01/baseline/",
+    "dispatch_inspection": "35 recorded source/config hashes matched at baseline copy time; no HEAD at dispatch; verify.py is now parameterized and never rewrites foundation evidence."
+  },
+  "dependency_semantics": "Prerequisites are entry conditions, not proof that all subfeatures are ready. W05 consumes each algorithm only after its corresponding semantics are verified. Existing Foundation is preserved; NOT_IMPLEMENTED describes each W target as a whole.",
+  "items": [
+    {
+      "id": "W00",
+      "title": "开工基线与证据隔离",
+      "prerequisites": [],
+      "contract_refs": [
+        "AL-00",
+        "AL-14",
+        "AL-15"
+      ],
+      "implementation": "IMPLEMENTED",
+      "automated_checks": "PASS",
+      "qualification": "QUALIFIED_WITHIN_PROFILE",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "features": [
+        "受控起始副本+SHA-256 清单(54 文件)与 foundation 35 hash 对比全匹配",
+        "verify.py 输出目录/标签参数化(schema atlas.verification.v2),显式拒绝写 evidence/foundation",
+        "Modus 保护检查改为可选:无基线/无 Modus 时记录 cannot-verify,不伪造保护结论",
+        "无 HEAD 时 git whitespace 检查覆盖范围如实记录",
+        "失败后未运行检查记录为 not_run_after_failure"
+      ],
+      "evidence": [
+        "evidence/daily/2026-09-09/w01/baseline/source-manifest.json",
+        "evidence/daily/2026-09-09/w01/baseline/verification/verification.json"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "W01",
+      "title": "语言材料与版本化 Flow IR",
+      "prerequisites": [
+        "W00"
+      ],
+      "contract_refs": [
+        "AL-01",
+        "AL-02",
+        "AL-04"
+      ],
+      "implementation": "IMPLEMENTED",
+      "automated_checks": "PASS",
+      "qualification": "QUALIFIED_WITHIN_PROFILE",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "features": [
+        "worker 0.2.0 输出 atlas.flow-ir.v1 / js-structured-control.v1:结构化语句/表达式树、UTF-8 锚点、Scope/Binding、参数默认值、捕获、unknown_regions",
+        "声明 profile 外构造一律显式 unknown+原因(for-of/in、解构、await/yield、模板插值、逻辑赋值、rest/展开、element access、with、class、delete、JSX、正则值)",
+        "Rust 校验:schema/producer/snapshot、锚点与字符边界、binding/scope 引用、catch 参数、重复 ID、语句/块/操作预算",
+        "函数内块/函数/catch/for/switch 作用域;var 提升到函数作用域;TDZ use-before-declare 仍解析到真绑定"
+      ],
+      "evidence": [
+        "workers/typescript/tests/flow.test.mjs (19/19)",
+        "crates/atlas-engine/src/flow.rs validate_flow"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "W02",
+      "title": "CFG 与完成语义",
+      "prerequisites": [
+        "W01"
+      ],
+      "contract_refs": [
+        "AL-05"
+      ],
+      "implementation": "IMPLEMENTED",
+      "automated_checks": "PASS",
+      "qualification": "QUALIFIED_WITHIN_PROFILE",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "features": [
+        "基本块 CFG:Goto/Branch/Return/Throw/共享 finally Dispatch/Sink",
+        "Completion(kind,value) 驱动 finally:正常结束恢复原 completion 并保留环境修改,自身 abrupt 覆盖;finally 体自身终止时不挂 dispatch;catch 内异常不重入同一 catch",
+        "短路 &&/||/?? 与条件表达式为显式分支+路径内临时变量(路径敏感值);switch 分支链与顺序 fallthrough;label break/continue;参数默认值在入口条件赋值",
+        "looping_blocks(迭代 Kosaraju)标记循环块;异常边 (op,handler) 表",
+        "await/yield/async 未建模(profile 外),不伪造挂起边"
+      ],
+      "evidence": [
+        "crates/atlas-engine/tests/flow_semantics.rs D02/D03/D04/D05",
+        "scripts/test_integration.py flow-lab finally/loop 断言"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "W03",
+      "title": "局部抽象解释与数据来源",
+      "prerequisites": [
+        "W02"
+      ],
+      "contract_refs": [
+        "AL-06"
+      ],
+      "implementation": "IMPLEMENTED",
+      "automated_checks": "PASS",
+      "qualification": "QUALIFIED_WITHIN_PROFILE",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "features": [
+        "维度:可达性、绑定环境(值+初始化状态+reaching defs)、CappedSet(常量8/目标64/来源8)、平坦堆(site,field)+wildcard、效果、completion",
+        "def-use 每绑定 defs/每定义 uses;TDZ 读取→may_throw+原因;来源 Parameter(i)/Constant/CallResult/Allocation/FunctionValue/External/Capture/Derived/Exception/This",
+        "堆:唯一具体对象(非循环分配点)强更新,其余弱更新+wildcard 合并;循环分配点强制弱更新",
+        "JS 常量折叠规则显式声明(f64 算术含 NaN/±0/除零、整数值字符串拼接、===/!==、同型比较、&&/||/??、typeof/!/void);位运算等不折叠→Top 带原因",
+        "worklist:BTreeSet 确定性、块访问上限+300k transfer 预算→partial_budget+frontier;常量条件剪枝记录 pruned_edges;cap 超限→Top+cap_exceeded 原因",
+        "跨函数绑定经 function directory 解析(捕获的模块函数→目标集合);callee 摘要一律 callee_summary_pending_interprocedural,不假装跨过程"
+      ],
+      "evidence": [
+        "crates/atlas-engine/tests/flow_semantics.rs D01/D07/D08/D09/D10/D12",
+        "examples/flow-lab"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "W04",
+      "title": "调用点与跨过程摘要",
+      "prerequisites": [
+        "W01",
+        "W02",
+        "W03"
+      ],
+      "contract_refs": [
+        "AL-07",
+        "AL-08"
+      ],
+      "implementation": "IMPLEMENTED",
+      "automated_checks": "PASS",
+      "qualification": "QUALIFIED_WITHIN_PROFILE",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "features": [
+        "符号化函数摘要(returns/throws/effects,来源含 Parameter(i))",
+        "调用点代回:Parameter origin 按实参重代入,不同 caller 实参/返回不串线(D13)",
+        "观测调用图 SCC 凝聚、callee-first 拓扑求解;递归 SCC 有限轮迭代,未收敛记 partial_recursion(D15)",
+        "pending 摘要永不充当 no-return/no-throw 证明;未知 callee 保持 Top",
+        "五层调用链 origin 存活(D14);call 边与 forwarded 数据边分开记录(D17)",
+        "FunctionFlowFact.interprocedural(status/summary/callsites(targets_complete/unknown_component/args/result))",
+        "coverage: interproc_sccs/interproc_recursive_sccs"
+      ],
+      "evidence": [
+        "crates/atlas-engine/src/inter.rs",
+        "crates/atlas-engine/tests/flow_semantics.rs d13/d14/d15/d17",
+        "examples/flow-lab indirect + test_flow_facts_through_real_worker_store_cli_and_http"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "W05",
+      "title": "不可变存储、查询与真实函数面板",
+      "prerequisites": [
+        "W01"
+      ],
+      "contract_refs": [
+        "AL-12",
+        "AL-14"
+      ],
+      "implementation": "IMPLEMENTED",
+      "automated_checks": "PASS",
+      "qualification": "QUALIFIED_WITHIN_PROFILE",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "features": [
+        "facts 表 (analysis,symbol,kind='flow') 与 Analysis 同事务原子发布;flow_digest 绑定派生事实内容到 analysis 身份",
+        "CLI flows/flow;HTTP /api/flows、/api/flow(沿用会话鉴权/Host/Origin);错误语义与既有一致(invalid_or_unavailable_query)",
+        "函数面板显示:算法/状态/预算、返回/抛出值摘要、效果、unknown 原因、块级绑定状态(有界截断);真实浏览器验证+截图",
+        "旧分析 flow facts 在重索引后可读(有测试);伪造 symbol 查询被拒绝(有测试)"
+      ],
+      "evidence": [
+        "scripts/test_integration.py test_flow_facts_through_real_worker_store_cli_and_http",
+        "evidence/daily/2026-09-09/w01/final/artifacts/flow-panel-branchpick.png"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "W06",
+      "title": "作业所有权、取消恢复与资源边界",
+      "prerequisites": [
+        "W05"
+      ],
+      "contract_refs": [
+        "AL-15"
+      ],
+      "implementation": "PARTIAL",
+      "automated_checks": "PASS",
+      "qualification": "NOT_QUALIFIED",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "features": [
+        "扫描阶段整体 deadline(--scan-deadline-seconds,默认 300/上限 3600;超限零发布,Rust 单测覆盖)",
+        "多项目同库隔离与跨 analysis 查询拒绝(test_multi_project_store_isolation)",
+        "索引管线级 deadline(--index-deadline-seconds,默认 600/上限 3600;剩余预算分配给 scan/worker 各阶段)",
+        "并发重复 index 幂等同终态(并发两进程同 id)",
+        "worker 阶段既有 1–600s 期限/输出上限/kill_on_drop 沿用"
+      ],
+      "evidence": [
+        "crates/atlas-engine/src/scan.rs deadline + tests",
+        "scripts/test_integration.py test_multi_project_store_isolation"
+      ],
+      "blockers": [
+        "取消信号、作业队列/租约、崩溃恢复矩阵、断电耐久仍未实现"
+      ]
+    },
+    {
+      "id": "W07",
+      "title": "增量失效、事实撤回与真实项目规模",
+      "prerequisites": [
+        "W04",
+        "W06"
+      ],
+      "contract_refs": [
+        "AL-11",
+        "GE-2",
+        "GE-3"
+      ],
+      "implementation": "NOT_IMPLEMENTED",
+      "automated_checks": "NOT_RUN",
+      "qualification": "NOT_QUALIFIED",
+      "review_status": "NOT_REQUESTED",
+      "features": [],
+      "evidence": [],
+      "blockers": []
+    },
+    {
+      "id": "W08",
+      "title": "执行画像与受控函数/场景测试",
+      "prerequisites": [
+        "W04",
+        "W06"
+      ],
+      "contract_refs": [
+        "AL-16",
+        "AL-13"
+      ],
+      "implementation": "NOT_IMPLEMENTED",
+      "automated_checks": "NOT_RUN",
+      "qualification": "NOT_QUALIFIED",
+      "review_status": "NOT_REQUESTED",
+      "features": [],
+      "evidence": [],
+      "blockers": []
+    },
+    {
+      "id": "W09",
+      "title": "正式双视图与 Agent/AI Coding",
+      "prerequisites": [
+        "W05",
+        "W06"
+      ],
+      "contract_refs": [
+        "DV",
+        "HI",
+        "MT"
+      ],
+      "implementation": "NOT_IMPLEMENTED",
+      "automated_checks": "NOT_RUN",
+      "qualification": "NOT_QUALIFIED",
+      "review_status": "NOT_REQUESTED",
+      "features": [],
+      "evidence": [],
+      "blockers": []
+    },
+    {
+      "id": "W10",
+      "title": "Modus 接缝与旧实现退役",
+      "prerequisites": [
+        "W06",
+        "W09"
+      ],
+      "contract_refs": [
+        "HI"
+      ],
+      "implementation": "NOT_IMPLEMENTED",
+      "automated_checks": "NOT_RUN",
+      "qualification": "NOT_QUALIFIED",
+      "review_status": "NOT_REQUESTED",
+      "features": [],
+      "evidence": [],
+      "blockers": []
+    }
+  ],
+  "independent_reviews": [],
+  "d_family_coverage": {
+    "covered_with_tests": {
+      "D01": "flow_semantics d01_tdz_read_is_reported + worker flow.test.mjs shadowing/TDZ",
+      "D02": "flow_semantics d02 + flow-lab shortCircuit 集成断言(剪枝证据)",
+      "D03": "flow_semantics d03 + flow-lab finallyOverrides(覆盖)与 withFinally(dispatch 保留)",
+      "D04": "flow_semantics d04 + flow-lab withFinally(不恢复旧环境)",
+      "D05": "flow_semantics d05(looping_blocks/fixpoint) + flow-lab countdown",
+      "D07": "flow_semantics d07 + flow-lab branchPick(两候选)",
+      "D08": "flow_semantics d08 + flow-lab strongUpdate(强更新 kill)",
+      "D09": "flow_semantics d09(别名强更新可见+wildcard 弱更新可见)",
+      "D10": "flow_semantics d10(9 常量超 cap→Top+原因,不截断冒充穷尽)",
+      "D12": "flow_semantics d12 + flow-lab identity(Parameter(0) 来源)",
+      "D20": "corrupt blob 拒绝读取+flow 存活+恢复路径;外来 symbol 查询拒绝;validate_flow 拒绝外来 ID",
+      "D22": "test_flow_facts_through_real_worker_store_cli_and_http(真实 worker→Rust→SQLite→CLI/HTTP→面板)",
+      "D13": "flow_semantics d13_caller_isolation_through_summary(两 caller 各取回自身 origin)",
+      "D14": "flow_semantics d14_five_layer_chain_propagates_origin(五层重代入后 Constant 仍在)",
+      "D15": "flow_semantics d15_mutual_recursion_converges_without_negative_proof(互递归 SCC 收敛,pending≠无返回)",
+      "D17": "flow_semantics d17_forwarding_keeps_call_and_data_edges_distinct(compute 转交:call 边与数据 origin 分开)",
+      "D06": "test_getters_and_proxies_are_data_never_executed_and_effects_stay_unknown(getter 不执行+未知对象属性访问保留 unknown_call)",
+      "D11": "同上测试 externalSink 部分(unknown_call/registers_callback/escaped_local_value)",
+      "D19": "nested finally 20 层 CFG 线性+60 分支预算内完成(集成);scan_deadline 单测;partial_budget 语义实现",
+      "D21": "test_alpha_renaming_yields_equivalent_flow_facts(产品级等长重命名:流事实映射回原后逐字节相等)+ worker 层结构等价测试"
+    },
+    "not_implemented": {
+      "D06": "getter/Proxy 不执行已由设计保证(纯静态),但无专项反例测试",
+      "D11": "外部调用接收对象/闭包的 unknown 分量有部分覆盖(escaped/registers_callback),无专项断言",
+      "D16": "类型签名唯一目标证明属后续",
+      "D18": "路径可行性剪枝仅限已证常量;矛盾路径反例未写",
+      "D19": "预算 partial_budget 已实现并有上限测试路径,但无高扇出/深链专项反例",
+      "D21": "alpha-renaming/文件顺序等价性测试未写"
+    }
+  }
+}

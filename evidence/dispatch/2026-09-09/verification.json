@@ -1,0 +1,22 @@
+{
+  "status": "PASS",
+  "scope": "work-order documents and queued planning state only; no 10-hour execution started; no product acceptance claimed",
+  "prepared_at_utc": "2026-09-08T16:13:06.638266+00:00",
+  "checks": {
+    "local_links_and_fences": "PASS",
+    "whitespace": "PASS",
+    "progress_json_and_acyclic_dependencies": "PASS",
+    "work_items": 11,
+    "unchanged_foundation_source_hashes": 35,
+    "product_tests": "NOT_RERUN_DOCUMENT_ONLY_CHANGE",
+    "final_exit_code": 0
+  },
+  "files": {
+    "docs/DAILY_DEVELOPMENT_WORK_ORDER.md": "cac29ae5c053e051b4023e973a2601ba374ca9fc8cff7ed70ab9f5ef7e255942",
+    "docs/START_CODING_AGENT.md": "f24c31e80d6d20e00609e7d3e8b58a7a596a82a913c66cd8f09cbea1bd2b172b",
+    "docs/implementation/DAILY_REPORT_TEMPLATE.md": "4cd32bfcf133e91c0d511c5dfbb5c5f3f7ec6697ddebfec36668176bdc4e945c",
+    "docs/implementation/README.md": "0ecc7c382d987623bd565200ede85b0020a93b3f8a19e239d1a08dde0f4bfb15",
+    "docs/implementation/progress.json": "158fcdd9b7d6bf5464c484e36c4ac235bcd01596aa3acd099c376190e794b2fe",
+    "docs/HANDOFF.md": "85dca78592418bde8dbfa5705cc207cad0336ac17e7a5da8f16a6498cae7e50f"
+  }
+}

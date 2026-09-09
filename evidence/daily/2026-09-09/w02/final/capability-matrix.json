@@ -1,0 +1,124 @@
+{
+  "schema": "atlas.capability-matrix.v1",
+  "window": "2026-09-09/w02",
+  "generated_utc": "2026-09-09T08:20:00+08:00",
+  "baseline": "evidence/reviews/2026-09-09-w01/ (CHANGES_REQUIRED, R1-R7 + M1-M3)",
+  "review_items": {
+    "R1": {
+      "status": "RESOLVED",
+      "evidence": [
+        "crates/atlas-engine/src/solve.rs transfer_block: per-may-throw-op pre-state snapshots; exception successors observe pre-throw state",
+        "flow.rs Term::Throw{handler}: thrown values travel to handlers (throwCatch now includes 7)",
+        "semantic probe exceptionState: returns.constants=[2,1] (was [2])",
+        "formal tests: flow_semantics r1_perturbation_throw_ordering_keeps_partial_state (throw between assignments; 99 must not appear)"
+      ],
+      "automated_checks": "PASS",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW"
+    },
+    "R2": {
+      "status": "RESOLVED",
+      "evidence": [
+        "solve.rs Summary.written + State.written: callee heap writes recorded under */param{i}/site keys",
+        "apply_summary_heap re-bases writes onto actual arguments; clobber_for_unknown_call dissolves escaped entries into wildcard tops on unknown_call",
+        "may_call accumulate (extend) in PropertyRead/PropertyWrite",
+        "semantic probe knownMutation constants=[1,2] contains 2; unknownMutation unknown=true"
+      ],
+      "automated_checks": "PASS",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "limits": [
+        "known-setter still merges old+new ({1,2}); unconditional-write strong update deferred (documented, sound)"
+      ]
+    },
+    "R3": {
+      "status": "RESOLVED",
+      "evidence": [
+        "solve.rs PropertyRead: per-candidate merge; object-literal known-missing field → undefined; unknown shape → top with reasons",
+        "semantic probe missingField constants=[1,'undefined']"
+      ],
+      "automated_checks": "PASS",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW"
+    },
+    "R4": {
+      "status": "RESOLVED",
+      "evidence": [
+        "solve.rs fold_add: numeric conversion for bool/null (true+1=2, null+1=1), NaN propagation for undefined, concatenation only when a string operand is present (extended js_string with exact decimal band)",
+        "formal test flow_semantics r4_primitive_addition_matrix (8 cases incl. adjacent perturbations 'a'+true, ''+0.5, 1+'1', undefined+1=NaN)"
+      ],
+      "automated_checks": "PASS",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW"
+    },
+    "R5": {
+      "status": "RESOLVED",
+      "evidence": [
+        "solve/inter/analyze accept and honor a monotonic deadline; pre-publish final gate",
+        "MAX_TOTAL_TRANSFERS now enforced (analysis_work_budget_exceeded)",
+        "boundary probe rust_stage_deadline: exit 1, ~1.1s, 0 analyses/0 facts (was exit 0 at 24.6s publishing 1+1200)",
+        "unit test flow_semantics r5_expired_deadline_aborts_derivation"
+      ],
+      "automated_checks": "PASS",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "limits": [
+        "cancel token/async cooperative checkpoints still future work; stages stop at next checkpoint"
+      ]
+    },
+    "R6": {
+      "status": "RESOLVED",
+      "evidence": [
+        "flow.rs validate_flow_with_symbols: duplicate binding ids rejected (ptr::eq allowance removed); dangling local/assign references rejected (flow_reference_unknown_binding); FunctionRef symbols verified; per-function coverage reconciliation (flow_coverage_mismatch)",
+        "formal test test_worker_ir_tampering_is_rejected_before_derived_facts (3 injections at the real worker boundary, zero analyses/facts published)"
+      ],
+      "automated_checks": "PASS",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW"
+    },
+    "R7": {
+      "status": "RESOLVED",
+      "evidence": [
+        "flow.rs: parameter-less catch allowed in validation and lowering",
+        "flow-lab optionalCatch (returns [7]) and rethrow (returns [2]) integration assertions",
+        "boundary probe optional_catch: exit 0, analysis published"
+      ],
+      "automated_checks": "PASS",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW"
+    },
+    "M1": {
+      "status": "RESOLVED",
+      "evidence": [
+        "apply_summary_value substitutes constants AND function targets through parameters (identityNumber constants=[41]; viaIdentity constants=[1], previously unknown)",
+        "inter.rs MAX_GRAPH_ROUNDS rescheduling: graph re-derived from last callsites; changed graph reruns the SCC fixpoint"
+      ],
+      "automated_checks": "PASS",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "limits": [
+        "k=1 contexts still future; heap-site substitution limited to single-site args"
+      ]
+    },
+    "M2": {
+      "status": "RESOLVED",
+      "evidence": [
+        "Dispatch precision (finallyReturn returns exactly [1], extra impossible path eliminated)",
+        "ValueJson.typed_constants sidecar (kind: number/string/boolean/null/undefined/nan/infinity/negative_infinity); legacy constants field retained for existing consumers, both machine-readable"
+      ],
+      "automated_checks": "PASS",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW"
+    },
+    "M3": {
+      "status": "RESOLVED",
+      "evidence": [
+        "progress.json d_family_coverage restructured per-family with sub-capability status, named tests, and explicit gaps; D06/D11/D19/D21 duplication removed; D18 registered as PARTIAL"
+      ],
+      "automated_checks": "PASS",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW"
+    }
+  },
+  "probe_results": {
+    "semantic_probe_exit": 0,
+    "boundary_probe_exit": 0,
+    "note": "probe JSON outputs rerun post-fix are copied to artifacts/; the reviewer's original failing JSON outputs were overwritten by the probe's own write-back design — the pre-fix failures are quoted in REVIEW.md and in this window's reproduction log",
+    "regression": {
+      "cargo": "30 pass / 0 fail",
+      "worker": "20 pass / 0 fail",
+      "integration": "12 pass (1 added this window: worker IR tampering)",
+      "verify_py": "PASS 9/9"
+    }
+  }
+}

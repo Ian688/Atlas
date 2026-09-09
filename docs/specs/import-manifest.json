@@ -1,0 +1,35 @@
+{
+  "status": "requirements_snapshot_not_implementation_acceptance",
+  "files": [
+    {
+      "file": "code-atlas-development-design-2026-09-07.md",
+      "sha256": "5ed034db2c1a5f9e9e014557e711f9a67334c15fddaea4797fd85f0b2c6994fb",
+      "source": "Modus/docs/code-atlas-development-design-2026-09-07.md"
+    },
+    {
+      "file": "code-atlas-coding-agent-work-order-2026-09-07.md",
+      "sha256": "67309e604ae62bf7d9992034cc221d2ee121c983937d8fa4d5d41b5ecd38343c",
+      "source": "Modus/docs/code-atlas-coding-agent-work-order-2026-09-07.md"
+    },
+    {
+      "file": "code-atlas-local-engine-algorithm-spec-2026-09-07.md",
+      "sha256": "31842ad02566f243ec9a4b58f13c8a58530f3bd3eef6e483da82c577e7c882fb",
+      "source": "Modus/docs/code-atlas-local-engine-algorithm-spec-2026-09-07.md"
+    },
+    {
+      "file": "code-atlas-maturity-and-scenario-spec-2026-09-07.md",
+      "sha256": "c35322434df8aa2e25f46907e58fd618e8a505111f468343ac6f434093d64706",
+      "source": "Modus/docs/code-atlas-maturity-and-scenario-spec-2026-09-07.md"
+    },
+    {
+      "file": "code-atlas-standalone-integration-spec-2026-09-08.md",
+      "sha256": "691b75289e1e526c363f30e74edd4ecd1a64f96a623fc045755a7d7a3dbdd71c",
+      "source": "Modus/docs/code-atlas-standalone-integration-spec-2026-09-08.md"
+    },
+    {
+      "file": "code-atlas-dual-view-design-2026-09-08.md",
+      "sha256": "84ccee8b31b82ddbf6e97f7f552a2f0e5881d73cb65dad03ac2baff9f04de6ba",
+      "source": "Modus/docs/code-atlas-dual-view-design-2026-09-08.md"
+    }
+  ]
+}

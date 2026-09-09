@@ -1,0 +1,11 @@
+Synthetic boundary: 120 files / 1200 functions / 7.06s incl. CLI queries; not GE qualification
+test_calculator_actual_cross_file_chain_and_unknown_denominator (__main__.Integration.test_calculator_actual_cross_file_chain_and_unknown_denominator) ... ok
+test_index_does_not_execute_project_or_load_ambient_node_options (__main__.Integration.test_index_does_not_execute_project_or_load_ambient_node_options) ... ok
+test_local_web_authorization_revision_and_shutdown (__main__.Integration.test_local_web_authorization_revision_and_shutdown) ... ok
+test_old_revision_context_and_query_cursor_survive_reindex (__main__.Integration.test_old_revision_context_and_query_cursor_survive_reindex) ... ok
+test_synthetic_pagination_counts_all_1200_functions_without_claiming_scale (__main__.Integration.test_synthetic_pagination_counts_all_1200_functions_without_claiming_scale) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 19.942s
+
+OK
