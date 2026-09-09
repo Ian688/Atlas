@@ -1932,3 +1932,311 @@ fn r1_perturbation_throw_ordering_keeps_partial_state() {
         output.throws.constants
     );
 }
+
+// ===================== w03 formal regression tests =====================
+// Extracted from the second review's adjacent probes
+// (evidence/reviews/2026-09-09-w02/probe_adjacent.py) plus perturbations.
+
+/// F1: typed_constants must distinguish finite numbers from NaN/±Infinity and
+/// from same-text strings.
+#[test]
+fn f1_typed_constants_are_machine_distinguishable() {
+    let value = atlas_engine::solve::value_from_constants(vec![
+        ConstValue::Num { value: 41.0 },
+        ConstValue::Num { value: -5.0 },
+        ConstValue::Num { value: 0.5 },
+        ConstValue::Num { value: f64::NAN },
+        ConstValue::Num {
+            value: f64::INFINITY,
+        },
+        ConstValue::Num {
+            value: f64::NEG_INFINITY,
+        },
+        ConstValue::Str {
+            value: "NaN".into(),
+        },
+        ConstValue::Str {
+            value: "Infinity".into(),
+        },
+    ]);
+    let json = atlas_engine::solve::value_to_json(&value);
+    let kinds: Vec<&str> = json.typed.iter().map(|t| t.kind).collect();
+    assert_eq!(
+        kinds,
+        vec![
+            "number",
+            "number",
+            "number",
+            "nan",
+            "infinity",
+            "negative_infinity",
+            "string",
+            "string"
+        ]
+    );
+    // Finite numbers keep their exact value in the tag.
+    assert_eq!(
+        json.typed[0].value.as_ref().and_then(|v| v.as_f64()),
+        Some(41.0)
+    );
+    // The legacy plain field still shows the ambiguity for strings, which is
+    // why the tagged sidecar exists: index 3 is real NaN, index 6 is the
+    // string "NaN", and both serialize to the same legacy value.
+    assert_eq!(json.constants[3], json!("NaN"));
+    assert_eq!(json.constants[6], json!("NaN"));
+    assert_ne!(json.typed[3].kind, json.typed[6].kind);
+}
+
+/// F5: integral JS numbers render as exact plain digits below the 1e21
+/// exponential threshold, including magnitudes beyond i64.
+#[test]
+fn f5_big_number_to_string_is_exact() {
+    let big = ConstValue::Num { value: 1e20 };
+    assert_eq!(
+        atlas_engine::solve::js_string(&big).as_deref(),
+        Some("100000000000000000000")
+    );
+    let i64_boundary = ConstValue::Num {
+        value: 9223372036854775808.0,
+    };
+    assert_eq!(
+        atlas_engine::solve::js_string(&i64_boundary).as_deref(),
+        Some("9223372036854775808")
+    );
+    let negative_big = ConstValue::Num { value: -1e20 };
+    assert_eq!(
+        atlas_engine::solve::js_string(&negative_big).as_deref(),
+        Some("-100000000000000000000")
+    );
+    // At and above 1e21 JS switches to exponential notation; we stay unknown
+    // instead of guessing the format.
+    assert_eq!(
+        atlas_engine::solve::js_string(&ConstValue::Num { value: 1e21 }),
+        None
+    );
+    // Concatenation folds the exact digits.
+    let folded = atlas_engine::solve::fold_constants(
+        "+",
+        &ConstValue::Str { value: "".into() },
+        &ConstValue::Num { value: 1e20 },
+    );
+    assert_eq!(
+        folded,
+        Some(ConstValue::Str {
+            value: "100000000000000000000".into()
+        })
+    );
+}
+
+/// F2: a heap write through a wrapper layer propagates to the caller's read.
+#[test]
+fn f2_wrapper_layer_heap_write_is_visible() {
+    let set = simple_function(
+        "set",
+        &["o"],
+        vec![stmt(
+            0,
+            30,
+            StmtKind::Expression {
+                expr: expr(
+                    0,
+                    30,
+                    ExprKind::Assign {
+                        op: "=".into(),
+                        target: AssignTarget::Property {
+                            object: Box::new(local("b:f.ts:p0:o")),
+                            name: "value".into(),
+                        },
+                        value: Box::new(expr(
+                            0,
+                            5,
+                            ExprKind::Const {
+                                value: ConstValue::Num { value: 2.0 },
+                            },
+                        )),
+                    },
+                ),
+            },
+        )],
+    );
+    let wrap = simple_function(
+        "wrap",
+        &["o"],
+        vec![stmt(
+            0,
+            30,
+            StmtKind::Expression {
+                expr: call_args(local("b:f.ts:0:set"), vec![local("b:f.ts:p0:o")]),
+            },
+        )],
+    );
+    let caller = simple_function(
+        "transitive",
+        &[],
+        vec![
+            stmt(
+                0,
+                10,
+                StmtKind::VarDecl {
+                    keyword: "const".into(),
+                    declarators: vec![Declarator {
+                        binding: "b:f.ts:0:o".into(),
+                        init: Some(expr(
+                            0,
+                            10,
+                            ExprKind::ObjectLiteral {
+                                fields: vec![ObjectField {
+                                    name: "value".into(),
+                                    value: expr(
+                                        0,
+                                        5,
+                                        ExprKind::Const {
+                                            value: ConstValue::Num { value: 1.0 },
+                                        },
+                                    ),
+                                }],
+                            },
+                        )),
+                    }],
+                },
+            ),
+            stmt(
+                11,
+                30,
+                StmtKind::Expression {
+                    expr: call_args(local("b:f.ts:0:wrap"), vec![local("b:f.ts:0:o")]),
+                },
+            ),
+            stmt(
+                31,
+                50,
+                StmtKind::Return {
+                    value: Some(expr(
+                        31,
+                        50,
+                        ExprKind::PropertyRead {
+                            object: Box::new(local("b:f.ts:0:o")),
+                            name: "value".into(),
+                            optional: false,
+                        },
+                    )),
+                },
+            ),
+        ],
+    );
+    let caller = with_local_bindings(caller, &[("b:f.ts:0:o", "const")]);
+    let directory = BTreeMap::from([
+        (
+            "b:f.ts:0:set".to_string(),
+            "symbol:f.ts:0:99:set".to_string(),
+        ),
+        (
+            "b:f.ts:0:wrap".to_string(),
+            "symbol:f.ts:0:99:wrap".to_string(),
+        ),
+    ]);
+    let returns = interproc_value(
+        vec![set, wrap, caller],
+        directory,
+        "symbol:f.ts:0:99:transitive",
+    );
+    assert!(
+        returns.constants.contains(&json!(2.0)),
+        "the write must survive the wrapper layer: {:?}",
+        returns.constants
+    );
+}
+
+/// F4: an unknown call invalidates objects reachable transitively through
+/// heap fields, so a nested read stays sound.
+#[test]
+fn f4_nested_reachable_objects_dissolve_on_unknown_call() {
+    let caller = simple_function(
+        "nestedUnknown",
+        &["change"],
+        vec![
+            stmt(
+                0,
+                10,
+                StmtKind::VarDecl {
+                    keyword: "const".into(),
+                    declarators: vec![Declarator {
+                        binding: "b:f.ts:0:inner".into(),
+                        init: Some(expr(
+                            0,
+                            10,
+                            ExprKind::ObjectLiteral {
+                                fields: vec![ObjectField {
+                                    name: "value".into(),
+                                    value: expr(
+                                        0,
+                                        5,
+                                        ExprKind::Const {
+                                            value: ConstValue::Num { value: 1.0 },
+                                        },
+                                    ),
+                                }],
+                            },
+                        )),
+                    }],
+                },
+            ),
+            stmt(
+                11,
+                20,
+                StmtKind::VarDecl {
+                    keyword: "const".into(),
+                    declarators: vec![Declarator {
+                        binding: "b:f.ts:0:outer".into(),
+                        init: Some(expr(
+                            0,
+                            20,
+                            ExprKind::ObjectLiteral {
+                                fields: vec![ObjectField {
+                                    name: "inner".into(),
+                                    value: local("b:f.ts:0:inner"),
+                                }],
+                            },
+                        )),
+                    }],
+                },
+            ),
+            stmt(
+                21,
+                40,
+                StmtKind::Expression {
+                    expr: call_args(local("b:f.ts:p0:change"), vec![local("b:f.ts:0:outer")]),
+                },
+            ),
+            stmt(
+                41,
+                60,
+                StmtKind::Return {
+                    value: Some(expr(
+                        41,
+                        60,
+                        ExprKind::PropertyRead {
+                            object: Box::new(local("b:f.ts:0:inner")),
+                            name: "value".into(),
+                            optional: false,
+                        },
+                    )),
+                },
+            ),
+        ],
+    );
+    let caller = with_local_bindings(
+        caller,
+        &[("b:f.ts:0:inner", "const"), ("b:f.ts:0:outer", "const")],
+    );
+    let output = solve_one(&caller, &BTreeMap::new());
+    assert!(
+        output.returns.unknown,
+        "a nested field reachable from the escaped argument must stay sound: {:?}",
+        output.returns
+    );
+    assert!(
+        !output.returns.constants.contains(&json!(1.0)) || output.returns.unknown,
+        "old value must not be reported as the certain result"
+    );
+}

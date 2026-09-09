@@ -1,0 +1,116 @@
+[
+  {
+    "name": "transitive",
+    "expected": 2,
+    "actual": {
+      "constants": [
+        1.0
+      ],
+      "origins": [
+        "Derived(op7)",
+        "Constant"
+      ],
+      "reasons": [],
+      "targets": [],
+      "typed_constants": [
+        {
+          "kind": "infinity"
+        }
+      ],
+      "unknown": false
+    },
+    "status": "complete_within_profile",
+    "passed": false
+  },
+  {
+    "name": "exceptional",
+    "expected": 2,
+    "actual": {
+      "constants": [
+        1.0
+      ],
+      "origins": [
+        "Derived(op9)",
+        "Constant"
+      ],
+      "reasons": [],
+      "targets": [],
+      "typed_constants": [
+        {
+          "kind": "infinity"
+        }
+      ],
+      "unknown": false
+    },
+    "status": "complete_within_profile",
+    "passed": false
+  },
+  {
+    "name": "finiteNumber",
+    "expected": 41,
+    "actual": {
+      "constants": [
+        41.0
+      ],
+      "origins": [
+        "Constant"
+      ],
+      "reasons": [],
+      "targets": [],
+      "typed_constants": [
+        {
+          "kind": "infinity"
+        }
+      ],
+      "unknown": false
+    },
+    "status": "complete_within_profile",
+    "passed": false
+  },
+  {
+    "name": "hugeString",
+    "expected": "100000000000000000000",
+    "actual": {
+      "constants": [
+        "9223372036854775807"
+      ],
+      "origins": [
+        "Constant"
+      ],
+      "reasons": [],
+      "targets": [],
+      "typed_constants": [
+        {
+          "kind": "string",
+          "value": "9223372036854775807"
+        }
+      ],
+      "unknown": false
+    },
+    "status": "complete_within_profile",
+    "passed": false
+  },
+  {
+    "name": "nestedUnknown",
+    "expected": 2,
+    "actual": {
+      "constants": [
+        1.0
+      ],
+      "origins": [
+        "Derived(op10)",
+        "Constant"
+      ],
+      "reasons": [],
+      "targets": [],
+      "typed_constants": [
+        {
+          "kind": "infinity"
+        }
+      ],
+      "unknown": false
+    },
+    "status": "complete_within_profile",
+    "passed": false
+  }
+]

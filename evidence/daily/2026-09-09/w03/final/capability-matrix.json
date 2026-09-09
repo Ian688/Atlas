@@ -1,0 +1,66 @@
+{
+  "schema": "atlas.capability-matrix.v1",
+  "window": "2026-09-09/w03",
+  "generated_utc": "2026-09-09T10:30:00+08:00",
+  "baseline": {
+    "git_commit": "6b4c474 (w02 delivery)",
+    "review": "evidence/reviews/2026-09-09-w02/REVIEW.md (F1-F5, CHANGES_REQUIRED)"
+  },
+  "review_items": {
+    "F1": {
+      "status": "RESOLVED",
+      "location": "solve.rs typed_constant",
+      "fix": "finite/NaN/±Infinity 守卫:有限数保留 number+精确值",
+      "formal_test": "flow_semantics f1_typed_constants_are_machine_distinguishable(8 常量矩阵,含同名歧义字符串演示)",
+      "probe": "finiteNumber typed=[{kind:number,value:41}]",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW"
+    },
+    "F2": {
+      "status": "RESOLVED",
+      "location": "solve.rs apply_summary_heap",
+      "fix": "重代入效果写入 state.written;实参为单 Parameter origin 时保留参数身份(param{j} 键)向上层传播;单 Allocation site 写具体 site 并登记 written",
+      "formal_test": "flow_semantics f2_wrapper_layer_heap_write_is_visible(set→wrap→caller 三层)",
+      "probe": "transitive constants=[1,2] 含 2",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW"
+    },
+    "F3": {
+      "status": "RESOLVED",
+      "location": "solve.rs transfer_block",
+      "fix": "at_throw 快照改为抛出操作之后的状态:抛出操作自身效果(含未知调用 clobber)在异常路径可见,块内后续操作仍不可见",
+      "formal_test": "r1_perturbation 保持通过(throw 后 x=99 不可见);probe exceptional unknown=true",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW"
+    },
+    "F4": {
+      "status": "RESOLVED",
+      "location": "solve.rs clobber_for_unknown_call",
+      "fix": "沿堆字段值传递可达分配点(有界 CAP_CLOBBER_REACH=64,超限显式 note_unknown);条目以 Top 合并替换而非移除(对象字面量已知缺失不误报)",
+      "formal_test": "flow_semantics f4_nested_reachable_objects_dissolve_on_unknown_call(嵌套对象 read unknown=true)",
+      "probe": "nestedUnknown unknown=true",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW"
+    },
+    "F5": {
+      "status": "RESOLVED",
+      "location": "solve.rs js_string",
+      "fix": "整数值用 {:.0} 精确渲染(1e20 不再经 i64 饱和);≥1e21 指数阈值外保持 unknown",
+      "formal_test": "flow_semantics f5_big_number_to_string_is_exact(±1e20/i64 边界/1e21 阈值/拼接)",
+      "probe": "hugeString='100000000000000000000'",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW"
+    }
+  },
+  "verification": {
+    "verify_py": "PASS 9/9 (evidence/daily/2026-09-09/w03/final/verification)",
+    "probe_adjacent": "exit 0 (5/5)",
+    "probe_semantic_w01": "exit 0",
+    "probe_boundary_w01": "exit 0",
+    "cargo": "34 pass / 0 fail (flow_semantics 23 条)",
+    "worker": "20 pass / 0 fail",
+    "integration": "13 pass",
+    "clippy_deny_warnings": "clean"
+  },
+  "limits_and_remaining": [
+    "已知 setter 写后值保守 {old,new} 合并;无条件写强更新待实现",
+    "k=1 上下文敏感、Capture origin 重代入未实现",
+    "W06 作业队列/取消租约/断电耐久;W07 增量失效",
+    "clobber 可达性有界(64 步),超限显式 note_unknown(不静默)"
+  ]
+}

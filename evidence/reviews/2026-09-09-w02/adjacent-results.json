@@ -1,0 +1,139 @@
+{
+  "source": "\nfunction set(o) { o.value=2; }\nfunction wrap(o) { set(o); }\nfunction fail(o) { o.value=2; throw 7; }\nexport function transitive() { const o={value:1}; wrap(o); return o.value; }\nexport function exceptional() { const o={value:1}; try { fail(o); } catch(e) { return o.value; } }\nexport function finiteNumber() { return 41; }\nexport function hugeString() { return ''+100000000000000000000; }\nexport function nestedUnknown(change) { const inner={value:1}; const outer={inner:inner}; change(outer); return inner.value; }\n",
+  "analysis_id": "b76b49e6824be735bb023553ca4daa596cf8a3aee776e7fdda2727b0f09c35d4",
+  "checks": [
+    {
+      "name": "transitive",
+      "expected": 2,
+      "actual": {
+        "constants": [
+          1.0,
+          2.0
+        ],
+        "origins": [
+          "Derived(op7)",
+          "Constant",
+          "CallResult(op5)",
+          "CallResult(op2)"
+        ],
+        "reasons": [],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 1.0
+          },
+          {
+            "kind": "number",
+            "value": 2.0
+          }
+        ],
+        "unknown": false
+      },
+      "status": "complete_within_profile",
+      "passed": true
+    },
+    {
+      "name": "exceptional",
+      "expected": 2,
+      "actual": {
+        "constants": [
+          1.0,
+          2.0
+        ],
+        "origins": [
+          "Derived(op9)",
+          "Constant",
+          "CallResult(op5)"
+        ],
+        "reasons": [],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 1.0
+          },
+          {
+            "kind": "number",
+            "value": 2.0
+          }
+        ],
+        "unknown": false
+      },
+      "status": "complete_within_profile",
+      "passed": true
+    },
+    {
+      "name": "finiteNumber",
+      "expected": 41,
+      "actual": {
+        "constants": [
+          41.0
+        ],
+        "origins": [
+          "Constant"
+        ],
+        "reasons": [],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 41.0
+          }
+        ],
+        "unknown": false
+      },
+      "status": "complete_within_profile",
+      "passed": true
+    },
+    {
+      "name": "hugeString",
+      "expected": "100000000000000000000",
+      "actual": {
+        "constants": [
+          "100000000000000000000"
+        ],
+        "origins": [
+          "Constant"
+        ],
+        "reasons": [],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "string",
+            "value": "100000000000000000000"
+          }
+        ],
+        "unknown": false
+      },
+      "status": "complete_within_profile",
+      "passed": true
+    },
+    {
+      "name": "nestedUnknown",
+      "expected": 2,
+      "actual": {
+        "constants": [
+          1.0
+        ],
+        "origins": [
+          "Derived(op10)",
+          "Constant"
+        ],
+        "reasons": [
+          "unknown_call_may_modify"
+        ],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 1.0
+          }
+        ],
+        "unknown": true
+      },
+      "status": "complete_within_profile",
+      "passed": true
+    }
+  ]
+}

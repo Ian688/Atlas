@@ -1,0 +1,32 @@
+{
+  "schema": "atlas.daily-changes.v2",
+  "window": "2026-09-09/w03",
+  "generated_utc": "2026-09-09T02:29:34.275196+00:00",
+  "baseline": {
+    "git_commit": "6b4c474 (w02 delivery)",
+    "w02_final_manifest": "evidence/daily/2026-09-09/w02/final/source-manifest.json",
+    "review": "evidence/reviews/2026-09-09-w02/REVIEW.md (F1-F5)"
+  },
+  "modified": [
+    "crates/atlas-engine/src/solve.rs",
+    "crates/atlas-engine/tests/flow_semantics.rs",
+    "docs/implementation/progress.json"
+  ],
+  "added": [],
+  "deleted": [],
+  "renamed": [],
+  "counts": {
+    "modified": 3,
+    "added": 0,
+    "deleted": 0
+  },
+  "line_diff": "git diff 6b4c474..HEAD captured in changes.patch (true line-level diff now that a Git baseline exists)",
+  "reasons": {
+    "F1": "solve.rs typed_constant: finite/NaN/±Infinity 守卫(41 不再是 infinity)",
+    "F2": "solve.rs apply_summary_heap: written 重代入(参数身份保留),包装层堆写传递",
+    "F3": "solve.rs transfer_block: at_throw 改为抛出操作后状态(调用自身堆效果在异常路径可见)",
+    "F4": "solve.rs clobber_for_unknown_call: 沿堆值传递可达分配点失效(有界)+Top 替换(不再移除)",
+    "F5": "solve.rs js_string: 积分值 {:.0} 精确渲染(1e20 不再 i64 饱和)",
+    "tests": "flow_semantics.rs 新增 f1/f2/f4/f5 正式回归(含扰动);solve.rs fold_constants/js_string 公开供测试"
+  }
+}

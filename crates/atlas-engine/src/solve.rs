@@ -26,6 +26,8 @@ pub const MAX_BLOCK_VISITS: usize = 48;
 pub const MAX_TRANSFERS: usize = 300_000;
 pub const MAX_OP_VALUES: usize = 2048;
 pub const MAX_LISTED_BINDINGS: usize = 64;
+/// Bounded transitive reachability steps for unknown-call heap invalidation.
+pub const CAP_CLOBBER_REACH: usize = 64;
 
 /// Binding id -> (definition ops, per-def use sites).
 pub type DefUseMap = BTreeMap<String, (BTreeSet<u32>, BTreeMap<u32, BTreeSet<u32>>)>;
@@ -802,13 +804,18 @@ impl<'a> Solver<'a> {
                 self.budget_exhausted = true;
                 break;
             }
-            if self.lowered.ops[op_index as usize].may_throw {
-                let mut pre = state.clone();
-                pre.completion = Completion::Normal;
-                pre.completion_value = None;
-                at_throw.insert(op_index, pre);
-            }
+            let may_throw = self.lowered.ops[op_index as usize].may_throw;
             self.transfer_op(&mut state, op_index);
+            if may_throw {
+                // Exception successors observe the state AFTER the throwing
+                // operation: its own effects (calls may write heap/state
+                // before throwing) are real, while LATER operations in the
+                // block have not executed (R1/F3).
+                let mut post = state.clone();
+                post.completion = Completion::Normal;
+                post.completion_value = None;
+                at_throw.insert(op_index, post);
+            }
         }
         (state, at_throw)
     }
@@ -1341,7 +1348,12 @@ impl<'a> Solver<'a> {
     /// objects that escaped as arguments may have been modified, and every
     /// wildcard-reachable field may have been touched. Affected concrete
     /// entries dissolve into wildcard tops so later reads stay sound.
-    fn clobber_for_unknown_call(&self, state: &mut State, arg_values: &[Value]) {
+    /// Conservative invalidation for operations whose write set is unknown:
+    /// every allocation site REACHABLE from escaped arguments (transitively
+    /// through heap values, bounded) may have been modified, so its concrete
+    /// entries dissolve into wildcard tops instead of being removed — a later
+    /// read must observe unknown, never a confidently stale value (F4).
+    fn clobber_for_unknown_call(&mut self, state: &mut State, arg_values: &[Value]) {
         let mut escaped_sites: BTreeSet<String> = BTreeSet::new();
         for value in arg_values {
             for origin in &value.origins {
@@ -1350,24 +1362,42 @@ impl<'a> Solver<'a> {
                 }
             }
         }
-        let keys: Vec<(String, String)> = state.heap.keys().cloned().collect();
-        for key in keys {
-            let (site, field) = key;
-            let is_escaped = escaped_sites.contains(&site);
-            if site == "*" || is_escaped {
-                let entry = state.heap.get(&(site.clone(), field.clone())).cloned();
-                let wildcard_key = ("*".to_string(), field.clone());
+        // Transitive reachability through heap entry values (bounded by the
+        // heap budget; the heap itself is capped so this terminates).
+        let mut pending: Vec<String> = escaped_sites.iter().cloned().collect();
+        let mut visited: BTreeSet<String> = BTreeSet::new();
+        let mut steps = 0usize;
+        while let Some(site) = pending.pop() {
+            if !visited.insert(site.clone()) {
+                continue;
+            }
+            steps += 1;
+            if steps > crate::solve::CAP_CLOBBER_REACH {
+                self.note_unknown("clobber_reach_budget_exceeded");
+                break;
+            }
+            let keys: Vec<(String, String)> = state
+                .heap
+                .keys()
+                .filter(|(s, _)| s == &site)
+                .cloned()
+                .collect();
+            for key in keys {
+                let entry = state.heap.get(&key).cloned();
                 let mut unknown_written = Value::top("unknown_call_may_modify");
-                if let Some(existing) = state.heap.get(&wildcard_key) {
-                    unknown_written = unknown_written.merge(existing);
+                if let Some(existing) = entry {
+                    // Child allocations reachable through this field value are
+                    // escaped as well.
+                    for origin in &existing.origins {
+                        if let Origin::Allocation(child) = origin {
+                            pending.push(format!("op{child}"));
+                        }
+                    }
+                    unknown_written = unknown_written.merge(&existing);
                 }
-                if let Some(entry) = entry {
-                    unknown_written = unknown_written.merge(&entry);
-                }
-                state.heap.insert(wildcard_key, unknown_written);
-                if is_escaped {
-                    state.heap.remove(&(site, field));
-                }
+                // Replace (never remove): a known object-literal site whose
+                // entry vanished would otherwise read as known-undefined.
+                state.heap.insert(key, unknown_written);
             }
         }
         let wildcard_fields: Vec<String> = state
@@ -1417,6 +1447,10 @@ impl<'a> Solver<'a> {
                     continue;
                 };
                 let mut applied = false;
+                // A single known allocation site receives the write on that
+                // site; a single parameter origin keeps the parameter identity
+                // so the re-based write propagates through wrapper layers
+                // (F2); anything else lands in the wildcard.
                 if !actual.unknown
                     && actual.origins.len() == 1
                     && let Some(Origin::Allocation(site_op)) = actual.origins.first()
@@ -1431,7 +1465,23 @@ impl<'a> Solver<'a> {
                         Some(existing) => existing.merge(&rebased),
                         None => rebased.clone(),
                     };
-                    state.heap.insert(key, merged);
+                    state.heap.insert(key.clone(), merged);
+                    let recorded = match state.written.get(&key) {
+                        Some(existing) => existing.merge(&rebased),
+                        None => rebased.clone(),
+                    };
+                    state.written.insert(key, recorded);
+                    applied = true;
+                } else if !actual.unknown
+                    && actual.origins.len() == 1
+                    && let Some(Origin::Parameter(inner)) = actual.origins.first()
+                {
+                    let key = (format!("param{inner}"), field.clone());
+                    let merged = match state.written.get(&key) {
+                        Some(existing) => existing.merge(&rebased),
+                        None => rebased.clone(),
+                    };
+                    state.written.insert(key, merged);
                     applied = true;
                 }
                 if !applied {
@@ -1440,7 +1490,12 @@ impl<'a> Solver<'a> {
                         Some(existing) => existing.merge(&rebased),
                         None => rebased.clone(),
                     };
-                    state.heap.insert(wildcard_key, merged);
+                    state.heap.insert(wildcard_key.clone(), merged);
+                    let recorded = match state.written.get(&wildcard_key) {
+                        Some(existing) => existing.merge(&rebased),
+                        None => rebased.clone(),
+                    };
+                    state.written.insert(wildcard_key, recorded);
                 }
             }
         }
@@ -1942,7 +1997,7 @@ fn js_number(value: &ConstValue) -> Option<f64> {
     }
 }
 
-fn js_string(value: &ConstValue) -> Option<String> {
+pub fn js_string(value: &ConstValue) -> Option<String> {
     match value {
         ConstValue::Str { value: s } => Some(s.clone()),
         ConstValue::Bool { value: b } => Some(b.to_string()),
@@ -1956,7 +2011,10 @@ fn js_string(value: &ConstValue) -> Option<String> {
                 return Some("0".into()); // covers -0 too
             }
             if n.fract() == 0.0 && n.abs() < 1e21 {
-                return Some(format!("{}", *n as i64));
+                // JS prints plain digits below 1e21. `{:.0}` renders the exact
+                // integer value of the f64 without narrow-integer saturation
+                // (1e20 exceeds i64 but is exactly representable).
+                return Some(format!("{:.0}", n));
             }
             // JS uses plain decimal notation roughly in [1e-6, 1e21); inside
             // that band Rust's shortest round-trip formatting matches, so the
@@ -2030,11 +2088,13 @@ fn typed_constant(value: &ConstValue) -> TypedConstant {
             kind: "nan",
             value: None,
         },
-        ConstValue::Num { value: n } if *n > 0.0 => TypedConstant {
+        // Only non-finite magnitudes are infinities; every finite number
+        // keeps its exact value in `number` (F1).
+        ConstValue::Num { value: n } if n.is_infinite() && *n > 0.0 => TypedConstant {
             kind: "infinity",
             value: None,
         },
-        ConstValue::Num { value: n } if *n < 0.0 => TypedConstant {
+        ConstValue::Num { value: n } if n.is_infinite() => TypedConstant {
             kind: "negative_infinity",
             value: None,
         },
@@ -2059,6 +2119,21 @@ fn typed_constant(value: &ConstValue) -> TypedConstant {
             value: None,
         },
     }
+}
+
+/// Build a value from constants (test/builder helper; applies caps and origins).
+pub fn value_from_constants(constants: Vec<ConstValue>) -> Value {
+    let mut value = Value {
+        constants: Vec::new(),
+        targets: Vec::new(),
+        origins: Vec::new(),
+        unknown: false,
+        reasons: BTreeSet::new(),
+    };
+    for constant in constants {
+        value = value.merge(&Value::constant(constant));
+    }
+    value
 }
 
 pub fn value_to_json(value: &Value) -> ValueJson {

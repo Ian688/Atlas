@@ -1,0 +1,1470 @@
+diff --git a/crates/atlas-engine/src/solve.rs b/crates/atlas-engine/src/solve.rs
+index 3100fac..f844bfc 100644
+--- a/crates/atlas-engine/src/solve.rs
++++ b/crates/atlas-engine/src/solve.rs
+@@ -26,6 +26,8 @@ pub const MAX_BLOCK_VISITS: usize = 48;
+ pub const MAX_TRANSFERS: usize = 300_000;
+ pub const MAX_OP_VALUES: usize = 2048;
+ pub const MAX_LISTED_BINDINGS: usize = 64;
++/// Bounded transitive reachability steps for unknown-call heap invalidation.
++pub const CAP_CLOBBER_REACH: usize = 64;
+ 
+ /// Binding id -> (definition ops, per-def use sites).
+ pub type DefUseMap = BTreeMap<String, (BTreeSet<u32>, BTreeMap<u32, BTreeSet<u32>>)>;
+@@ -802,13 +804,18 @@ impl<'a> Solver<'a> {
+                 self.budget_exhausted = true;
+                 break;
+             }
+-            if self.lowered.ops[op_index as usize].may_throw {
+-                let mut pre = state.clone();
+-                pre.completion = Completion::Normal;
+-                pre.completion_value = None;
+-                at_throw.insert(op_index, pre);
+-            }
++            let may_throw = self.lowered.ops[op_index as usize].may_throw;
+             self.transfer_op(&mut state, op_index);
++            if may_throw {
++                // Exception successors observe the state AFTER the throwing
++                // operation: its own effects (calls may write heap/state
++                // before throwing) are real, while LATER operations in the
++                // block have not executed (R1/F3).
++                let mut post = state.clone();
++                post.completion = Completion::Normal;
++                post.completion_value = None;
++                at_throw.insert(op_index, post);
++            }
+         }
+         (state, at_throw)
+     }
+@@ -1341,7 +1348,12 @@ impl<'a> Solver<'a> {
+     /// objects that escaped as arguments may have been modified, and every
+     /// wildcard-reachable field may have been touched. Affected concrete
+     /// entries dissolve into wildcard tops so later reads stay sound.
+-    fn clobber_for_unknown_call(&self, state: &mut State, arg_values: &[Value]) {
++    /// Conservative invalidation for operations whose write set is unknown:
++    /// every allocation site REACHABLE from escaped arguments (transitively
++    /// through heap values, bounded) may have been modified, so its concrete
++    /// entries dissolve into wildcard tops instead of being removed — a later
++    /// read must observe unknown, never a confidently stale value (F4).
++    fn clobber_for_unknown_call(&mut self, state: &mut State, arg_values: &[Value]) {
+         let mut escaped_sites: BTreeSet<String> = BTreeSet::new();
+         for value in arg_values {
+             for origin in &value.origins {
+@@ -1350,24 +1362,42 @@ impl<'a> Solver<'a> {
+                 }
+             }
+         }
+-        let keys: Vec<(String, String)> = state.heap.keys().cloned().collect();
+-        for key in keys {
+-            let (site, field) = key;
+-            let is_escaped = escaped_sites.contains(&site);
+-            if site == "*" || is_escaped {
+-                let entry = state.heap.get(&(site.clone(), field.clone())).cloned();
+-                let wildcard_key = ("*".to_string(), field.clone());
++        // Transitive reachability through heap entry values (bounded by the
++        // heap budget; the heap itself is capped so this terminates).
++        let mut pending: Vec<String> = escaped_sites.iter().cloned().collect();
++        let mut visited: BTreeSet<String> = BTreeSet::new();
++        let mut steps = 0usize;
++        while let Some(site) = pending.pop() {
++            if !visited.insert(site.clone()) {
++                continue;
++            }
++            steps += 1;
++            if steps > crate::solve::CAP_CLOBBER_REACH {
++                self.note_unknown("clobber_reach_budget_exceeded");
++                break;
++            }
++            let keys: Vec<(String, String)> = state
++                .heap
++                .keys()
++                .filter(|(s, _)| s == &site)
++                .cloned()
++                .collect();
++            for key in keys {
++                let entry = state.heap.get(&key).cloned();
+                 let mut unknown_written = Value::top("unknown_call_may_modify");
+-                if let Some(existing) = state.heap.get(&wildcard_key) {
+-                    unknown_written = unknown_written.merge(existing);
+-                }
+-                if let Some(entry) = entry {
+-                    unknown_written = unknown_written.merge(&entry);
+-                }
+-                state.heap.insert(wildcard_key, unknown_written);
+-                if is_escaped {
+-                    state.heap.remove(&(site, field));
++                if let Some(existing) = entry {
++                    // Child allocations reachable through this field value are
++                    // escaped as well.
++                    for origin in &existing.origins {
++                        if let Origin::Allocation(child) = origin {
++                            pending.push(format!("op{child}"));
++                        }
++                    }
++                    unknown_written = unknown_written.merge(&existing);
+                 }
++                // Replace (never remove): a known object-literal site whose
++                // entry vanished would otherwise read as known-undefined.
++                state.heap.insert(key, unknown_written);
+             }
+         }
+         let wildcard_fields: Vec<String> = state
+@@ -1417,6 +1447,10 @@ impl<'a> Solver<'a> {
+                     continue;
+                 };
+                 let mut applied = false;
++                // A single known allocation site receives the write on that
++                // site; a single parameter origin keeps the parameter identity
++                // so the re-based write propagates through wrapper layers
++                // (F2); anything else lands in the wildcard.
+                 if !actual.unknown
+                     && actual.origins.len() == 1
+                     && let Some(Origin::Allocation(site_op)) = actual.origins.first()
+@@ -1431,7 +1465,23 @@ impl<'a> Solver<'a> {
+                         Some(existing) => existing.merge(&rebased),
+                         None => rebased.clone(),
+                     };
+-                    state.heap.insert(key, merged);
++                    state.heap.insert(key.clone(), merged);
++                    let recorded = match state.written.get(&key) {
++                        Some(existing) => existing.merge(&rebased),
++                        None => rebased.clone(),
++                    };
++                    state.written.insert(key, recorded);
++                    applied = true;
++                } else if !actual.unknown
++                    && actual.origins.len() == 1
++                    && let Some(Origin::Parameter(inner)) = actual.origins.first()
++                {
++                    let key = (format!("param{inner}"), field.clone());
++                    let merged = match state.written.get(&key) {
++                        Some(existing) => existing.merge(&rebased),
++                        None => rebased.clone(),
++                    };
++                    state.written.insert(key, merged);
+                     applied = true;
+                 }
+                 if !applied {
+@@ -1440,7 +1490,12 @@ impl<'a> Solver<'a> {
+                         Some(existing) => existing.merge(&rebased),
+                         None => rebased.clone(),
+                     };
+-                    state.heap.insert(wildcard_key, merged);
++                    state.heap.insert(wildcard_key.clone(), merged);
++                    let recorded = match state.written.get(&wildcard_key) {
++                        Some(existing) => existing.merge(&rebased),
++                        None => rebased.clone(),
++                    };
++                    state.written.insert(wildcard_key, recorded);
+                 }
+             }
+         }
+@@ -1942,7 +1997,7 @@ fn js_number(value: &ConstValue) -> Option<f64> {
+     }
+ }
+ 
+-fn js_string(value: &ConstValue) -> Option<String> {
++pub fn js_string(value: &ConstValue) -> Option<String> {
+     match value {
+         ConstValue::Str { value: s } => Some(s.clone()),
+         ConstValue::Bool { value: b } => Some(b.to_string()),
+@@ -1956,7 +2011,10 @@ fn js_string(value: &ConstValue) -> Option<String> {
+                 return Some("0".into()); // covers -0 too
+             }
+             if n.fract() == 0.0 && n.abs() < 1e21 {
+-                return Some(format!("{}", *n as i64));
++                // JS prints plain digits below 1e21. `{:.0}` renders the exact
++                // integer value of the f64 without narrow-integer saturation
++                // (1e20 exceeds i64 but is exactly representable).
++                return Some(format!("{:.0}", n));
+             }
+             // JS uses plain decimal notation roughly in [1e-6, 1e21); inside
+             // that band Rust's shortest round-trip formatting matches, so the
+@@ -2030,11 +2088,13 @@ fn typed_constant(value: &ConstValue) -> TypedConstant {
+             kind: "nan",
+             value: None,
+         },
+-        ConstValue::Num { value: n } if *n > 0.0 => TypedConstant {
++        // Only non-finite magnitudes are infinities; every finite number
++        // keeps its exact value in `number` (F1).
++        ConstValue::Num { value: n } if n.is_infinite() && *n > 0.0 => TypedConstant {
+             kind: "infinity",
+             value: None,
+         },
+-        ConstValue::Num { value: n } if *n < 0.0 => TypedConstant {
++        ConstValue::Num { value: n } if n.is_infinite() => TypedConstant {
+             kind: "negative_infinity",
+             value: None,
+         },
+@@ -2061,6 +2121,21 @@ fn typed_constant(value: &ConstValue) -> TypedConstant {
+     }
+ }
+ 
++/// Build a value from constants (test/builder helper; applies caps and origins).
++pub fn value_from_constants(constants: Vec<ConstValue>) -> Value {
++    let mut value = Value {
++        constants: Vec::new(),
++        targets: Vec::new(),
++        origins: Vec::new(),
++        unknown: false,
++        reasons: BTreeSet::new(),
++    };
++    for constant in constants {
++        value = value.merge(&Value::constant(constant));
++    }
++    value
++}
++
+ pub fn value_to_json(value: &Value) -> ValueJson {
+     ValueJson {
+         constants: value.constants.iter().map(const_to_json).collect(),
+diff --git a/crates/atlas-engine/tests/flow_semantics.rs b/crates/atlas-engine/tests/flow_semantics.rs
+index 80654f5..57c7f0a 100644
+--- a/crates/atlas-engine/tests/flow_semantics.rs
++++ b/crates/atlas-engine/tests/flow_semantics.rs
+@@ -1932,3 +1932,311 @@ fn r1_perturbation_throw_ordering_keeps_partial_state() {
+         output.throws.constants
+     );
+ }
++
++// ===================== w03 formal regression tests =====================
++// Extracted from the second review's adjacent probes
++// (evidence/reviews/2026-09-09-w02/probe_adjacent.py) plus perturbations.
++
++/// F1: typed_constants must distinguish finite numbers from NaN/±Infinity and
++/// from same-text strings.
++#[test]
++fn f1_typed_constants_are_machine_distinguishable() {
++    let value = atlas_engine::solve::value_from_constants(vec![
++        ConstValue::Num { value: 41.0 },
++        ConstValue::Num { value: -5.0 },
++        ConstValue::Num { value: 0.5 },
++        ConstValue::Num { value: f64::NAN },
++        ConstValue::Num {
++            value: f64::INFINITY,
++        },
++        ConstValue::Num {
++            value: f64::NEG_INFINITY,
++        },
++        ConstValue::Str {
++            value: "NaN".into(),
++        },
++        ConstValue::Str {
++            value: "Infinity".into(),
++        },
++    ]);
++    let json = atlas_engine::solve::value_to_json(&value);
++    let kinds: Vec<&str> = json.typed.iter().map(|t| t.kind).collect();
++    assert_eq!(
++        kinds,
++        vec![
++            "number",
++            "number",
++            "number",
++            "nan",
++            "infinity",
++            "negative_infinity",
++            "string",
++            "string"
++        ]
++    );
++    // Finite numbers keep their exact value in the tag.
++    assert_eq!(
++        json.typed[0].value.as_ref().and_then(|v| v.as_f64()),
++        Some(41.0)
++    );
++    // The legacy plain field still shows the ambiguity for strings, which is
++    // why the tagged sidecar exists: index 3 is real NaN, index 6 is the
++    // string "NaN", and both serialize to the same legacy value.
++    assert_eq!(json.constants[3], json!("NaN"));
++    assert_eq!(json.constants[6], json!("NaN"));
++    assert_ne!(json.typed[3].kind, json.typed[6].kind);
++}
++
++/// F5: integral JS numbers render as exact plain digits below the 1e21
++/// exponential threshold, including magnitudes beyond i64.
++#[test]
++fn f5_big_number_to_string_is_exact() {
++    let big = ConstValue::Num { value: 1e20 };
++    assert_eq!(
++        atlas_engine::solve::js_string(&big).as_deref(),
++        Some("100000000000000000000")
++    );
++    let i64_boundary = ConstValue::Num {
++        value: 9223372036854775808.0,
++    };
++    assert_eq!(
++        atlas_engine::solve::js_string(&i64_boundary).as_deref(),
++        Some("9223372036854775808")
++    );
++    let negative_big = ConstValue::Num { value: -1e20 };
++    assert_eq!(
++        atlas_engine::solve::js_string(&negative_big).as_deref(),
++        Some("-100000000000000000000")
++    );
++    // At and above 1e21 JS switches to exponential notation; we stay unknown
++    // instead of guessing the format.
++    assert_eq!(
++        atlas_engine::solve::js_string(&ConstValue::Num { value: 1e21 }),
++        None
++    );
++    // Concatenation folds the exact digits.
++    let folded = atlas_engine::solve::fold_constants(
++        "+",
++        &ConstValue::Str { value: "".into() },
++        &ConstValue::Num { value: 1e20 },
++    );
++    assert_eq!(
++        folded,
++        Some(ConstValue::Str {
++            value: "100000000000000000000".into()
++        })
++    );
++}
++
++/// F2: a heap write through a wrapper layer propagates to the caller's read.
++#[test]
++fn f2_wrapper_layer_heap_write_is_visible() {
++    let set = simple_function(
++        "set",
++        &["o"],
++        vec![stmt(
++            0,
++            30,
++            StmtKind::Expression {
++                expr: expr(
++                    0,
++                    30,
++                    ExprKind::Assign {
++                        op: "=".into(),
++                        target: AssignTarget::Property {
++                            object: Box::new(local("b:f.ts:p0:o")),
++                            name: "value".into(),
++                        },
++                        value: Box::new(expr(
++                            0,
++                            5,
++                            ExprKind::Const {
++                                value: ConstValue::Num { value: 2.0 },
++                            },
++                        )),
++                    },
++                ),
++            },
++        )],
++    );
++    let wrap = simple_function(
++        "wrap",
++        &["o"],
++        vec![stmt(
++            0,
++            30,
++            StmtKind::Expression {
++                expr: call_args(local("b:f.ts:0:set"), vec![local("b:f.ts:p0:o")]),
++            },
++        )],
++    );
++    let caller = simple_function(
++        "transitive",
++        &[],
++        vec![
++            stmt(
++                0,
++                10,
++                StmtKind::VarDecl {
++                    keyword: "const".into(),
++                    declarators: vec![Declarator {
++                        binding: "b:f.ts:0:o".into(),
++                        init: Some(expr(
++                            0,
++                            10,
++                            ExprKind::ObjectLiteral {
++                                fields: vec![ObjectField {
++                                    name: "value".into(),
++                                    value: expr(
++                                        0,
++                                        5,
++                                        ExprKind::Const {
++                                            value: ConstValue::Num { value: 1.0 },
++                                        },
++                                    ),
++                                }],
++                            },
++                        )),
++                    }],
++                },
++            ),
++            stmt(
++                11,
++                30,
++                StmtKind::Expression {
++                    expr: call_args(local("b:f.ts:0:wrap"), vec![local("b:f.ts:0:o")]),
++                },
++            ),
++            stmt(
++                31,
++                50,
++                StmtKind::Return {
++                    value: Some(expr(
++                        31,
++                        50,
++                        ExprKind::PropertyRead {
++                            object: Box::new(local("b:f.ts:0:o")),
++                            name: "value".into(),
++                            optional: false,
++                        },
++                    )),
++                },
++            ),
++        ],
++    );
++    let caller = with_local_bindings(caller, &[("b:f.ts:0:o", "const")]);
++    let directory = BTreeMap::from([
++        (
++            "b:f.ts:0:set".to_string(),
++            "symbol:f.ts:0:99:set".to_string(),
++        ),
++        (
++            "b:f.ts:0:wrap".to_string(),
++            "symbol:f.ts:0:99:wrap".to_string(),
++        ),
++    ]);
++    let returns = interproc_value(
++        vec![set, wrap, caller],
++        directory,
++        "symbol:f.ts:0:99:transitive",
++    );
++    assert!(
++        returns.constants.contains(&json!(2.0)),
++        "the write must survive the wrapper layer: {:?}",
++        returns.constants
++    );
++}
++
++/// F4: an unknown call invalidates objects reachable transitively through
++/// heap fields, so a nested read stays sound.
++#[test]
++fn f4_nested_reachable_objects_dissolve_on_unknown_call() {
++    let caller = simple_function(
++        "nestedUnknown",
++        &["change"],
++        vec![
++            stmt(
++                0,
++                10,
++                StmtKind::VarDecl {
++                    keyword: "const".into(),
++                    declarators: vec![Declarator {
++                        binding: "b:f.ts:0:inner".into(),
++                        init: Some(expr(
++                            0,
++                            10,
++                            ExprKind::ObjectLiteral {
++                                fields: vec![ObjectField {
++                                    name: "value".into(),
++                                    value: expr(
++                                        0,
++                                        5,
++                                        ExprKind::Const {
++                                            value: ConstValue::Num { value: 1.0 },
++                                        },
++                                    ),
++                                }],
++                            },
++                        )),
++                    }],
++                },
++            ),
++            stmt(
++                11,
++                20,
++                StmtKind::VarDecl {
++                    keyword: "const".into(),
++                    declarators: vec![Declarator {
++                        binding: "b:f.ts:0:outer".into(),
++                        init: Some(expr(
++                            0,
++                            20,
++                            ExprKind::ObjectLiteral {
++                                fields: vec![ObjectField {
++                                    name: "inner".into(),
++                                    value: local("b:f.ts:0:inner"),
++                                }],
++                            },
++                        )),
++                    }],
++                },
++            ),
++            stmt(
++                21,
++                40,
++                StmtKind::Expression {
++                    expr: call_args(local("b:f.ts:p0:change"), vec![local("b:f.ts:0:outer")]),
++                },
++            ),
++            stmt(
++                41,
++                60,
++                StmtKind::Return {
++                    value: Some(expr(
++                        41,
++                        60,
++                        ExprKind::PropertyRead {
++                            object: Box::new(local("b:f.ts:0:inner")),
++                            name: "value".into(),
++                            optional: false,
++                        },
++                    )),
++                },
++            ),
++        ],
++    );
++    let caller = with_local_bindings(
++        caller,
++        &[("b:f.ts:0:inner", "const"), ("b:f.ts:0:outer", "const")],
++    );
++    let output = solve_one(&caller, &BTreeMap::new());
++    assert!(
++        output.returns.unknown,
++        "a nested field reachable from the escaped argument must stay sound: {:?}",
++        output.returns
++    );
++    assert!(
++        !output.returns.constants.contains(&json!(1.0)) || output.returns.unknown,
++        "old value must not be reported as the certain result"
++    );
++}
+diff --git a/docs/implementation/progress.json b/docs/implementation/progress.json
+index 9dcd495..b9a7b00 100644
+--- a/docs/implementation/progress.json
++++ b/docs/implementation/progress.json
+@@ -7,11 +7,10 @@
+   "mode": "external_agent_daily_window",
+   "window_limit_hours": 10,
+   "active_window": {
+-    "window": "2026-09-09/w02",
+-    "started_local": "2026-09-09T05:15:51+08:00",
+-    "started_utc": "2026-09-08T21:15:51Z",
++    "window": "2026-09-09/w03",
++    "started_local": "2026-09-09T08:27:00+08:00",
+     "status": "RUNNING",
+-    "note": "修复复审 CHANGES_REQUIRED(evidence/reviews/2026-09-09-w01/REVIEW.md):R1-R7 全部完成并通过独立 probe(退出码 0);M1 参数常量/目标代入+调用图重调度完成;M2 tagged constants sidecar+Dispatch 精度完成;M3 台账重构完成。"
++    "note": "修复第二轮复审 CHANGES_REQUIRED(evidence/reviews/2026-09-09-w02/REVIEW.md):F1-F5 全部完成并通过 probe_adjacent(退出码 0)。"
+   },
+   "windows": [
+     {
+@@ -50,10 +49,23 @@
+         "M3"
+       ],
+       "report": "evidence/daily/2026-09-09/w02/final/daily-report.md"
++    },
++    {
++      "id": "2026-09-09/w03",
++      "started_local": "2026-09-09T08:27:00+08:00",
++      "status": "RUNNING",
++      "work_items": [
++        "F1",
++        "F2",
++        "F3",
++        "F4",
++        "F5"
++      ],
++      "report": "evidence/daily/2026-09-09/w03/final/daily-report.md"
+     }
+   ],
+   "next_work_item": "W06-剩余",
+-  "next_action": "W06 剩余(取消信号/作业队列租约/崩溃恢复矩阵);W07 增量失效;M1 的 k=1 上下文敏感。先处理下一轮复审 CHANGES_REQUIRED(若有)。",
++  "next_action": "W06 剩余(取消信号/作业队列租约)、W07 增量失效、M1 的 k=1 上下文敏感;先处理下一轮复审反馈。",
+   "baseline": {
+     "foundation_evidence": "../../evidence/foundation/verification.json",
+     "status": "REFERENCE_ONLY",
+@@ -478,7 +490,8 @@
+         "status": "IMPLEMENTED",
+         "tested_by": [
+           "flow_semantics d02_short_circuit_rhs_reachability",
+-          "flow-lab shortCircuit integration (pruning evidence)"
++          "flow-lab shortCircuit integration (pruning evidence)",
++          "w03: 短路临时值跨块保留(op_values 保留集)"
+         ],
+         "gaps": []
+       },
+@@ -644,6 +657,34 @@
+           "test_flow_facts_through_real_worker_store_cli_and_http"
+         ],
+         "gaps": []
++      },
++      "R2-异常路径堆效果": {
++        "status": "IMPLEMENTED",
++        "tested_by": [
++          "flow_semantics r2_unknown_call_clobbers_escaped_objects(普通路径)",
++          "probe_adjacent exceptional(异常路径 unknown=true)"
++        ],
++        "gaps": [
++          "精确写后值仍为保守 unknown"
++        ]
++      },
++      "F2-多层包装堆写": {
++        "status": "IMPLEMENTED",
++        "tested_by": [
++          "flow_semantics f2_wrapper_layer_heap_write_is_visible(set→wrap→caller 三层)",
++          "probe_adjacent transitive([1,2] 含 2)"
++        ],
++        "gaps": [
++          "无条件写强更新仍为保守合并"
++        ]
++      },
++      "F5-大数转字符串": {
++        "status": "IMPLEMENTED",
++        "tested_by": [
++          "flow_semantics f5_big_number_to_string_is_exact(±1e20/i64边界/1e21 阈值/拼接)",
++          "probe_adjacent hugeString"
++        ],
++        "gaps": []
+       }
+     }
+   },
+diff --git a/evidence/reviews/2026-09-09-w01/boundary-probes.json b/evidence/reviews/2026-09-09-w01/boundary-probes.json
+index d55aca0..e04813c 100644
+--- a/evidence/reviews/2026-09-09-w01/boundary-probes.json
++++ b/evidence/reviews/2026-09-09-w01/boundary-probes.json
+@@ -1,18 +1,18 @@
+ {
+-  "time_utc": "2026-09-09T00:08:02.273452+00:00",
++  "time_utc": "2026-09-09T02:25:46.330008+00:00",
+   "cases": [
+     {
+       "case": "optional_catch",
+       "argv": [
+         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+         "--store",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-svir2ghd/store",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-5bsc4e0w/store",
+         "index",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-svir2ghd/project"
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-5bsc4e0w/project"
+       ],
+       "exit_code": 0,
+-      "seconds": 1.317,
+-      "stdout": "{\n  \"call_count\": 0,\n  \"coverage\": {\n    \"catalog_entries\": 2,\n    \"disposition:captured\": 1,\n    \"disposition:directory\": 1,\n    \"encountered_source_files\": 1,\n    \"flow_complete_within_profile\": 1,\n    \"flow_functions\": 1,\n    \"flow_partial\": 0,\n    \"flow_unknown_regions\": 0,\n    \"interproc_recursive_sccs\": 0,\n    \"interproc_sccs\": 1,\n    \"parsed_source_files\": 1\n  },\n  \"diagnostics\": [],\n  \"edge_count\": 2,\n  \"engine\": \"foundation-flow-0.2.0\",\n  \"file_count\": 1,\n  \"flow_digest\": \"5882dae7ed99c2103ef94524b90577dd1ef2eafec9998f0e68c17bbc85ccad31\",\n  \"function_count\": 1,\n  \"id\": \"96ac02b57c1b98144e85342c9f1bf28c7d494a2255c87347510fa8f3e03d4f94\",\n  \"limitations\": [\n    \"Lexical declaration candidates, not a complete runtime call graph or execution trace.\",\n    \"Snapshot captures files over an interval; it is not an atomic filesystem transaction.\",\n    \"Only captured UTF-8 JS/TS inputs; external dependencies, standard library and project tsconfig are not loaded.\",\n    \"Ignored directories are explicit boundaries; their unvisited descendants are not counted.\",\n    \"Local flow facts cover declared profile js-structured-control.v1 only; other constructs are explicit unknowns. Interprocedural summaries are symbolic per function (Parameter origins re-based per callsite); captured origins are not re-substituted and unknown callees stay top.\"\n  ],\n  \"node_count\": 3,\n  \"producer\": \"typescript/5.9.3;worker/0.2.0\",\n  \"recursive_components\": [],\n  \"schema\": \"atlas.analysis.v1\",\n  \"snapshot_id\": \"576f801bcdafc11e27cda41d841dc9d27963d18abde47ea227bd12aedad75119\",\n  \"unresolved_call_count\": 0\n}\n",
++      "seconds": 1.282,
++      "stdout": "{\n  \"call_count\": 0,\n  \"coverage\": {\n    \"catalog_entries\": 2,\n    \"disposition:captured\": 1,\n    \"disposition:directory\": 1,\n    \"encountered_source_files\": 1,\n    \"flow_complete_within_profile\": 1,\n    \"flow_functions\": 1,\n    \"flow_partial\": 0,\n    \"flow_unknown_regions\": 0,\n    \"interproc_recursive_sccs\": 0,\n    \"interproc_sccs\": 1,\n    \"parsed_source_files\": 1\n  },\n  \"diagnostics\": [],\n  \"edge_count\": 2,\n  \"engine\": \"foundation-flow-0.2.0\",\n  \"file_count\": 1,\n  \"flow_digest\": \"25f4c485cf782701b50e917a55c3df1d6fb99ee79cfcc0572b041d4c180c9523\",\n  \"function_count\": 1,\n  \"id\": \"38ae268800f025ae60907ee77b52e797a0623d6b6a338fa92e5beb3628dfe155\",\n  \"limitations\": [\n    \"Lexical declaration candidates, not a complete runtime call graph or execution trace.\",\n    \"Snapshot captures files over an interval; it is not an atomic filesystem transaction.\",\n    \"Only captured UTF-8 JS/TS inputs; external dependencies, standard library and project tsconfig are not loaded.\",\n    \"Ignored directories are explicit boundaries; their unvisited descendants are not counted.\",\n    \"Local flow facts cover declared profile js-structured-control.v1 only; other constructs are explicit unknowns. Interprocedural summaries are symbolic per function (Parameter origins re-based per callsite); captured origins are not re-substituted and unknown callees stay top.\"\n  ],\n  \"node_count\": 3,\n  \"producer\": \"typescript/5.9.3;worker/0.2.0\",\n  \"recursive_components\": [],\n  \"schema\": \"atlas.analysis.v1\",\n  \"snapshot_id\": \"576f801bcdafc11e27cda41d841dc9d27963d18abde47ea227bd12aedad75119\",\n  \"unresolved_call_count\": 0\n}\n",
+       "stderr": "",
+       "published_counts": {
+         "snapshots": 1,
+@@ -29,14 +29,14 @@
+       "argv": [
+         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+         "--store",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-mb6c24an/store",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-3galb07s/store",
+         "index",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-mb6c24an/project",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-3galb07s/project",
+         "--worker",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-mb6c24an/worker.mjs"
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-3galb07s/worker.mjs"
+       ],
+       "exit_code": 1,
+-      "seconds": 1.247,
++      "seconds": 1.187,
+       "stdout": "",
+       "stderr": "Error: Invalid(\"duplicate_flow_binding_id\")\n",
+       "published_counts": {
+@@ -54,14 +54,14 @@
+       "argv": [
+         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+         "--store",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-73ohtb9y/store",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-u_thsoja/store",
+         "index",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-73ohtb9y/project",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-u_thsoja/project",
+         "--worker",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-73ohtb9y/worker.mjs"
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-u_thsoja/worker.mjs"
+       ],
+       "exit_code": 1,
+-      "seconds": 1.474,
++      "seconds": 1.197,
+       "stdout": "",
+       "stderr": "Error: Invalid(\"flow_coverage_mismatch\")\n",
+       "published_counts": {
+@@ -79,14 +79,14 @@
+       "argv": [
+         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+         "--store",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-xpjquczt/store",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-7il29qve/store",
+         "index",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-xpjquczt/project",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-7il29qve/project",
+         "--worker",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-xpjquczt/worker.mjs"
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-7il29qve/worker.mjs"
+       ],
+       "exit_code": 1,
+-      "seconds": 1.144,
++      "seconds": 1.285,
+       "stdout": "",
+       "stderr": "Error: Invalid(\"flow_reference_unknown_binding\")\n",
+       "published_counts": {
+@@ -104,14 +104,14 @@
+       "argv": [
+         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+         "--store",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-d35np1fb/store",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-w00ijy99/store",
+         "index",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-d35np1fb/project",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-w00ijy99/project",
+         "--index-deadline-seconds",
+         "2"
+       ],
+       "exit_code": 1,
+-      "seconds": 2.078,
++      "seconds": 2.084,
+       "stdout": "",
+       "stderr": "Error: \"worker_deadline\"\n",
+       "published_counts": {
+@@ -129,16 +129,16 @@
+       "argv": [
+         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+         "--store",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-881d2hoq/store",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-lbhovpp2/store",
+         "index",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-881d2hoq/project",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-lbhovpp2/project",
+         "--index-deadline-seconds",
+         "1",
+         "--worker",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-881d2hoq/worker.mjs"
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-lbhovpp2/worker.mjs"
+       ],
+       "exit_code": 1,
+-      "seconds": 1.105,
++      "seconds": 1.127,
+       "stdout": "",
+       "stderr": "Error: Invalid(\"analysis_deadline_exceeded_no_analysis_published\")\n",
+       "published_counts": {
+diff --git a/evidence/reviews/2026-09-09-w01/semantic-probes.json b/evidence/reviews/2026-09-09-w01/semantic-probes.json
+index 82ef41e..a08409b 100644
+--- a/evidence/reviews/2026-09-09-w01/semantic-probes.json
++++ b/evidence/reviews/2026-09-09-w01/semantic-probes.json
+@@ -1,5 +1,5 @@
+ {
+-  "time_utc": "2026-09-09T00:07:41.744484+00:00",
++  "time_utc": "2026-09-09T02:25:25.966579+00:00",
+   "fixture_sha256": "b372e4682948272dcb13bd46ccf4dd2f75103f0fb3fa12f4c61f6389a131ffdf",
+   "analysis": {
+     "call_count": 9,
+@@ -20,9 +20,9 @@
+     "edge_count": 29,
+     "engine": "foundation-flow-0.2.0",
+     "file_count": 1,
+-    "flow_digest": "9eaa809df61f6c674f783b9a6b52a5218f91ff464f1c4a9124ef7221281b2df5",
++    "flow_digest": "50d1e8a2995fec9f796c426540072e57890b21df64845adb7c224c51ce6c6835",
+     "function_count": 19,
+-    "id": "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++    "id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+     "limitations": [
+       "Lexical declaration candidates, not a complete runtime call graph or execution trace.",
+       "Snapshot captures files over an interval; it is not an atomic filesystem transaction.",
+@@ -92,7 +92,7 @@
+         "id": "atlas-local-absint",
+         "version": "0.1.0"
+       },
+-      "analysis_id": "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+       "binding_kinds": {
+         "b:probe.mjs:1045:change": "param",
+         "b:probe.mjs:1059:x": "let",
+@@ -180,7 +180,8 @@
+                 "targets": [],
+                 "typed_constants": [
+                   {
+-                    "kind": "infinity"
++                    "kind": "number",
++                    "value": 1.0
+                   }
+                 ],
+                 "unknown": false
+@@ -360,10 +361,12 @@
+           "targets": [],
+           "typed_constants": [
+             {
+-              "kind": "infinity"
++              "kind": "number",
++              "value": 2.0
+             },
+             {
+-              "kind": "infinity"
++              "kind": "number",
++              "value": 1.0
+             }
+           ],
+           "unknown": false
+@@ -478,10 +481,12 @@
+         "targets": [],
+         "typed_constants": [
+           {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 2.0
+           },
+           {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 1.0
+           }
+         ],
+         "unknown": false
+@@ -507,7 +512,7 @@
+         "id": "atlas-local-absint",
+         "version": "0.1.0"
+       },
+-      "analysis_id": "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+       "binding_kinds": {
+         "b:probe.mjs:143:o": "const"
+       },
+@@ -694,10 +699,12 @@
+           "targets": [],
+           "typed_constants": [
+             {
+-              "kind": "infinity"
++              "kind": "number",
++              "value": 1.0
+             },
+             {
+-              "kind": "infinity"
++              "kind": "number",
++              "value": 2.0
+             }
+           ],
+           "unknown": false
+@@ -796,10 +803,12 @@
+         "targets": [],
+         "typed_constants": [
+           {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 1.0
+           },
+           {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 2.0
+           }
+         ],
+         "unknown": false
+@@ -825,7 +834,7 @@
+         "id": "atlas-local-absint",
+         "version": "0.1.0"
+       },
+-      "analysis_id": "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+       "binding_kinds": {
+         "b:probe.mjs:222:change": "param",
+         "b:probe.mjs:238:o": "const"
+@@ -1014,7 +1023,6 @@
+         },
+         "summary_returns": {
+           "constants": [
+-            "undefined",
+             1.0
+           ],
+           "origins": [
+@@ -1027,10 +1035,8 @@
+           "targets": [],
+           "typed_constants": [
+             {
+-              "kind": "undefined"
+-            },
+-            {
+-              "kind": "infinity"
++              "kind": "number",
++              "value": 1.0
+             }
+           ],
+           "unknown": true
+@@ -1117,7 +1123,6 @@
+       "pruned_edges": [],
+       "returns": {
+         "constants": [
+-          "undefined",
+           1.0
+         ],
+         "origins": [
+@@ -1130,10 +1135,8 @@
+         "targets": [],
+         "typed_constants": [
+           {
+-            "kind": "undefined"
+-          },
+-          {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 1.0
+           }
+         ],
+         "unknown": true
+@@ -1159,7 +1162,7 @@
+         "id": "atlas-local-absint",
+         "version": "0.1.0"
+       },
+-      "analysis_id": "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+       "binding_kinds": {},
+       "binding_names": {},
+       "block_states": [
+@@ -1261,7 +1264,8 @@
+           "targets": [],
+           "typed_constants": [
+             {
+-              "kind": "infinity"
++              "kind": "number",
++              "value": 2.0
+             }
+           ],
+           "unknown": false
+@@ -1317,7 +1321,8 @@
+         "targets": [],
+         "typed_constants": [
+           {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 2.0
+           }
+         ],
+         "unknown": false
+@@ -1341,7 +1346,7 @@
+         "id": "atlas-local-absint",
+         "version": "0.1.0"
+       },
+-      "analysis_id": "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+       "binding_kinds": {},
+       "binding_names": {},
+       "block_states": [
+@@ -1443,7 +1448,8 @@
+           "targets": [],
+           "typed_constants": [
+             {
+-              "kind": "infinity"
++              "kind": "number",
++              "value": 1.0
+             }
+           ],
+           "unknown": false
+@@ -1499,7 +1505,8 @@
+         "targets": [],
+         "typed_constants": [
+           {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 1.0
+           }
+         ],
+         "unknown": false
+@@ -1523,7 +1530,7 @@
+         "id": "atlas-local-absint",
+         "version": "0.1.0"
+       },
+-      "analysis_id": "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+       "binding_kinds": {
+         "b:probe.mjs:417:flag": "param",
+         "b:probe.mjs:431:o": "const"
+@@ -1890,7 +1897,8 @@
+           "targets": [],
+           "typed_constants": [
+             {
+-              "kind": "infinity"
++              "kind": "number",
++              "value": 1.0
+             },
+             {
+               "kind": "undefined"
+@@ -2007,7 +2015,8 @@
+         "targets": [],
+         "typed_constants": [
+           {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 1.0
+           },
+           {
+             "kind": "undefined"
+@@ -2034,7 +2043,7 @@
+         "id": "atlas-local-absint",
+         "version": "0.1.0"
+       },
+-      "analysis_id": "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+       "binding_kinds": {
+         "b:probe.mjs:515:f": "const"
+       },
+@@ -2213,7 +2222,8 @@
+               "targets": [],
+               "typed_constants": [
+                 {
+-                  "kind": "infinity"
++                  "kind": "number",
++                  "value": 1.0
+                 }
+               ],
+               "unknown": false
+@@ -2255,7 +2265,8 @@
+           "targets": [],
+           "typed_constants": [
+             {
+-              "kind": "infinity"
++              "kind": "number",
++              "value": 1.0
+             }
+           ],
+           "unknown": false
+@@ -2336,7 +2347,8 @@
+         "targets": [],
+         "typed_constants": [
+           {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 1.0
+           }
+         ],
+         "unknown": false
+@@ -2362,7 +2374,7 @@
+         "id": "atlas-local-absint",
+         "version": "0.1.0"
+       },
+-      "analysis_id": "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+       "binding_kinds": {},
+       "binding_names": {},
+       "block_states": [
+@@ -2454,7 +2466,8 @@
+                 "targets": [],
+                 "typed_constants": [
+                   {
+-                    "kind": "infinity"
++                    "kind": "number",
++                    "value": 41.0
+                   }
+                 ],
+                 "unknown": false
+@@ -2475,7 +2488,8 @@
+               "targets": [],
+               "typed_constants": [
+                 {
+-                  "kind": "infinity"
++                  "kind": "number",
++                  "value": 41.0
+                 }
+               ],
+               "unknown": false
+@@ -2516,7 +2530,8 @@
+           "targets": [],
+           "typed_constants": [
+             {
+-              "kind": "infinity"
++              "kind": "number",
++              "value": 41.0
+             }
+           ],
+           "unknown": false
+@@ -2573,7 +2588,8 @@
+         "targets": [],
+         "typed_constants": [
+           {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 41.0
+           }
+         ],
+         "unknown": false
+@@ -2599,7 +2615,7 @@
+         "id": "atlas-local-absint",
+         "version": "0.1.0"
+       },
+-      "analysis_id": "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+       "binding_kinds": {
+         "b:probe.mjs:649:f": "function",
+         "b:probe.mjs:676:inner": "function"
+@@ -2743,7 +2759,8 @@
+               "targets": [],
+               "typed_constants": [
+                 {
+-                  "kind": "infinity"
++                  "kind": "number",
++                  "value": 1.0
+                 }
+               ],
+               "unknown": true
+@@ -2789,7 +2806,8 @@
+           "targets": [],
+           "typed_constants": [
+             {
+-              "kind": "infinity"
++              "kind": "number",
++              "value": 1.0
+             }
+           ],
+           "unknown": true
+@@ -2890,7 +2908,8 @@
+         "targets": [],
+         "typed_constants": [
+           {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 1.0
+           }
+         ],
+         "unknown": true
+@@ -2914,7 +2933,7 @@
+         "id": "atlas-local-absint",
+         "version": "0.1.0"
+       },
+-      "analysis_id": "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+       "binding_kinds": {
+         "b:probe.mjs:765:x": "let",
+         "b:probe.mjs:778:previous": "const"
+@@ -3190,7 +3209,7 @@
+         "id": "atlas-local-absint",
+         "version": "0.1.0"
+       },
+-      "analysis_id": "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+       "binding_kinds": {
+         "b:probe.mjs:881:x": "const"
+       },
+@@ -3265,7 +3284,8 @@
+                 "targets": [],
+                 "typed_constants": [
+                   {
+-                    "kind": "infinity"
++                    "kind": "number",
++                    "value": 2.0
+                   }
+                 ],
+                 "unknown": false
+@@ -3437,7 +3457,8 @@
+           "targets": [],
+           "typed_constants": [
+             {
+-              "kind": "infinity"
++              "kind": "number",
++              "value": 1.0
+             }
+           ],
+           "unknown": false
+@@ -3528,7 +3549,8 @@
+         "targets": [],
+         "typed_constants": [
+           {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 1.0
+           }
+         ],
+         "unknown": false
+@@ -3552,7 +3574,7 @@
+         "id": "atlas-local-absint",
+         "version": "0.1.0"
+       },
+-      "analysis_id": "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+       "binding_kinds": {
+         "b:probe.mjs:942:fail": "function",
+         "b:probe.mjs:995:e": "catch"
+@@ -3766,10 +3788,12 @@
+           "targets": [],
+           "typed_constants": [
+             {
+-              "kind": "infinity"
++              "kind": "number",
++              "value": 1.0
+             },
+             {
+-              "kind": "infinity"
++              "kind": "number",
++              "value": 7.0
+             }
+           ],
+           "unknown": false
+@@ -3868,10 +3892,12 @@
+         "targets": [],
+         "typed_constants": [
+           {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 1.0
+           },
+           {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 7.0
+           }
+         ],
+         "unknown": false
+@@ -3895,7 +3921,7 @@
+     {
+       "argv": [
+         "node",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-m0n4x7my/oracle.mjs"
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-i2r4kxt9/oracle.mjs"
+       ],
+       "exit_code": 0,
+       "stderr": ""
+@@ -3904,9 +3930,9 @@
+       "argv": [
+         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+         "--store",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-m0n4x7my/store",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-i2r4kxt9/store",
+         "index",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-m0n4x7my/project"
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-i2r4kxt9/project"
+       ],
+       "exit_code": 0,
+       "stderr": ""
+@@ -3915,9 +3941,9 @@
+       "argv": [
+         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+         "--store",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-m0n4x7my/store",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-i2r4kxt9/store",
+         "nodes",
+-        "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+         "--kind",
+         "function",
+         "--limit",
+@@ -3930,9 +3956,9 @@
+       "argv": [
+         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+         "--store",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-m0n4x7my/store",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-i2r4kxt9/store",
+         "flow",
+-        "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+         "symbol:probe.mjs:1014:1126"
+       ],
+       "exit_code": 0,
+@@ -3942,9 +3968,9 @@
+       "argv": [
+         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+         "--store",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-m0n4x7my/store",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-i2r4kxt9/store",
+         "flow",
+-        "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+         "symbol:probe.mjs:103:189"
+       ],
+       "exit_code": 0,
+@@ -3954,9 +3980,9 @@
+       "argv": [
+         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+         "--store",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-m0n4x7my/store",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-i2r4kxt9/store",
+         "flow",
+-        "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+         "symbol:probe.mjs:190:282"
+       ],
+       "exit_code": 0,
+@@ -3966,9 +3992,9 @@
+       "argv": [
+         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+         "--store",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-m0n4x7my/store",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-i2r4kxt9/store",
+         "flow",
+-        "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+         "symbol:probe.mjs:283:335"
+       ],
+       "exit_code": 0,
+@@ -3978,9 +4004,9 @@
+       "argv": [
+         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+         "--store",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-m0n4x7my/store",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-i2r4kxt9/store",
+         "flow",
+-        "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+         "symbol:probe.mjs:336:387"
+       ],
+       "exit_code": 0,
+@@ -3990,9 +4016,9 @@
+       "argv": [
+         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+         "--store",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-m0n4x7my/store",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-i2r4kxt9/store",
+         "flow",
+-        "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+         "symbol:probe.mjs:388:476"
+       ],
+       "exit_code": 0,
+@@ -4002,9 +4028,9 @@
+       "argv": [
+         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+         "--store",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-m0n4x7my/store",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-i2r4kxt9/store",
+         "flow",
+-        "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+         "symbol:probe.mjs:477:547"
+       ],
+       "exit_code": 0,
+@@ -4014,9 +4040,9 @@
+       "argv": [
+         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+         "--store",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-m0n4x7my/store",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-i2r4kxt9/store",
+         "flow",
+-        "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+         "symbol:probe.mjs:548:605"
+       ],
+       "exit_code": 0,
+@@ -4026,9 +4052,9 @@
+       "argv": [
+         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+         "--store",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-m0n4x7my/store",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-i2r4kxt9/store",
+         "flow",
+-        "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+         "symbol:probe.mjs:606:730"
+       ],
+       "exit_code": 0,
+@@ -4038,9 +4064,9 @@
+       "argv": [
+         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+         "--store",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-m0n4x7my/store",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-i2r4kxt9/store",
+         "flow",
+-        "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+         "symbol:probe.mjs:731:812"
+       ],
+       "exit_code": 0,
+@@ -4050,9 +4076,9 @@
+       "argv": [
+         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+         "--store",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-m0n4x7my/store",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-i2r4kxt9/store",
+         "flow",
+-        "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+         "symbol:probe.mjs:813:901"
+       ],
+       "exit_code": 0,
+@@ -4062,9 +4088,9 @@
+       "argv": [
+         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+         "--store",
+-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-m0n4x7my/store",
++        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-i2r4kxt9/store",
+         "flow",
+-        "4a358275bd8312978ef2dda25a4e21f1ee4fb42b04e9890868b36c2d503e1a93",
++        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+         "symbol:probe.mjs:902:1013"
+       ],
+       "exit_code": 0,
+@@ -4092,10 +4118,12 @@
+         "targets": [],
+         "typed_constants": [
+           {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 2.0
+           },
+           {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 1.0
+           }
+         ],
+         "unknown": false
+@@ -4122,10 +4150,12 @@
+         "targets": [],
+         "typed_constants": [
+           {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 1.0
+           },
+           {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 2.0
+           }
+         ],
+         "unknown": false
+@@ -4140,7 +4170,6 @@
+       },
+       "actual": {
+         "constants": [
+-          "undefined",
+           1.0
+         ],
+         "origins": [
+@@ -4153,10 +4182,8 @@
+         "targets": [],
+         "typed_constants": [
+           {
+-            "kind": "undefined"
+-          },
+-          {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 1.0
+           }
+         ],
+         "unknown": true
+@@ -4180,7 +4207,8 @@
+         "targets": [],
+         "typed_constants": [
+           {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 2.0
+           }
+         ],
+         "unknown": false
+@@ -4204,7 +4232,8 @@
+         "targets": [],
+         "typed_constants": [
+           {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 1.0
+           }
+         ],
+         "unknown": false
+@@ -4229,7 +4258,8 @@
+         "targets": [],
+         "typed_constants": [
+           {
+-            "kind": "infinity"
++            "kind": "number",
++            "value": 1.0
+           },
+           {
+             "kind": "undefined"

@@ -7,11 +7,10 @@
   "mode": "external_agent_daily_window",
   "window_limit_hours": 10,
   "active_window": {
-    "window": "2026-09-09/w02",
-    "started_local": "2026-09-09T05:15:51+08:00",
-    "started_utc": "2026-09-08T21:15:51Z",
+    "window": "2026-09-09/w03",
+    "started_local": "2026-09-09T08:27:00+08:00",
     "status": "RUNNING",
-    "note": "修复复审 CHANGES_REQUIRED(evidence/reviews/2026-09-09-w01/REVIEW.md):R1-R7 全部完成并通过独立 probe(退出码 0);M1 参数常量/目标代入+调用图重调度完成;M2 tagged constants sidecar+Dispatch 精度完成;M3 台账重构完成。"
+    "note": "修复第二轮复审 CHANGES_REQUIRED(evidence/reviews/2026-09-09-w02/REVIEW.md):F1-F5 全部完成并通过 probe_adjacent(退出码 0)。"
   },
   "windows": [
     {
@@ -50,10 +49,23 @@
         "M3"
       ],
       "report": "evidence/daily/2026-09-09/w02/final/daily-report.md"
+    },
+    {
+      "id": "2026-09-09/w03",
+      "started_local": "2026-09-09T08:27:00+08:00",
+      "status": "RUNNING",
+      "work_items": [
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F5"
+      ],
+      "report": "evidence/daily/2026-09-09/w03/final/daily-report.md"
     }
   ],
   "next_work_item": "W06-剩余",
-  "next_action": "W06 剩余(取消信号/作业队列租约/崩溃恢复矩阵);W07 增量失效;M1 的 k=1 上下文敏感。先处理下一轮复审 CHANGES_REQUIRED(若有)。",
+  "next_action": "W06 剩余(取消信号/作业队列租约)、W07 增量失效、M1 的 k=1 上下文敏感;先处理下一轮复审反馈。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
@@ -478,7 +490,8 @@
         "status": "IMPLEMENTED",
         "tested_by": [
           "flow_semantics d02_short_circuit_rhs_reachability",
-          "flow-lab shortCircuit integration (pruning evidence)"
+          "flow-lab shortCircuit integration (pruning evidence)",
+          "w03: 短路临时值跨块保留(op_values 保留集)"
         ],
         "gaps": []
       },
@@ -642,6 +655,34 @@
         "status": "IMPLEMENTED",
         "tested_by": [
           "test_flow_facts_through_real_worker_store_cli_and_http"
+        ],
+        "gaps": []
+      },
+      "R2-异常路径堆效果": {
+        "status": "IMPLEMENTED",
+        "tested_by": [
+          "flow_semantics r2_unknown_call_clobbers_escaped_objects(普通路径)",
+          "probe_adjacent exceptional(异常路径 unknown=true)"
+        ],
+        "gaps": [
+          "精确写后值仍为保守 unknown"
+        ]
+      },
+      "F2-多层包装堆写": {
+        "status": "IMPLEMENTED",
+        "tested_by": [
+          "flow_semantics f2_wrapper_layer_heap_write_is_visible(set→wrap→caller 三层)",
+          "probe_adjacent transitive([1,2] 含 2)"
+        ],
+        "gaps": [
+          "无条件写强更新仍为保守合并"
+        ]
+      },
+      "F5-大数转字符串": {
+        "status": "IMPLEMENTED",
+        "tested_by": [
+          "flow_semantics f5_big_number_to_string_is_exact(±1e20/i64边界/1e21 阈值/拼接)",
+          "probe_adjacent hugeString"
         ],
         "gaps": []
       }
