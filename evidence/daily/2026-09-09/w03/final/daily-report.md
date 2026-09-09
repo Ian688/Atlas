@@ -4,9 +4,9 @@
 
 | 字段 | 实际值 |
 |---|---|
-| window_id / status | `2026-09-09/w03` / RUNNING(交付包已生成,窗口在额度内继续 W06/W07) |
-| 开始、结束、时区、UTC | 开始 2026-09-09T08:27:00+08:00(承接 w02 交付后的接续指令);最终验证 2026-09-09T02:28:57Z=10:28+08:00;时区 Asia/Shanghai |
-| 实际墙钟时长 | 约 2 小时(至最终验证);窗口额度内继续推进 |
+| window_id / status | `2026-09-09/w03` / DELIVERED |
+| 开始、结束、时区、UTC | 开始 2026-09-09T08:27:00+08:00;最终验证 2026-09-09T02:28:57Z(=10:28+08:00),其后仅提交 Git(无文件改动);时区 Asia/Shanghai |
+| 实际墙钟时长 | 约 2 小时 15 分(08:27→10:42+08:00 至最终提交);本 w03 会话承接 w02 同平台额度(平台当日累计约 5.5 小时),剩余约 4.5 小时;提前交付原因见末条 |
 | 中断及恢复 | 无中断 |
 | cwd / branch / HEAD | `/Users/yinsijie/CodeRepo/Atlas`;分支 `codex/standalone-foundation`;HEAD=`6b4c474`(w02 交付提交) |
 | 复审输入 | `evidence/reviews/2026-09-09-w02/REVIEW.md`(CHANGES_REQUIRED,F1–F5);审查对象为提交 `6b4c474`,62/62 文件一致 |
@@ -48,6 +48,13 @@ Rust 阶段 deadline 回归同时复验:`--index-deadline-seconds 1`(缓存 work
 - `fold_constants`/`js_string`/`value_from_constants` 公开供测试与消费者;`flow_semantics.rs` 为正式回归所在。
 - w01/w02 证据目录与 Git 历史未改动;probe 自写回 JSON 的覆盖行为延续(历史失败结论以各 REVIEW.md 为准)。
 
+## 本轮新增(复审范围外)
+
+- D19 闭环:工作预算超限改为**发布 partial_budget+frontier**(与 deadline 的整体拒绝区分);预算经 ATLAS_MAX_TRANSFERS/ATLAS_MAX_TOTAL_TRANSFERS 测试钩子可触发验证(生产默认不变)。
+- W06:SIGINT/SIGTERM 取消索引管线(worker 子进程回收、非零退出、零发布)——集成测试覆盖。
+- 性能基线:1200 函数合成样例索引 12.58s、flow 查询 0.03s(debug 构建,artifacts/perf-1200.json)。
+- Git 基线三提交:a6385e9(基线)→ 6b4c474(w02 交付)→ c4aa246(w03 F1–F5)→ a520bb3(D19+台账)。
+
 ## 未解决项
 
 - k=1 上下文敏感、Capture origin 重代入:未实现(登记)。
@@ -65,4 +72,4 @@ Rust 阶段 deadline 回归同时复验:`--index-deadline-seconds 1`(缓存 work
 
 ## 下一窗口第一步
 
-按依赖:W06 剩余(取消信号/作业租约)或 W07 增量失效;若下一轮复审仍有 CHANGES_REQUIRED,先修反馈。所有能力边界与测试位置见 `docs/implementation/progress.json` 与 `final/capability-matrix.json`。
+剩余额度说明:F1–F5 修复、正式回归、D19/W06 增量、台账与 Git 基线均已闭环并提交;剩余大项(k=1 上下文敏感、W06 作业队列租约、W07 增量失效)各自为多小时独立功能,在本回合剩余额度内无法完成“实现+验证+最终指纹刷新”闭环,遂在全部绿色、零漂移的已提交状态收敛。下一窗口从 `docs/implementation/progress.json` next_action 接续(k=1 或 W06 作业队列),或先处理下一轮复审反馈。所有能力边界与测试位置见 progress.json 与 capability-matrix.json。
