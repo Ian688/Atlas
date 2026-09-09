@@ -1,0 +1,19 @@
+{
+  "fixture": "120 files / 1200 chained functions (synthetic)",
+  "index_total_s": 12.58,
+  "flow_query_s": 0.03,
+  "coverage": {
+    "catalog_entries": 121,
+    "disposition:captured": 120,
+    "disposition:directory": 1,
+    "encountered_source_files": 120,
+    "flow_complete_within_profile": 1200,
+    "flow_functions": 1200,
+    "flow_partial": 0,
+    "flow_unknown_regions": 0,
+    "interproc_recursive_sccs": 0,
+    "interproc_sccs": 1200,
+    "parsed_source_files": 120
+  },
+  "note": "debug build; not a large-project qualification"
+}

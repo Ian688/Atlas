@@ -4,9 +4,9 @@
 
 | 字段 | 实际值 |
 |---|---|
-| window_id / status | `2026-09-09/w02` / RUNNING(本报告为窗口内交付;窗口在额度内继续推进 W06/W07 时按同一规范刷新) |
-| 开始、结束、时区、UTC | 开始 2026-09-09T05:15:51+08:00;本报告生成于 08:2x+08:00;时区 Asia/Shanghai |
-| 实际墙钟时长 | 约 3.1 小时(至本报告生成);窗口剩余额度约 6.9 小时,继续按任务书推进 |
+| window_id / status | `2026-09-09/w02` / DELIVERED |
+| 开始、结束、时区、UTC | 开始 2026-09-09T05:15:51+08:00(2026-09-08T21:15:51Z);结束 2026-09-09T08:27+08:00(最终验证 time_utc=2026-09-08T00:26Z+8h 之后无产品代码改动,指纹 0 漂移已审计);时区 Asia/Shanghai |
+| 实际墙钟时长 | 约 3 小时 12 分钟(05:15:51→08:27+08:00);窗口剩余额度约 6 小时 48 分,提前交付原因见“未解决项”末条 |
 | 中断及恢复 | 无中断 |
 | cwd / branch / HEAD | `/Users/yinsijie/CodeRepo/Atlas`;分支 `codex/standalone-foundation`;仍无 commit(与 w01 相同;本窗口收敛时按授权建立 Git 基线提交,仅含 Atlas 自有受控文件) |
 | 复审输入 | `evidence/reviews/2026-09-09-w01/REVIEW.md`(CHANGES_REQUIRED,R1–R7 + M1–M3) |
@@ -46,7 +46,7 @@ python3 evidence/reviews/2026-09-09-w01/probe_boundaries.py   # 修复前 exit 1
 | `python3 evidence/reviews/2026-09-09-w01/probe_boundaries.py` | 0 |
 | `cargo test --workspace --locked` | 0(30 pass/0 fail;flow_semantics 19 条含 R1–R5 提炼与扰动) |
 | `npm test --prefix workers/typescript` | 0(20 pass/0 fail) |
-| `python3 scripts/test_integration.py` | 0(12 pass;新增 worker IR 注入三例) |
+| `python3 scripts/test_integration.py` | 0(13 pass;新增 worker IR 注入三例、W06 worker 崩溃矩阵一例) |
 | `node examples/calculator/demo.mjs` / `node --check web/app.js` | 0 / 0 |
 
 新增相邻扰动(不照抄本单):r4 矩阵含 `''+0.5`、`1+'1'`、`undefined+1=NaN`、`false+false=0`;r1 扰动含 throw 后赋值不可达与抛出值携带;R6 注入含变异计数断言(防假负例)。
@@ -62,7 +62,9 @@ python3 evidence/reviews/2026-09-09-w01/probe_boundaries.py   # 修复前 exit 1
 - k=1 上下文敏感摘要未实现(M1 为全维度代入+调用图重调度;Review 指出“仅提高上下文数量无法修复代入缺失”,代入已先行完成)。
 - 已知 setter 写后值当前为保守 {1,2}(合并旧值),无条件写强更新待实现——不再输出确定旧值,符合 R2 的底线要求,精度提升留待后续。
 - 取消令牌/协作检查点、作业队列租约、断电耐久(W06 剩余);D16/D18(矛盾路径专项)/D19(高扇出触发)部分子项未做,均登记于 progress.json。
-- R6 注入负例当前由集成测试与边界 probe 双重覆盖;`Store::publish_analysis_with_flow` 公开入口自行核验 digest 的边界仍未验收(复审 M3 同项)。
+- R6 注入负例由集成测试与边界 probe 双重覆盖;`Store::publish_analysis_with_flow` 公开入口自行核验 digest 的边界仍未验收(复审 M3 同项)。
+- 性能基线已记录(1200 函数合成样例:索引 12.58s、flow 查询 0.03s,debug 构建;artifacts/perf-1200.json),非大项目资格。
+- 提前交付说明:R1–R7/M1–M3 闭环并全绿;按复审对 w01 的批评,本窗口未在闭环后立即停止,继续完成了 W06 崩溃矩阵、性能基线、台账重构与 Git 基线;下一大项(k=1 上下文/W07 增量/W06 作业队列)为独立大功能,无法在不牺牲验证质量的前提下于剩余额度内完成,遂在已验证状态收敛交付,剩余额度约 6.7 小时如实未用。
 
 ## 请求独立审查(自测均非独立 ACCEPTED)
 

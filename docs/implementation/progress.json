@@ -289,11 +289,13 @@
         "多项目同库隔离与跨 analysis 查询拒绝(test_multi_project_store_isolation)",
         "索引管线级 deadline(--index-deadline-seconds,默认 600/上限 3600;剩余预算分配给 scan/worker 各阶段)",
         "并发重复 index 幂等同终态(并发两进程同 id)",
-        "worker 阶段既有 1–600s 期限/输出上限/kill_on_drop 沿用"
+        "worker 阶段既有 1–600s 期限/输出上限/kill_on_drop 沿用",
+        "worker 崩溃矩阵集成测试:非零退出→零新增 Analysis,旧分析(含 flow facts)完整可读"
       ],
       "evidence": [
         "crates/atlas-engine/src/scan.rs deadline + tests",
-        "scripts/test_integration.py test_multi_project_store_isolation"
+        "scripts/test_integration.py test_multi_project_store_isolation",
+        "scripts/test_integration.py test_worker_crash_leaves_store_intact_and_old_analyses_readable"
       ],
       "blockers": [
         "取消信号、作业队列/租约、崩溃恢复矩阵、断电耐久仍未实现"
@@ -644,5 +646,12 @@
         "gaps": []
       }
     }
+  },
+  "performance_baseline": {
+    "recorded_utc": "2026-09-09T00:22:28.569404+00:00",
+    "artifact": "evidence/daily/2026-09-09/w02/final/artifacts/perf-1200.json",
+    "index_1200fn_debug_s": 12.58,
+    "flow_query_s": 0.03,
+    "qualification": "debug build synthetic; not a large-project qualification"
   }
 }

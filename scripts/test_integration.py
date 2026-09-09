@@ -500,6 +500,30 @@ class Integration(unittest.TestCase):
                     self.assertEqual(analyses, 0, f"{name}: no analysis may be published")
                     self.assertEqual(facts, 0, f"{name}: no derived facts may be published")
 
+    def test_worker_crash_leaves_store_intact_and_old_analyses_readable(self):
+        """W06: a worker that exits non-zero mid-pipeline publishes nothing,
+        and previously published analyses stay readable."""
+        shutil.rmtree(self.project)
+        self.project.mkdir()
+        (self.project / "ok.js").write_text("export function fine(){return 1}")
+        a = self.index()
+        crashing_worker = self.base / "crash.mjs"
+        crashing_worker.write_text("process.exit(3);")
+        result = subprocess.run(
+            [str(BIN), "--store", str(self.store), "index", str(self.project), "--worker", str(crashing_worker)],
+            cwd=ROOT, capture_output=True, text=True, timeout=90,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        import sqlite3
+        with sqlite3.connect(self.store / "atlas.db") as conn:
+            analyses = conn.execute("SELECT COUNT(*) FROM analyses").fetchone()[0]
+        self.assertEqual(analyses, 1, "crashed worker must not add analyses")
+        # Old analysis stays fully readable, including derived flow facts.
+        self.cli("report", a["id"])
+        symbols = {n["name"]: n["id"] for n in self.cli("nodes", a["id"], "--kind", "function")["items"]}
+        flow = self.cli("flow", a["id"], symbols["fine"])
+        self.assertEqual(flow["status"], "complete_within_profile")
+
     def test_flow_queries_reject_unknown_symbols(self):
         """D20-lite: invented flow facts cannot be queried into existence."""
         shutil.rmtree(self.project)

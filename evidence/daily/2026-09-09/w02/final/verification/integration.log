@@ -1,11 +1,11 @@
-Synthetic boundary: 120 files / 1200 functions / 14.81s incl. CLI queries; not GE qualification
+Synthetic boundary: 120 files / 1200 functions / 13.94s incl. CLI queries; not GE qualification
 test_alpha_renaming_yields_equivalent_flow_facts (__main__.Integration.test_alpha_renaming_yields_equivalent_flow_facts)
 D21: same-length alpha renaming must produce byte-identical flow ... ok
 test_calculator_actual_cross_file_chain_and_unknown_denominator (__main__.Integration.test_calculator_actual_cross_file_chain_and_unknown_denominator) ... ok
 test_corrupted_blob_is_refused_and_old_flow_facts_survive (__main__.Integration.test_corrupted_blob_is_refused_and_old_flow_facts_survive)
 D20: a corrupted captured blob must fail source reads cleanly while ... ok
 test_flow_facts_through_real_worker_store_cli_and_http (__main__.Integration.test_flow_facts_through_real_worker_store_cli_and_http)
-D22 pipeline: JS source -> worker IR -> Rust CFG/solver -> SQLite -> ... /usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/request.py:1293: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x10416e200>
+D22 pipeline: JS source -> worker IR -> Rust CFG/solver -> SQLite -> ... /usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/request.py:1293: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x10925e2f0>
   headers = dict(req.unredirected_hdrs)
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
 ok
@@ -21,10 +21,12 @@ test_nested_finally_and_wide_branch_stay_linear_within_budget (__main__.Integrat
 D19/AL-05: shared finally dispatch must keep the CFG linear under ... ok
 test_old_revision_context_and_query_cursor_survive_reindex (__main__.Integration.test_old_revision_context_and_query_cursor_survive_reindex) ... ok
 test_synthetic_pagination_counts_all_1200_functions_without_claiming_scale (__main__.Integration.test_synthetic_pagination_counts_all_1200_functions_without_claiming_scale) ... ok
+test_worker_crash_leaves_store_intact_and_old_analyses_readable (__main__.Integration.test_worker_crash_leaves_store_intact_and_old_analyses_readable)
+W06: a worker that exits non-zero mid-pipeline publishes nothing, ... ok
 test_worker_ir_tampering_is_rejected_before_derived_facts (__main__.Integration.test_worker_ir_tampering_is_rejected_before_derived_facts)
 R6 formalization: duplicate binding ids, dangling local references ... ok
 
 ----------------------------------------------------------------------
-Ran 13 tests in 71.925s
+Ran 14 tests in 71.207s
 
 OK

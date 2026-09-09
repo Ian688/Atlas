@@ -1,7 +1,7 @@
 {
   "schema": "atlas.daily-changes.v2",
   "window": "2026-09-09/w02",
-  "generated_utc": "2026-09-09T00:15:22.104129+00:00",
+  "generated_utc": "2026-09-09T00:26:09.756589+00:00",
   "baseline": {
     "w01_final_manifest": "evidence/daily/2026-09-09/w01/final/source-manifest.json (62 files)",
     "review_bound_hashes": "evidence/reviews/2026-09-09-w01/review-verification.json (46 product source files)"

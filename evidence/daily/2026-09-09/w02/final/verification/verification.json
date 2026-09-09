@@ -1,7 +1,7 @@
 {
   "schema": "atlas.verification.v2",
   "label": "w02-final",
-  "time_utc": "2026-09-09T00:13:12.482872+00:00",
+  "time_utc": "2026-09-09T00:24:07.253443+00:00",
   "platform": "macOS-15.7.9-x86_64-i386-64bit-Mach-O",
   "cwd": "/Users/yinsijie/CodeRepo/Atlas",
   "out_dir": "evidence/daily/2026-09-09/w02/final/verification",
@@ -15,7 +15,7 @@
         "--check"
       ],
       "exit_code": 0,
-      "seconds": 1.25,
+      "seconds": 1.271,
       "log": "rust-format.log"
     },
     {
@@ -31,7 +31,7 @@
         "warnings"
       ],
       "exit_code": 0,
-      "seconds": 2.978,
+      "seconds": 2.95,
       "log": "rust-clippy.log"
     },
     {
@@ -43,7 +43,7 @@
         "--locked"
       ],
       "exit_code": 0,
-      "seconds": 10.27,
+      "seconds": 10.108,
       "log": "rust-tests.log"
     },
     {
@@ -55,7 +55,7 @@
         "--locked"
       ],
       "exit_code": 0,
-      "seconds": 0.751,
+      "seconds": 0.626,
       "log": "rust-build.log"
     },
     {
@@ -67,7 +67,7 @@
         "workers/typescript"
       ],
       "exit_code": 0,
-      "seconds": 4.691,
+      "seconds": 4.389,
       "log": "worker-tests.log"
     },
     {
@@ -77,7 +77,7 @@
         "scripts/test_integration.py"
       ],
       "exit_code": 0,
-      "seconds": 72.567,
+      "seconds": 71.879,
       "log": "integration.log"
     },
     {
@@ -87,7 +87,7 @@
         "examples/calculator/demo.mjs"
       ],
       "exit_code": 0,
-      "seconds": 0.305,
+      "seconds": 0.36,
       "log": "calculator.log"
     },
     {
@@ -98,7 +98,7 @@
         "web/app.js"
       ],
       "exit_code": 0,
-      "seconds": 0.256,
+      "seconds": 0.285,
       "log": "web-syntax.log"
     },
     {
@@ -109,7 +109,7 @@
         "--check"
       ],
       "exit_code": 0,
-      "seconds": 0.028,
+      "seconds": 0.068,
       "log": "whitespace.log"
     }
   ],
@@ -120,9 +120,9 @@
   "npm": "12.0.2",
   "python": "Python 3.14.7",
   "git": {
-    "head_exists": false,
-    "head": null,
-    "whitespace_check_scope": "git diff --check covers tracked/index diffs only; with no commits it inspects almost nothing, so a PASS here is not a whitespace audit of untracked files"
+    "head_exists": true,
+    "head": "a6385e9 baseline: Atlas independent repo state after w01 delivery and w02 review fixes",
+    "whitespace_check_scope": "git diff --check covers uncommitted diffs of tracked files"
   },
   "source_hashes": {
     "crates/.DS_Store": "ab817580395f07864e750d0a7a4d4f2d82b405b3215d707d48601f7487c7a9cf",
@@ -165,7 +165,7 @@
     "examples/flow-lab/README.md": "0e34296db5addd3c8bb19f26824588c3ae298cdcd2f451d61d177fc8f7ff8e65",
     "examples/flow-lab/src/pipeline.js": "5aebefe8e5a88ee9ed0af2cff73b157e947dcf8a2c1d3d00bf427bc44c618a2c",
     "scripts/demo.py": "25c6d6862c3f404ede40951bf65fe6fd882aae8b58483d19f5a4e8a33fcb1fd4",
-    "scripts/test_integration.py": "6ce60a8d90a4beace96444bbe31cdc96a6aa515e595ecdd61a16b458cc3a9a0b",
+    "scripts/test_integration.py": "373f560cd0cb724fe6c2e6dcd6c05f40350fdf5f58c745be5a0817564a92727e",
     "scripts/verify.py": "d7649275007108a8f7f5784ff4260fb721f86a525ceebe4578ecb892a80a5360",
     "Cargo.toml": "79776f36dc675c16f978e32dcb1ae8a4a342ccec008d614a25b62ec4565a98c9",
     "Cargo.lock": "d0ccb687b56f03af218e892b1e3936507f5db8b82b0c5e36f5a012405e18837f",

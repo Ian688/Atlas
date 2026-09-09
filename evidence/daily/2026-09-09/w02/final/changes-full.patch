@@ -1,6 +1,5 @@
-# Atlas w02 full-change package (no Git HEAD exists at window start; the
-# review-bound w01 hashes identify exactly what changed). Full post-state
-# content for every changed file; unchanged files are bounded by the manifests.
+# Atlas w02 full-change package (measured against the w01 final manifest;
+# the review-bound 46 hashes identify the product-source subset).
 
 ================================================================================
 FILE: crates/atlas-app/src/main.rs
@@ -8142,7 +8141,7 @@ fn byte_windows_never_split_utf8_and_unparseable_bytes_are_reported() {
 ================================================================================
 FILE: docs/implementation/progress.json
 OLD_SHA256: 0850e14a60106ca8d24b04acac3a2e6e2f8e8a5fc299d6d35a666697beefbf73
-NEW_SHA256: 9b82cc5314baafe9fe9d51b53593edff1253eb74cb4fec6c25b8c96e76b37edf
+NEW_SHA256: a58264c9c35b10745c553e169c50fb8feaa3269af6ba00084333af835e27801c
 ================================================================================
 {
   "schema": "atlas.daily-development-progress.v1",
@@ -8435,11 +8434,13 @@ NEW_SHA256: 9b82cc5314baafe9fe9d51b53593edff1253eb74cb4fec6c25b8c96e76b37edf
         "多项目同库隔离与跨 analysis 查询拒绝(test_multi_project_store_isolation)",
         "索引管线级 deadline(--index-deadline-seconds,默认 600/上限 3600;剩余预算分配给 scan/worker 各阶段)",
         "并发重复 index 幂等同终态(并发两进程同 id)",
-        "worker 阶段既有 1–600s 期限/输出上限/kill_on_drop 沿用"
+        "worker 阶段既有 1–600s 期限/输出上限/kill_on_drop 沿用",
+        "worker 崩溃矩阵集成测试:非零退出→零新增 Analysis,旧分析(含 flow facts)完整可读"
       ],
       "evidence": [
         "crates/atlas-engine/src/scan.rs deadline + tests",
-        "scripts/test_integration.py test_multi_project_store_isolation"
+        "scripts/test_integration.py test_multi_project_store_isolation",
+        "scripts/test_integration.py test_worker_crash_leaves_store_intact_and_old_analyses_readable"
       ],
       "blockers": [
         "取消信号、作业队列/租约、崩溃恢复矩阵、断电耐久仍未实现"
@@ -8790,6 +8791,13 @@ NEW_SHA256: 9b82cc5314baafe9fe9d51b53593edff1253eb74cb4fec6c25b8c96e76b37edf
         "gaps": []
       }
     }
+  },
+  "performance_baseline": {
+    "recorded_utc": "2026-09-09T00:22:28.569404+00:00",
+    "artifact": "evidence/daily/2026-09-09/w02/final/artifacts/perf-1200.json",
+    "index_1200fn_debug_s": 12.58,
+    "flow_query_s": 0.03,
+    "qualification": "debug build synthetic; not a large-project qualification"
   }
 }
 
@@ -8901,7 +8909,7 @@ export function rethrow() {
 ================================================================================
 FILE: scripts/test_integration.py
 OLD_SHA256: acb15cd9a25de1e940e520a0ff7c0636e691e382f7accecf0ebcd47e43e411d6
-NEW_SHA256: 6ce60a8d90a4beace96444bbe31cdc96a6aa515e595ecdd61a16b458cc3a9a0b
+NEW_SHA256: 373f560cd0cb724fe6c2e6dcd6c05f40350fdf5f58c745be5a0817564a92727e
 ================================================================================
 #!/usr/bin/env python3
 """Exercise the actual Rust CLI, Node worker, SQLite queries and HTTP boundary.
@@ -9404,6 +9412,30 @@ class Integration(unittest.TestCase):
                         facts = conn.execute("SELECT COUNT(*) FROM facts").fetchone()[0]
                     self.assertEqual(analyses, 0, f"{name}: no analysis may be published")
                     self.assertEqual(facts, 0, f"{name}: no derived facts may be published")
+
+    def test_worker_crash_leaves_store_intact_and_old_analyses_readable(self):
+        """W06: a worker that exits non-zero mid-pipeline publishes nothing,
+        and previously published analyses stay readable."""
+        shutil.rmtree(self.project)
+        self.project.mkdir()
+        (self.project / "ok.js").write_text("export function fine(){return 1}")
+        a = self.index()
+        crashing_worker = self.base / "crash.mjs"
+        crashing_worker.write_text("process.exit(3);")
+        result = subprocess.run(
+            [str(BIN), "--store", str(self.store), "index", str(self.project), "--worker", str(crashing_worker)],
+            cwd=ROOT, capture_output=True, text=True, timeout=90,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        import sqlite3
+        with sqlite3.connect(self.store / "atlas.db") as conn:
+            analyses = conn.execute("SELECT COUNT(*) FROM analyses").fetchone()[0]
+        self.assertEqual(analyses, 1, "crashed worker must not add analyses")
+        # Old analysis stays fully readable, including derived flow facts.
+        self.cli("report", a["id"])
+        symbols = {n["name"]: n["id"] for n in self.cli("nodes", a["id"], "--kind", "function")["items"]}
+        flow = self.cli("flow", a["id"], symbols["fine"])
+        self.assertEqual(flow["status"], "complete_within_profile")
 
     def test_flow_queries_reject_unknown_symbols(self):
         """D20-lite: invented flow facts cannot be queried into existence."""
