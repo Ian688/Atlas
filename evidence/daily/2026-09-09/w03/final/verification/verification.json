@@ -1,7 +1,7 @@
 {
   "schema": "atlas.verification.v2",
   "label": "w03-final",
-  "time_utc": "2026-09-09T03:04:15.372321+00:00",
+  "time_utc": "2026-09-09T03:36:49.134597+00:00",
   "platform": "macOS-15.7.9-x86_64-i386-64bit-Mach-O",
   "cwd": "/Users/yinsijie/CodeRepo/Atlas",
   "out_dir": "evidence/daily/2026-09-09/w03/final/verification",
@@ -15,7 +15,7 @@
         "--check"
       ],
       "exit_code": 0,
-      "seconds": 1.179,
+      "seconds": 1.914,
       "log": "rust-format.log"
     },
     {
@@ -31,7 +31,7 @@
         "warnings"
       ],
       "exit_code": 0,
-      "seconds": 2.567,
+      "seconds": 3.166,
       "log": "rust-clippy.log"
     },
     {
@@ -43,7 +43,7 @@
         "--locked"
       ],
       "exit_code": 0,
-      "seconds": 8.815,
+      "seconds": 11.358,
       "log": "rust-tests.log"
     },
     {
@@ -55,7 +55,7 @@
         "--locked"
       ],
       "exit_code": 0,
-      "seconds": 9.059,
+      "seconds": 10.193,
       "log": "rust-build.log"
     },
     {
@@ -67,7 +67,7 @@
         "workers/typescript"
       ],
       "exit_code": 0,
-      "seconds": 3.134,
+      "seconds": 4.554,
       "log": "worker-tests.log"
     },
     {
@@ -77,7 +77,7 @@
         "scripts/test_integration.py"
       ],
       "exit_code": 0,
-      "seconds": 82.259,
+      "seconds": 104.905,
       "log": "integration.log"
     },
     {
@@ -87,7 +87,7 @@
         "examples/calculator/demo.mjs"
       ],
       "exit_code": 0,
-      "seconds": 0.237,
+      "seconds": 0.148,
       "log": "calculator.log"
     },
     {
@@ -98,7 +98,7 @@
         "web/app.js"
       ],
       "exit_code": 0,
-      "seconds": 0.206,
+      "seconds": 0.134,
       "log": "web-syntax.log"
     },
     {
@@ -109,7 +109,7 @@
         "--check"
       ],
       "exit_code": 0,
-      "seconds": 0.06,
+      "seconds": 0.193,
       "log": "whitespace.log"
     }
   ],
@@ -121,7 +121,7 @@
   "python": "Python 3.14.7",
   "git": {
     "head_exists": true,
-    "head": "c4aa246 w03 delivery: review fixes F1-F5 (typed constants, wrapper heap writes, exception heap effects, transitive clobber, big-number ToString) + formal regression tests",
+    "head": "c88a43a w06: SIGINT/SIGTERM cancels index pipeline (worker child reaped, zero publication) + adjacent-probe fixes F1-F5 verified + perf baseline",
     "whitespace_check_scope": "git diff --check covers uncommitted diffs of tracked files"
   },
   "source_hashes": {
@@ -137,11 +137,11 @@
     "crates/atlas-engine/src/analyze.rs": "0ed05e7a34654751d6cf43816ae206fb191abebd6712edc0a5512ff742551b1f",
     "crates/atlas-engine/src/facts.rs": "85cfe5eb3356f3fa8a194331ddf8c2432be7359ba23f889a3ca337f60e4becbf",
     "crates/atlas-engine/src/flow.rs": "85aab34cc6f4f95d8ea7167c687b2ba4039789475b817344769f125f3860ed8c",
-    "crates/atlas-engine/src/inter.rs": "28f9d91f8eab90319ddc14a089953dbd16e1ff9d25ff90395450886ba9565e46",
+    "crates/atlas-engine/src/inter.rs": "f1fa8c1dc197668d287364bd770dc2833dbfed2da825ada83996e7baccf2900f",
     "crates/atlas-engine/src/lib.rs": "cd8cfc66bf8deb2fa5c9fb1eb68bd0e513d85b175143071f50571459f679ba47",
     "crates/atlas-engine/src/query.rs": "b9c0949603b1d9467b64420a5fb8f63b0aac59bcc6b7d0ff63065e9c715c2f84",
     "crates/atlas-engine/src/scan.rs": "24d8b9bfe31f4fee1a42db97d0cd817468908b7308a8cd2dae20bf09d1a3536d",
-    "crates/atlas-engine/src/solve.rs": "56112782e41c673c34a1104b52c274c578f1dfb45c87c78b8eaa2bdaf2671ce5",
+    "crates/atlas-engine/src/solve.rs": "6aa7e47182e228905c7567eb0cd0636833ef2cc7622b0ce71ed0802c00dcfe13",
     "crates/atlas-engine/src/store.rs": "c15ad8630daf41f5f4c8b7439c155eb67509477cb487a7b8658f112985f2c2b5",
     "crates/atlas-engine/tests/flow_semantics.rs": "ea316152982b9f13245096bec06b911dcb5d4a8a0fccf10ca8d89047caf04f33",
     "crates/atlas-engine/tests/foundation.rs": "d955a5ea3350304be03b5ef6206d6e2c98c85a1b129039f334d1c5742cbb2075",

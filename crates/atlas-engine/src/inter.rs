@@ -17,6 +17,17 @@ pub const MAX_SCC_ROUNDS: usize = 32;
 pub const MAX_GRAPH_ROUNDS: usize = 4;
 pub const MAX_TOTAL_TRANSFERS: usize = MAX_TRANSFERS * 8;
 
+/// Test/debug hook for the whole-job work budget (see max_transfers_budget).
+fn max_total_transfers_budget() -> usize {
+    if cfg!(debug_assertions)
+        && let Ok(value) = std::env::var("ATLAS_MAX_TOTAL_TRANSFERS")
+        && let Ok(parsed) = value.parse::<usize>()
+    {
+        return parsed;
+    }
+    MAX_TOTAL_TRANSFERS
+}
+
 pub struct FunctionInterproc {
     pub output: SolveOutput,
     pub lowered: LoweredFunction,
@@ -30,6 +41,9 @@ pub struct InterprocResult {
     pub recursive_sccs: usize,
     pub rounds_max: usize,
     pub budget_exhausted: bool,
+    /// Symbols the work budget could not reach; published as an explicit
+    /// frontier rather than silently missing facts (D19).
+    pub frontier_symbols: Vec<String>,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -99,11 +113,8 @@ pub fn analyze_interprocedural(
             },
         );
     }
-    if total_transfers > MAX_TOTAL_TRANSFERS {
-        return Err(crate::invalid(
-            "analysis_work_budget_exceeded_no_analysis_published",
-        ));
-    }
+    let work_budget_exhausted =
+        std::cell::Cell::new(total_transfers > max_total_transfers_budget());
     // M1: when summaries substitute argument values, callee target sets can
     // GROW (e.g. `const f = identity(one); f()`), adding call edges that the
     // pass-1 graph did not have. Re-derive the graph from the last solves and
@@ -145,16 +156,18 @@ pub fn analyze_interprocedural(
                             "analysis_deadline_exceeded_no_analysis_published",
                         ));
                     }
+                    if work_budget_exhausted.get() {
+                        status_by_symbol.insert(symbol.clone(), "partial_budget");
+                        continue;
+                    }
                     let Some(function) = flow.functions.iter().find(|f| &f.symbol == symbol) else {
                         continue;
                     };
                     let cfg = &lowered[symbol.as_str()];
                     let output = solve::solve(cfg, function, directory, &summaries, deadline);
                     total_transfers += output.budgets.get("transfers").copied().unwrap_or(0);
-                    if total_transfers > MAX_TOTAL_TRANSFERS {
-                        return Err(crate::invalid(
-                            "analysis_work_budget_exceeded_no_analysis_published",
-                        ));
+                    if total_transfers > max_total_transfers_budget() {
+                        work_budget_exhausted.set(true);
                     }
                     let internal = extract_internal(&output.internal);
                     final_outputs.insert(symbol.clone(), internal.clone());
@@ -222,8 +235,11 @@ pub fn analyze_interprocedural(
         }
     }
     // Final pass: one solve per function with the converged summaries so the
-    // served values include re-based interprocedural origins.
+    // served values include re-based interprocedural origins. Functions that
+    // the work budget could not reach are reported as an explicit frontier
+    // instead of silently disappearing (D19).
     let mut functions = BTreeMap::new();
+    let mut frontier: Vec<String> = Vec::new();
     for function in &flow.functions {
         if expired(deadline) {
             return Err(crate::invalid(
@@ -231,6 +247,10 @@ pub fn analyze_interprocedural(
             ));
         }
         let symbol = function.symbol.as_str();
+        if work_budget_exhausted.get() && !final_outputs.contains_key(symbol) {
+            frontier.push(symbol.to_string());
+            continue;
+        }
         let cfg = &lowered[symbol];
         let output = solve::solve(cfg, function, directory, &summaries, deadline);
         let status = match output.status {
@@ -249,6 +269,7 @@ pub fn analyze_interprocedural(
             },
         );
     }
+    frontier.sort();
     Ok(InterprocResult {
         functions,
         status: if budget_exhausted.get() {
@@ -260,6 +281,7 @@ pub fn analyze_interprocedural(
         recursive_sccs,
         rounds_max,
         budget_exhausted: budget_exhausted.get(),
+        frontier_symbols: frontier,
     })
 }
 

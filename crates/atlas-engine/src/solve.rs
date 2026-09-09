@@ -24,6 +24,19 @@ pub const CAP_HEAP: usize = 32;
 /// re-transferring exponentially many path combinations.
 pub const MAX_BLOCK_VISITS: usize = 48;
 pub const MAX_TRANSFERS: usize = 300_000;
+
+/// Test/debug hook to shrink the per-function transfer budget so the
+/// partial-budget degradation path can be exercised end to end. Production
+/// default is unchanged.
+fn max_transfers_budget() -> usize {
+    if cfg!(debug_assertions)
+        && let Ok(value) = std::env::var("ATLAS_MAX_TRANSFERS")
+        && let Ok(parsed) = value.parse::<usize>()
+    {
+        return parsed;
+    }
+    MAX_TRANSFERS
+}
 pub const MAX_OP_VALUES: usize = 2048;
 pub const MAX_LISTED_BINDINGS: usize = 64;
 /// Bounded transitive reachability steps for unknown-call heap invalidation.
@@ -800,7 +813,7 @@ impl<'a> Solver<'a> {
         let mut at_throw: BTreeMap<u32, State> = BTreeMap::new();
         for op_index in block_ops {
             self.transfers += 1;
-            if self.transfers >= MAX_TRANSFERS {
+            if self.transfers >= max_transfers_budget() {
                 self.budget_exhausted = true;
                 break;
             }

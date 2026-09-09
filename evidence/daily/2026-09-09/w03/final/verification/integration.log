@@ -1,11 +1,11 @@
-Synthetic boundary: 120 files / 1200 functions / 10.65s incl. CLI queries; not GE qualification
+Synthetic boundary: 120 files / 1200 functions / 12.74s incl. CLI queries; not GE qualification
 test_alpha_renaming_yields_equivalent_flow_facts (__main__.Integration.test_alpha_renaming_yields_equivalent_flow_facts)
 D21: same-length alpha renaming must produce byte-identical flow ... ok
 test_calculator_actual_cross_file_chain_and_unknown_denominator (__main__.Integration.test_calculator_actual_cross_file_chain_and_unknown_denominator) ... ok
 test_corrupted_blob_is_refused_and_old_flow_facts_survive (__main__.Integration.test_corrupted_blob_is_refused_and_old_flow_facts_survive)
 D20: a corrupted captured blob must fail source reads cleanly while ... ok
 test_flow_facts_through_real_worker_store_cli_and_http (__main__.Integration.test_flow_facts_through_real_worker_store_cli_and_http)
-D22 pipeline: JS source -> worker IR -> Rust CFG/solver -> SQLite -> ... /usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/request.py:1293: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x10e1123e0>
+D22 pipeline: JS source -> worker IR -> Rust CFG/solver -> SQLite -> ... /usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/request.py:1293: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x1058ce3e0>
   headers = dict(req.unredirected_hdrs)
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
 ok
@@ -28,7 +28,7 @@ ResourceWarning: Enable tracemalloc to get the object allocation traceback
   result = method()
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
 ok
-test_synthetic_pagination_counts_all_1200_functions_without_claiming_scale (__main__.Integration.test_synthetic_pagination_counts_all_1200_functions_without_claiming_scale) ... /usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/decoder.py:361: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x10e1fe2f0>
+test_synthetic_pagination_counts_all_1200_functions_without_claiming_scale (__main__.Integration.test_synthetic_pagination_counts_all_1200_functions_without_claiming_scale) ... /usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/decoder.py:361: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x1059ba2f0>
   obj, end = self.scan_once(s, idx)
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
 ok
@@ -38,6 +38,6 @@ test_worker_ir_tampering_is_rejected_before_derived_facts (__main__.Integration.
 R6 formalization: duplicate binding ids, dangling local references ... ok
 
 ----------------------------------------------------------------------
-Ran 15 tests in 81.790s
+Ran 15 tests in 104.213s
 
 OK

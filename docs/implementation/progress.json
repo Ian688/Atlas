@@ -624,14 +624,15 @@
         ]
       },
       "D19": {
-        "status": "PARTIAL",
+        "status": "IMPLEMENTED",
         "tested_by": [
           "flow_semantics d10 (cap)",
           "test_nested_finally... (20层finally CFG线性+60分支预算内)",
-          "scan_deadline 单测"
+          "scan_deadline 单测",
+          "flow_semantics 全套件 + ATLAS_MAX_TRANSFERS/ATLAS_MAX_TOTAL_TRANSFERS 测试钩子触发 partial_budget(发布部分结果+frontier,与 deadline 拒绝区分)"
         ],
         "gaps": [
-          "高扇出/超深链的partial_budget触发专项未做"
+          "高扇出/超深链的自然规模触发未做(预算钩子已可覆盖)"
         ]
       },
       "D20": {

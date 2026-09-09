@@ -1,17 +1,17 @@
 {
-  "time_utc": "2026-09-09T03:04:15.079025+00:00",
+  "time_utc": "2026-09-09T03:31:53.980473+00:00",
   "cases": [
     {
       "case": "optional_catch",
       "argv": [
         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
         "--store",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-_ws_37tp/store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-17djnqbc/store",
         "index",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-_ws_37tp/project"
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-17djnqbc/project"
       ],
       "exit_code": 0,
-      "seconds": 0.631,
+      "seconds": 1.037,
       "stdout": "{\n  \"call_count\": 0,\n  \"coverage\": {\n    \"catalog_entries\": 2,\n    \"disposition:captured\": 1,\n    \"disposition:directory\": 1,\n    \"encountered_source_files\": 1,\n    \"flow_complete_within_profile\": 1,\n    \"flow_functions\": 1,\n    \"flow_partial\": 0,\n    \"flow_unknown_regions\": 0,\n    \"interproc_recursive_sccs\": 0,\n    \"interproc_sccs\": 1,\n    \"parsed_source_files\": 1\n  },\n  \"diagnostics\": [],\n  \"edge_count\": 2,\n  \"engine\": \"foundation-flow-0.2.0\",\n  \"file_count\": 1,\n  \"flow_digest\": \"25f4c485cf782701b50e917a55c3df1d6fb99ee79cfcc0572b041d4c180c9523\",\n  \"function_count\": 1,\n  \"id\": \"38ae268800f025ae60907ee77b52e797a0623d6b6a338fa92e5beb3628dfe155\",\n  \"limitations\": [\n    \"Lexical declaration candidates, not a complete runtime call graph or execution trace.\",\n    \"Snapshot captures files over an interval; it is not an atomic filesystem transaction.\",\n    \"Only captured UTF-8 JS/TS inputs; external dependencies, standard library and project tsconfig are not loaded.\",\n    \"Ignored directories are explicit boundaries; their unvisited descendants are not counted.\",\n    \"Local flow facts cover declared profile js-structured-control.v1 only; other constructs are explicit unknowns. Interprocedural summaries are symbolic per function (Parameter origins re-based per callsite); captured origins are not re-substituted and unknown callees stay top.\"\n  ],\n  \"node_count\": 3,\n  \"producer\": \"typescript/5.9.3;worker/0.2.0\",\n  \"recursive_components\": [],\n  \"schema\": \"atlas.analysis.v1\",\n  \"snapshot_id\": \"576f801bcdafc11e27cda41d841dc9d27963d18abde47ea227bd12aedad75119\",\n  \"unresolved_call_count\": 0\n}\n",
       "stderr": "",
       "published_counts": {
@@ -29,14 +29,14 @@
       "argv": [
         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
         "--store",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-le9w0nz0/store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-y6lkktof/store",
         "index",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-le9w0nz0/project",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-y6lkktof/project",
         "--worker",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-le9w0nz0/worker.mjs"
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-y6lkktof/worker.mjs"
       ],
       "exit_code": 1,
-      "seconds": 0.628,
+      "seconds": 1.255,
       "stdout": "",
       "stderr": "Error: Invalid(\"duplicate_flow_binding_id\")\n",
       "published_counts": {
@@ -54,14 +54,14 @@
       "argv": [
         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
         "--store",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-7u39i1nb/store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-eis7qmiq/store",
         "index",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-7u39i1nb/project",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-eis7qmiq/project",
         "--worker",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-7u39i1nb/worker.mjs"
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-eis7qmiq/worker.mjs"
       ],
       "exit_code": 1,
-      "seconds": 0.685,
+      "seconds": 1.286,
       "stdout": "",
       "stderr": "Error: Invalid(\"flow_coverage_mismatch\")\n",
       "published_counts": {
@@ -79,14 +79,14 @@
       "argv": [
         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
         "--store",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-l04m6vs0/store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-ocii8rql/store",
         "index",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-l04m6vs0/project",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-ocii8rql/project",
         "--worker",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-l04m6vs0/worker.mjs"
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-ocii8rql/worker.mjs"
       ],
       "exit_code": 1,
-      "seconds": 0.714,
+      "seconds": 1.047,
       "stdout": "",
       "stderr": "Error: Invalid(\"flow_reference_unknown_binding\")\n",
       "published_counts": {
@@ -104,14 +104,14 @@
       "argv": [
         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
         "--store",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-h9t8o_us/store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-3vquwg8v/store",
         "index",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-h9t8o_us/project",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-3vquwg8v/project",
         "--index-deadline-seconds",
         "2"
       ],
       "exit_code": 1,
-      "seconds": 2.052,
+      "seconds": 2.072,
       "stdout": "",
       "stderr": "Error: \"worker_deadline\"\n",
       "published_counts": {
@@ -129,16 +129,16 @@
       "argv": [
         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
         "--store",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-958vfnb4/store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-rd0as9de/store",
         "index",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-958vfnb4/project",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-rd0as9de/project",
         "--index-deadline-seconds",
         "1",
         "--worker",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-958vfnb4/worker.mjs"
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-boundary-rd0as9de/worker.mjs"
       ],
       "exit_code": 1,
-      "seconds": 1.063,
+      "seconds": 1.065,
       "stdout": "",
       "stderr": "Error: Invalid(\"analysis_deadline_exceeded_no_analysis_published\")\n",
       "published_counts": {
