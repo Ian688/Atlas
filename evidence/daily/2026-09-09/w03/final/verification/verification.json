@@ -1,7 +1,7 @@
 {
   "schema": "atlas.verification.v2",
   "label": "w03-final",
-  "time_utc": "2026-09-09T02:27:12.187001+00:00",
+  "time_utc": "2026-09-09T03:04:15.372321+00:00",
   "platform": "macOS-15.7.9-x86_64-i386-64bit-Mach-O",
   "cwd": "/Users/yinsijie/CodeRepo/Atlas",
   "out_dir": "evidence/daily/2026-09-09/w03/final/verification",
@@ -15,7 +15,7 @@
         "--check"
       ],
       "exit_code": 0,
-      "seconds": 1.514,
+      "seconds": 1.179,
       "log": "rust-format.log"
     },
     {
@@ -31,7 +31,7 @@
         "warnings"
       ],
       "exit_code": 0,
-      "seconds": 3.342,
+      "seconds": 2.567,
       "log": "rust-clippy.log"
     },
     {
@@ -43,7 +43,7 @@
         "--locked"
       ],
       "exit_code": 0,
-      "seconds": 10.446,
+      "seconds": 8.815,
       "log": "rust-tests.log"
     },
     {
@@ -55,7 +55,7 @@
         "--locked"
       ],
       "exit_code": 0,
-      "seconds": 11.689,
+      "seconds": 9.059,
       "log": "rust-build.log"
     },
     {
@@ -67,7 +67,7 @@
         "workers/typescript"
       ],
       "exit_code": 0,
-      "seconds": 4.821,
+      "seconds": 3.134,
       "log": "worker-tests.log"
     },
     {
@@ -77,7 +77,7 @@
         "scripts/test_integration.py"
       ],
       "exit_code": 0,
-      "seconds": 75.011,
+      "seconds": 82.259,
       "log": "integration.log"
     },
     {
@@ -87,7 +87,7 @@
         "examples/calculator/demo.mjs"
       ],
       "exit_code": 0,
-      "seconds": 0.36,
+      "seconds": 0.237,
       "log": "calculator.log"
     },
     {
@@ -98,7 +98,7 @@
         "web/app.js"
       ],
       "exit_code": 0,
-      "seconds": 0.293,
+      "seconds": 0.206,
       "log": "web-syntax.log"
     },
     {
@@ -109,7 +109,7 @@
         "--check"
       ],
       "exit_code": 0,
-      "seconds": 0.099,
+      "seconds": 0.06,
       "log": "whitespace.log"
     }
   ],
@@ -121,15 +121,15 @@
   "python": "Python 3.14.7",
   "git": {
     "head_exists": true,
-    "head": "6b4c474 w02 delivery: review fixes R1-R7 + M1-M3, formal regression tests, evidence package",
+    "head": "c4aa246 w03 delivery: review fixes F1-F5 (typed constants, wrapper heap writes, exception heap effects, transitive clobber, big-number ToString) + formal regression tests",
     "whitespace_check_scope": "git diff --check covers uncommitted diffs of tracked files"
   },
   "source_hashes": {
     "crates/.DS_Store": "ab817580395f07864e750d0a7a4d4f2d82b405b3215d707d48601f7487c7a9cf",
     "crates/atlas-app/Cargo.toml": "b6ded5f1c3fbfff067a5fd8210376608f97616a7ad8e3f270c44ce258a31087a",
-    "crates/atlas-app/src/main.rs": "f3e96c4fa3caf78a8b3353b3f33ed706b00771876f66666a0b5c00269934680d",
+    "crates/atlas-app/src/main.rs": "a4085a4412267b3538bb33148ce35368ebe8d777b986633088a382b6cf21d389",
     "crates/atlas-app/src/server.rs": "5fd0fd1135636d418fa71880874bfe2b7b20e3b45c8dfa5a486e2fcd07db04ce",
-    "crates/atlas-app/src/worker.rs": "3889622cd64df2c86b3ac441f796481e426ed301f3eae57de61d3f3dd84c92ab",
+    "crates/atlas-app/src/worker.rs": "a7bf817e912385e3549e4afa3e7d7a0da6297540945d24eba16e31d990f4cb0c",
     "crates/atlas-contract/Cargo.toml": "04d5fed2ea665298fc0d439e2a219ea1a660fb90441a64bf3773c0526f779a41",
     "crates/atlas-contract/src/flow.rs": "7e568e5f7df777764916844e1bc52e272ef7ed9a372cea3d85b049fd104efca8",
     "crates/atlas-contract/src/lib.rs": "79203a41498f8689a081b436b15a6d1ddfacf348acea1cd48f90fd05c2e2c6a7",
@@ -165,7 +165,7 @@
     "examples/flow-lab/README.md": "0e34296db5addd3c8bb19f26824588c3ae298cdcd2f451d61d177fc8f7ff8e65",
     "examples/flow-lab/src/pipeline.js": "5aebefe8e5a88ee9ed0af2cff73b157e947dcf8a2c1d3d00bf427bc44c618a2c",
     "scripts/demo.py": "25c6d6862c3f404ede40951bf65fe6fd882aae8b58483d19f5a4e8a33fcb1fd4",
-    "scripts/test_integration.py": "373f560cd0cb724fe6c2e6dcd6c05f40350fdf5f58c745be5a0817564a92727e",
+    "scripts/test_integration.py": "b9dd6e97380582d066746084cbc68a6eec724e11af5bc56f7f6792b3ce2c9111",
     "scripts/verify.py": "d7649275007108a8f7f5784ff4260fb721f86a525ceebe4578ecb892a80a5360",
     "Cargo.toml": "79776f36dc675c16f978e32dcb1ae8a4a342ccec008d614a25b62ec4565a98c9",
     "Cargo.lock": "d0ccb687b56f03af218e892b1e3936507f5db8b82b0c5e36f5a012405e18837f",

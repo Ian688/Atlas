@@ -524,6 +524,58 @@ class Integration(unittest.TestCase):
         flow = self.cli("flow", a["id"], symbols["fine"])
         self.assertEqual(flow["status"], "complete_within_profile")
 
+    def test_sigint_cancels_index_kills_worker_and_publishes_nothing(self):
+        """W06: SIGINT during the worker stage terminates atlas with a nonzero
+        exit, reaps the owned worker child, and publishes no analysis."""
+        import os as _os
+        import time as _time
+        shutil.rmtree(self.project)
+        self.project.mkdir()
+        for i in range(1200):
+            (self.project / f"g{i}.js").write_text(
+                f"export function g{i}() {{ let v = 0; for (let k = 0; k < 50; k++) {{ v = v + k; }} return g{i+1} === undefined ? v : 0; }}"
+            )
+        proc = subprocess.Popen(
+            [str(BIN), "--store", str(self.store), "index", str(self.project)],
+            cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        # Wait until the real worker process is alive (ps-based; pgrep -f is
+        # unreliable on some platforms).
+        worker_pid = None
+        deadline = _time.monotonic() + 30
+        while _time.monotonic() < deadline:
+            out = subprocess.run(["ps", "-eo", "pid,command"], capture_output=True, text=True)
+            for line in out.stdout.splitlines():
+                if "workers/typescript/worker.mjs" in line and "grep" not in line:
+                    worker_pid = int(line.split()[0])
+                    break
+            if worker_pid is not None:
+                break
+            if proc.poll() is not None:
+                self.fail(f"atlas exited before worker start: rc={proc.returncode} err={proc.stderr.read()!r}")
+            _time.sleep(0.05)
+        self.assertIsNotNone(worker_pid, "worker must start for the cancel test")
+        _os.kill(proc.pid, signal.SIGINT)
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            self.fail("atlas did not exit after SIGINT")
+        self.assertNotEqual(proc.returncode, 0)
+        # The owned worker child must be reaped.
+        _time.sleep(0.5)
+        alive = subprocess.run(["pgrep", "-f", "workers/typescript/worker.mjs"], capture_output=True, text=True)
+        self.assertEqual(alive.stdout.strip(), "", "worker child must be reaped after cancellation")
+        # And nothing may be published.
+        import sqlite3
+        db = self.store / "atlas.db"
+        if db.exists():
+            with sqlite3.connect(db) as conn:
+                analyses = conn.execute("SELECT COUNT(*) FROM analyses").fetchone()[0]
+                facts = conn.execute("SELECT COUNT(*) FROM facts").fetchone()[0]
+            self.assertEqual(analyses, 0)
+            self.assertEqual(facts, 0)
+
     def test_flow_queries_reject_unknown_symbols(self):
         """D20-lite: invented flow facts cannot be queried into existence."""
         shutil.rmtree(self.project)

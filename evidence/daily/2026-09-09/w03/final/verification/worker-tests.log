@@ -1,23 +1,23 @@
-✔ flow IR carries version, profile and per-function anchors (98.926628ms)
-✔ block shadowing produces distinct binding ids (D01) (15.831891ms)
-✔ TDZ use-before-declare still resolves to the real binding (D01) (45.994984ms)
-✔ short-circuit and conditional operators become structured control (D02) (6.063353ms)
-✔ try/catch/finally lowers with catch param binding and anchors (D03/D04) (7.186477ms)
-✔ labeled break/continue keep labels (D05) (8.040268ms)
-✔ unsupported constructs are explicit unknowns with reasons (profile boundary) (6.312686ms)
-✔ module peers resolve to bindings and are recorded as captures (D14 setup) (5.728023ms)
-✔ object and array literals keep field names and element anchors (7.465963ms)
-✔ destructuring declarations become explicit unknowns, not silent copies (profile) (8.414848ms)
-✔ alpha-renaming preserves flow structure modulo identity (D21) (19.921227ms)
-✔ cross-file alias and re-export resolve using captured sources (152.898184ms)
-✔ lexical shadowing does not bind to a global namesake (7.433434ms)
-✔ reassigned function declarations are marked; indirect and constructor calls stay unknown (21.003178ms)
-✔ duplicate script declarations are ambiguous, not first-declaration wins (4.265128ms)
-✔ UTF-8 byte spans retain Chinese and emoji source anchors (11.836455ms)
-✔ nested calls with identical start offsets have distinct full-span IDs (4.20998ms)
-✔ compiler host never falls back to ambient source or config reads (12.300934ms)
-✔ syntax failures and dynamic language features are explicit (6.279026ms)
-✔ request isolation rejects traversal and duplicates; source is never evaluated (10.573747ms)
+✔ flow IR carries version, profile and per-function anchors (69.468278ms)
+✔ block shadowing produces distinct binding ids (D01) (12.020789ms)
+✔ TDZ use-before-declare still resolves to the real binding (D01) (38.307107ms)
+✔ short-circuit and conditional operators become structured control (D02) (5.670793ms)
+✔ try/catch/finally lowers with catch param binding and anchors (D03/D04) (5.684062ms)
+✔ labeled break/continue keep labels (D05) (8.567577ms)
+✔ unsupported constructs are explicit unknowns with reasons (profile boundary) (5.31209ms)
+✔ module peers resolve to bindings and are recorded as captures (D14 setup) (4.304266ms)
+✔ object and array literals keep field names and element anchors (6.038529ms)
+✔ destructuring declarations become explicit unknowns, not silent copies (profile) (6.435091ms)
+✔ alpha-renaming preserves flow structure modulo identity (D21) (19.244924ms)
+✔ cross-file alias and re-export resolve using captured sources (120.599191ms)
+✔ lexical shadowing does not bind to a global namesake (6.445688ms)
+✔ reassigned function declarations are marked; indirect and constructor calls stay unknown (16.830376ms)
+✔ duplicate script declarations are ambiguous, not first-declaration wins (4.745853ms)
+✔ UTF-8 byte spans retain Chinese and emoji source anchors (6.962648ms)
+✔ nested calls with identical start offsets have distinct full-span IDs (3.673976ms)
+✔ compiler host never falls back to ambient source or config reads (7.356884ms)
+✔ syntax failures and dynamic language features are explicit (4.747536ms)
+✔ request isolation rejects traversal and duplicates; source is never evaluated (10.235131ms)
 ℹ tests 20
 ℹ suites 0
 ℹ pass 20
@@ -25,6 +25,6 @@
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 2087.248238
+ℹ duration_ms 1226.247927
 npm notice run @atlas/typescript-worker@0.1.0 test
 npm notice run node --test tests/*.test.mjs

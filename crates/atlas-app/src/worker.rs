@@ -3,6 +3,7 @@ use std::{io, path::Path, process::Stdio, time::Duration};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
     process::Command,
+    sync::watch,
 };
 
 async fn bounded(mut reader: impl AsyncRead + Unpin, limit: usize) -> io::Result<Vec<u8>> {
@@ -26,6 +27,7 @@ pub async fn parse(
     request: &ParseRequest,
     deadline: Duration,
     output_limit: usize,
+    cancel: watch::Receiver<bool>,
 ) -> Result<LanguageFacts, String> {
     let bytes = serde_json::to_vec(request).map_err(|_| "worker_request_encoding")?;
     if bytes.len() > 160 * 1024 * 1024 {
@@ -47,6 +49,7 @@ pub async fn parse(
     let mut stdin = child.stdin.take().unwrap();
     let stdout = child.stdout.take().unwrap();
     let stderr = child.stderr.take().unwrap();
+    let mut cancel = cancel;
     let result = tokio::time::timeout(deadline, async {
         let write = async {
             stdin.write_all(&bytes).await?;
@@ -54,16 +57,30 @@ pub async fn parse(
             drop(stdin);
             Ok::<_, io::Error>(())
         };
-        let (_, stdout, _stderr) = tokio::try_join!(
-            write,
-            bounded(stdout, output_limit),
-            bounded(stderr, 64 * 1024)
-        )?;
-        let status = child.wait().await?;
-        if !status.success() {
-            return Err(io::Error::other("worker_exit_failed"));
+        let worker_io = async {
+            let (_, stdout, _stderr) = tokio::try_join!(
+                write,
+                bounded(stdout, output_limit),
+                bounded(stderr, 64 * 1024)
+            )?;
+            let status = child.wait().await?;
+            if !status.success() {
+                return Err(io::Error::other("worker_exit_failed"));
+            }
+            Ok::<_, io::Error>(stdout)
+        };
+        // Cancellation: kill the owned child immediately and stop the stage
+        // (W06). start_kill is synchronous, so the SIGKILL lands even if the
+        // process exits right after.
+        tokio::select! {
+            outcome = worker_io => outcome,
+            _ = cancel.changed() => {
+                // Best-effort kill: if the child already exited, the error is
+                // irrelevant — the stage result is the cancellation itself.
+                let _ = child.start_kill();
+                Err(io::Error::other("cancelled_by_signal"))
+            }
         }
-        Ok::<_, io::Error>(stdout)
     })
     .await;
     let output = match result {
@@ -101,7 +118,8 @@ mod tests {
                 &p,
                 &request,
                 Duration::from_millis(150),
-                1000
+                1000,
+                tokio::sync::watch::channel(false).1,
             )
             .await
             .unwrap_err(),
@@ -119,6 +137,7 @@ mod tests {
             &request,
             Duration::from_secs(3),
             1000,
+            tokio::sync::watch::channel(false).1,
         )
         .await
         .unwrap_err();

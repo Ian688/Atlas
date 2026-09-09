@@ -122,6 +122,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("index deadline must be 1..3600 seconds".into());
             }
             let pipeline_started = std::time::Instant::now();
+            // W06: SIGINT/SIGTERM cancel the pipeline — kill the owned worker
+            // child and exit without publishing. The watcher hard-exits after
+            // a short grace so a blocked scan stage cannot outlive the
+            // cancellation by more than the grace window.
+            let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+            let signal_watcher = tokio::spawn(async move {
+                let sigint = tokio::signal::ctrl_c();
+                #[cfg(unix)]
+                {
+                    use tokio::signal::unix::{SignalKind, signal};
+                    let mut sigterm = signal(SignalKind::terminate()).expect("sigterm handler");
+                    tokio::select! {
+                        _ = sigint => {}
+                        _ = sigterm.recv() => {}
+                    }
+                }
+                #[cfg(not(unix))]
+                {
+                    let _ = sigint.await;
+                }
+                let _ = cancel_tx.send(true);
+                tokio::time::sleep(Duration::from_millis(300)).await;
+                std::process::exit(130);
+            });
             let stage_budget = |own: Duration| -> Duration {
                 let remaining = Duration::from_secs(index_deadline_seconds)
                     .saturating_sub(pipeline_started.elapsed());
@@ -144,8 +168,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &request,
                 stage_budget(Duration::from_secs(timeout_seconds)),
                 32 * 1024 * 1024,
+                cancel_rx.clone(),
             )
             .await?;
+            signal_watcher.abort();
             let analysis = analyze::analyze(
                 &store,
                 &snapshot,
