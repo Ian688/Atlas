@@ -401,3 +401,186 @@ function atlasIndexHit(index, x, y) {
   }
   return { hit, candidates: bucket.length, scanned: bucket.length, inBounds: true };
 }
+
+// ---------------------------------------------------------------------------
+// The column scale contract.
+//
+// Height used to be linear in the declared function count, which is not a
+// stylistic choice but a false statement: measured on rxjs@7.8.1, 92.1% of the
+// files that have any function at all came out under 1% of the tallest column's
+// height -- invisible -- while one 1056-function bundle flattened the whole
+// picture. A reader concludes "that file is the project"; the analysis never
+// said that.
+//
+// The work order states the scale rather than leaving it to taste (design
+// 13.2): N=0 is a flat stub that shows the file's role, N=1-8 is linear so every
+// layer is distinguishable, N=9-20 uses thin ticks, N=21-50 groups by
+// contiguous source range, and N>50 gets a bounded height with an explicit
+// compression marker and drill-down groups. The height is a piecewise monotone
+// function: linear for the first eight layers, logarithmic and capped after
+// that. Radius moves weakly and monotonically. The scale is visible, and it is
+// never reported as LOC, time or quality.
+//
+// It lives here, next to the hierarchy, because both projections must use the
+// same one: two different scale functions would be the same class of drift as
+// two different hierarchies, only harder to notice.
+const ATLAS_SCALE_FREE = 8;
+const ATLAS_SCALE_GAIN = 3;
+const ATLAS_SCALE_CAP = 8 + ATLAS_SCALE_GAIN * 24;
+const ATLAS_FLAT_HEIGHT = 0.45;
+const ATLAS_RADIUS_GAIN = 0.35;
+const ATLAS_RADIUS_REF = 1024;
+const ATLAS_SCALE_TIERS = ['flat', 'linear', 'thin', 'group', 'compressed'];
+const ATLAS_SCALE_TIER_LABELS = {
+  flat: 'N=0 矮柱（文件角色）',
+  linear: '1–8 线性（每层可辨）',
+  thin: '9–20 薄层刻度',
+  group: '21–50 按源码范围分组',
+  compressed: '>50 有界高度 + 压缩标记',
+};
+
+/// Height in layer units. One unit is one drawn function layer.
+function atlasScaleHeight(n) {
+  const count = Number.isFinite(Number(n)) ? Math.max(Math.floor(Number(n)), 0) : 0;
+  if (count <= 0) return ATLAS_FLAT_HEIGHT;
+  if (count <= ATLAS_SCALE_FREE) return count;
+  return Math.min(ATLAS_SCALE_FREE + ATLAS_SCALE_GAIN * Math.log2(count / ATLAS_SCALE_FREE), ATLAS_SCALE_CAP);
+}
+
+function atlasScaleTier(n) {
+  const count = Number.isFinite(Number(n)) ? Math.max(Math.floor(Number(n)), 0) : 0;
+  if (count <= 0) return 'flat';
+  if (count <= ATLAS_SCALE_FREE) return 'linear';
+  if (count <= 20) return 'thin';
+  if (count <= 50) return 'group';
+  return 'compressed';
+}
+
+/// Weakly monotone: 1.0 at N=0 and 1.35 at the reference count. Radius is a
+/// second channel, not a second scale -- it must not become the thing readers
+/// compare.
+function atlasScaleRadius(n) {
+  const count = Number.isFinite(Number(n)) ? Math.max(Math.floor(Number(n)), 0) : 0;
+  // Saturating by construction, so the bound is a property of the function
+  // rather than a number somebody has to remember to keep small. Past the
+  // reference count the radius stops saying anything, which is the honest
+  // behaviour for a channel that only exists to stop every column looking
+  // identical.
+  const ratio = Math.min(1, Math.log1p(count) / Math.log1p(ATLAS_RADIUS_REF));
+  return 1 + ATLAS_RADIUS_GAIN * ratio;
+}
+
+/// The layer at which compression starts, and the compressed height for a
+/// count. Exposed so a renderer can mark the boundary instead of letting a
+/// compressed column look like a measured one.
+function atlasScaleCompression(count) {
+  const n = Number.isFinite(Number(count)) ? Math.max(Math.floor(Number(count)), 0) : 0;
+  const tier = atlasScaleTier(n);
+  const height = atlasScaleHeight(n);
+  return {
+    tier,
+    height,
+    compressed: tier === 'compressed',
+    // What the layer count would have been without compression.
+    linearHeight: Math.max(n, ATLAS_FLAT_HEIGHT),
+    boundaryLayer: n > ATLAS_SCALE_FREE ? ATLAS_SCALE_FREE : null,
+    cap: ATLAS_SCALE_CAP,
+  };
+}
+
+/// Readability as a number instead of a matter of taste.
+///
+/// The criterion this exists for: with a scale that claims to be readable, no
+/// column that carries functions may be drawn under 1% of the tallest one, and
+/// the median column must stay a meaningful fraction of it. Both are computed
+/// from the facts, so "the picture got better" is checkable rather than
+/// asserted.
+function atlasScaleReport(counts) {
+  const list = (counts || []).map((c) => (Number.isFinite(Number(c)) ? Math.max(Math.floor(Number(c)), 0) : 0));
+  const withFunctions = list.filter((c) => c > 0);
+  const heights = withFunctions.map(atlasScaleHeight).sort((a, b) => a - b);
+  const maxHeight = heights.length ? heights[heights.length - 1] : 0;
+  const median = heights.length ? heights[Math.floor((heights.length - 1) / 2)] : 0;
+  const p90 = heights.length ? heights[Math.min(heights.length - 1, Math.floor(heights.length * 0.9))] : 0;
+  const ratio = (value) => (maxHeight > 0 ? value / maxHeight : 0);
+  const tiers = {};
+  for (const key of ATLAS_SCALE_TIERS) tiers[key] = 0;
+  for (const count of list) tiers[atlasScaleTier(count)] += 1;
+  // Monotonicity and the linear first eight layers are properties of the
+  // function, so they are verified rather than promised.
+  let monotone = true;
+  let previous = -Infinity;
+  for (const count of list.slice().sort((a, b) => a - b)) {
+    const height = atlasScaleHeight(count);
+    if (height < previous - 1e-9) monotone = false;
+    previous = height;
+  }
+  let linearFirstEight = true;
+  for (let n = 0; n <= ATLAS_SCALE_FREE; n++) {
+    if (atlasScaleHeight(n) !== (n === 0 ? ATLAS_FLAT_HEIGHT : n)) linearFirstEight = false;
+  }
+  return {
+    schema: 'atlas.scale-report.v1',
+    scale: {
+      schema: 'atlas.column-scale.v1',
+      free: ATLAS_SCALE_FREE,
+      gain: ATLAS_SCALE_GAIN,
+      cap: ATLAS_SCALE_CAP,
+      flat: ATLAS_FLAT_HEIGHT,
+      tiers: ATLAS_SCALE_TIERS.slice(),
+    },
+    files: list.length,
+    empty: list.filter((c) => c === 0).length,
+    withFunctions: withFunctions.length,
+    heights: { max: maxHeight, median, p90 },
+    ratios: { medianOverMax: ratio(median), p90OverMax: ratio(p90) },
+    under: {
+      of: withFunctions.length,
+      onePct: heights.filter((h) => ratio(h) < 0.01).length,
+      tenPct: heights.filter((h) => ratio(h) < 0.1).length,
+    },
+    tiers,
+    monotone,
+    linearFirstEight,
+    // The linear scale this replaced, kept so the improvement is shown rather
+    // than remembered.
+    linear: (() => {
+      const raw = withFunctions.map((c) => Math.max(c, 1));
+      const top = raw.length ? Math.max(...raw) : 0;
+      return {
+        max: top,
+        median: raw.length ? raw.slice().sort((a, b) => a - b)[Math.floor((raw.length - 1) / 2)] : 0,
+        onePct: top > 0 ? raw.filter((v) => v / top < 0.01).length : 0,
+      };
+    })(),
+  };
+}
+
+/// Ticks for a visible ruler: the tier boundaries plus the tallest column, each
+/// with the count it stands for. A compressed height that is not shown as
+/// compressed is a wrong number with a nicer finish.
+function atlasScaleRuler(counts) {
+  const list = (counts || []).map((c) => (Number.isFinite(Number(c)) ? Math.max(Math.floor(Number(c)), 0) : 0));
+  const maxCount = list.length ? Math.max(...list) : 0;
+  const stops = [0, 1, ATLAS_SCALE_FREE, 20, 50];
+  if (maxCount > 50) stops.push(maxCount);
+  const seen = new Set();
+  const ticks = [];
+  for (const count of stops) {
+    if (seen.has(count)) continue;
+    seen.add(count);
+    ticks.push({
+      count,
+      height: atlasScaleHeight(count),
+      tier: atlasScaleTier(count),
+      label: count === maxCount && maxCount > 50 ? `${count}（封顶）` : String(count),
+    });
+  }
+  return {
+    schema: 'atlas.scale-ruler.v1',
+    ticks,
+    maxCount,
+    capLayer: ATLAS_SCALE_CAP,
+    note: '压缩后的高度不是 LOC、耗时或质量分；同一档位内才可直接比较高度。',
+  };
+}

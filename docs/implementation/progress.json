@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-shared-hierarchy",
+    "window": "2026-09-12/w09-column-scale",
     "status": "DELIVERED",
-    "note": "把 项目→目录→文件 形式层级抽成两个投影共用的唯一定义（web/hierarchy.js），2D 画布获得真实层级切换与空间索引；消除 2D/3D 各自实现同一层级造成的不可见漂移。第一次门禁运行因 build.rs 指纹清单缺 web/hierarchy.js 而 FAIL（原始失败证据保留在窗口 runs/ 下），修复后 23/23 绿。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-shared-hierarchy",
-    "verification": "evidence/development/2026-09-12-w09-shared-hierarchy/verification.json"
+    "note": "柱高从等比改为分段单调的尺度合同（前 8 层线性、其后对数封顶、N=0 矮柱、半径饱和），两个投影共用一个尺度函数；可读性由 scripts/bench_view_readability.py 量测并进入门禁（判据必须能被证伪：被替换的等比尺度须在同一条判据上失败）。真实 rxjs：不足最高柱 1% 的列 850/923 → 0/923，中位/最高 0.003 → 0.103。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-column-scale",
+    "verification": "evidence/development/2026-09-12-w09-column-scale/verification.json"
   },
   "windows": [
     {
@@ -437,10 +437,20 @@
       "note": "2D 与 3D 共用一个几何无关的层级定义（atlas.hierarchy.v1）：身份、成员、被计数事实、层级分组只在 web/hierarchy.js 写一次；cityLevelView 退化为\"共享块集 + 几何\"，2D 概览按层级绘制同一批块。层级省略（omitted）与渲染预算（budget）分开报告，2D 还自报\"只加载了一页对象\"。画布点选走均匀网格空间索引（命中/代价/具名未命中）。app 行为断言 32→40，city3d 25 项重构后不变（等价证据）；verify.py 新增 web-syntax-hierarchy 并把手资产计入指纹（含 build.rs 同步修复）。不声称：2D 未翻页、层级不经 fragment 传递、无行级采样。",
       "report": "evidence/development/2026-09-12-w09-shared-hierarchy/REPORT.md",
       "verification": "evidence/development/2026-09-12-w09-shared-hierarchy/verification.json"
+    },
+    {
+      "id": "2026-09-12/w09-column-scale",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09"
+      ],
+      "note": "尺度合同：atlasScaleHeight/Tier/Radius/Compression/Report/Ruler 写进 web/hierarchy.js（2D/3D 共用），city3d 柱高走该尺度并画压缩标记环，层数受压缩高度限制；页面新增「尺度」行给出标尺、中位/最高、不足 1% 的列数（并给出线性尺度下的对照）。可读性基准 scripts/bench_view_readability.py（node 驱动读取同一份尺度实现，不重抄公式）以 --self-check 进入门禁。第一次门禁运行 24/24 绿但 status=UNSTABLE（运行中改了源文件），原始记录保留在 runs/run-1-unstable-sources-changed/，冻结后重跑为 PASS。仍未做：玻璃、边界端口、正交/平面视角、相机与折叠保存、按需重绘、搜索定位到层、类层组、visibility_reason、文件树/小图/时间轴；2D 真实布局是下一步。",
+      "report": "evidence/development/2026-09-12-w09-column-scale/REPORT.md",
+      "verification": "evidence/development/2026-09-12-w09-column-scale/verification.json"
     }
   ],
   "next_work_item": "2D 画布的正式层级与空间索引，或大仓库/monorepo 的规模资格",
-  "next_action": "按价值：2D 层级数据改为翻页取全（与 3D 一致，或明确上限）→ 层级经 URL fragment 在 2D/3D 间传递 → 大仓库/monorepo 资格（W07 GE-2，需要真实第二项目）→ 合并与逐文件备份（W09）→ 行级/调用级采样 → Modus 宿主侧 E2E（环境性硬阻塞：Modus 检出不在本工作区）。",
+  "next_action": "按用户决定转深度、暂停广度：(1) 2D 真正的分层布局（端口 + 摘要边语义，布局用本地钉版的 ELK 方向而不是手搓坐标）；(2) 3D 玻璃 / 边界端口 / 正交平面视角；(3) 相机与折叠跨视图保存、按需重绘、搜索定位到层、visibility_reason；(4) 标签碰撞与边交叉的可读性判据（目前只有柱高有判据）。已暂停并如实标注：W07 大仓库资格、W10 宿主侧 E2E（环境性阻塞）。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",

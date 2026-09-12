@@ -6,7 +6,7 @@
 
 <section class="connect"><label for="city-token">本地会话令牌</label><input id="city-token" type="password" autocomplete="off" placeholder="从启动命令返回的 session_file 读取"><button id="city-connect">连接</button><span id="city-analysis" class="subtle"></span></section>
 
-<section class="intro"><div><p class="eyebrow">SAME ANALYSIS, A SECOND PROJECTION</p><h1>目录是地块，文件是柱，函数是层。</h1><p class="subtitle">高度来自引擎声明的函数数量，不是视觉缩放；同一份事实有三个层级（项目 / 目录 / 文件），切换层级只改变画什么，不改变计数什么。调用候选走地面管道；解析不出来的调用不会消失，它会变成柱边那根琥珀色的矮桩。</p></div></section>
+<section class="intro"><div><p class="eyebrow">SAME ANALYSIS, A SECOND PROJECTION</p><h1>目录是地块，文件是柱，函数是层。</h1><p class="subtitle">高度来自引擎声明的函数数量，按分段尺度压缩（前 8 层线性，其后对数封顶），不是视觉缩放；同一份事实有三个层级（项目 / 目录 / 文件），切换层级只改变画什么，不改变计数什么。调用候选走地面管道；解析不出来的调用不会消失，它会变成柱边那根琥珀色的矮桩。</p></div></section>
 
 <main class="city-main">
 <section class="city-stage" id="city-stage">
@@ -34,6 +34,7 @@
   <div class="city-coverage-bar"><span class="subtle">覆盖</span><span id="city-coverage">尚未加载</span></div>
   <div class="city-coverage-bar"><span class="subtle">层级</span><span id="city-level">尚未加载</span></div>
   <div class="city-coverage-bar"><span class="subtle">观测</span><span id="city-observed">尚未加载</span></div>
+  <div class="city-coverage-bar"><span class="subtle">尺度</span><span id="city-scale">尚未加载</span></div>
 </section>
 
 <aside class="city-inspector">

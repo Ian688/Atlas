@@ -394,6 +394,11 @@ function levelStatusLine(view,index,shownPipes){
   if(view.budget.files)bits.push(`预算截断：文件层只画前 ${view.budget.maxFiles} 个文件（${view.totals.files} 中）`);
   if(view.pairUniverse>shownPipes)bits.push(`预算截断：管道 ${shownPipes}/${view.pairUniverse}`);
   bits.push(`索引 ${index.boxes} 盒 / ${index.cells} 格`);
+  // The same scale function sizes the 3D columns. Saying it here is what makes
+  // "one scale definition" checkable rather than a claim about the source.
+  const scale = atlasScaleReport((state.nodes || []).filter((n) => n.kind === 'file')
+    .map((n) => n.function_count || 0));
+  bits.push(`柱高尺度（与 3D 同一函数）中位/最高 ${scale.ratios.medianOverMax.toFixed(3)} · 不足最高 1% 的列 ${scale.under.onePct}/${scale.under.of}` + (scale.linear.onePct ? `（线性尺度下 ${scale.linear.onePct}）` : ''));
   return bits.join(' · ');
 }
 

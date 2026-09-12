@@ -586,6 +586,69 @@ check('switching level keeps the object, re-derives the markers and never re-anc
   assert.equal(none.code, 'no_layout');
 });
 
+
+// ---------------------------------------------------------------------------
+// The column scale. A linear height is not a stylistic choice: measured on
+// rxjs@7.8.1 it drew 92.1% of the files that carry functions under 1% of the
+// tallest column, and one 1056-function bundle flattened the picture. These
+// assertions pin the scale the renderer actually consumes.
+check('the shared scale is monotone, tiered, and compresses instead of lying', () => {
+  const t = boot();
+  const heights = [0, 1, 8, 9, 20, 21, 50, 51, 200, 1056, 1000000]
+    .map((n) => t.run(`atlasScaleHeight(${n})`));
+  for (let i = 1; i < heights.length; i++) {
+    assert.ok(heights[i] >= heights[i - 1], `height must not fall at index ${i}`);
+  }
+  assert.ok(heights[0] < heights[1], 'N=0 must be visibly flatter than N=1');
+  assert.equal(heights[1], 1, 'the first eight layers are linear');
+  assert.equal(heights[2], 8, 'and the eighth is exactly eight layers');
+  assert.ok(heights[9] < 1056, 'a 1056-function file must not be drawn 1056 layers tall');
+  assert.ok(heights[10] < 200, 'and the height must be capped, not merely slowed');
+
+  const tiers = [0, 1, 8, 9, 20, 21, 50, 51].map((n) => t.run(`atlasScaleTier(${n})`));
+  assert.deepEqual(tiers, ['flat', 'linear', 'linear', 'thin', 'thin', 'group', 'group', 'compressed']);
+  const radii = [0, 1, 100, 1024, 1000000].map((n) => t.run(`atlasScaleRadius(${n})`));
+  for (let i = 1; i < radii.length; i++) assert.ok(radii[i] >= radii[i - 1] - 1e-9, 'radius weak-monotone');
+  assert.ok(radii[radii.length - 1] <= 1.35 + 1e-9, 'radius must stay a second channel');
+});
+
+check('the readability criterion is met, and it is not vacuous', () => {
+  const t = boot();
+  const report = t.run('atlasScaleReport(__counts)'.replace('__counts',
+    JSON.stringify([...new Array(59).fill(0), 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 14, 20, 21, 31, 50, 51, 80, 120, 233, 512, 1056])));
+  assert.equal(report.monotone, true);
+  assert.equal(report.linearFirstEight, true);
+  assert.equal(report.under.onePct, 0, 'no column carrying functions may be under 1% of the tallest');
+  assert.ok(report.ratios.medianOverMax >= 0.25, `median/max ${report.ratios.medianOverMax}`);
+  assert.ok(report.linear.onePct > 0,
+    'the linear scale this replaced must fail the same criterion, or the check is decoration');
+});
+
+check('a compressed column is marked, and its layers fit inside its own height', () => {
+  const t = boot();
+  const nodes = [
+    { id: 'file:huge.js', kind: 'file', name: 'huge.js', path: 'huge.js', function_count: 400, disposition: 'captured' },
+    { id: 'file:tiny.js', kind: 'file', name: 'tiny.js', path: 'tiny.js', function_count: 2, disposition: 'captured' },
+  ];
+  const functions = [];
+  for (let i = 0; i < 30; i++) functions.push({ id: `symbol:huge.js:${i}:${i + 1}`, kind: 'function', name: `f${i}`, path: 'huge.js', start: i, end: i + 1 });
+  const layout = t.run(`cityLevelView(buildCityHierarchy(${JSON.stringify(nodes.concat(functions))}, []), "file")`);
+  const huge = layout.columns.find((c) => c.path === 'huge.js');
+  const tiny = layout.columns.find((c) => c.path === 'tiny.js');
+  assert.equal(huge.tier, 'compressed');
+  assert.ok(huge.compressed, 'a 400-function file is compressed');
+  assert.equal(tiny.compressed, false);
+  assert.ok(huge.visibleSlabs <= Math.floor(huge.scaleLayerHeight),
+    'drawn layers must fit inside the compressed height');
+  assert.ok(huge.height < tiny.height * 20, `compressed height ${huge.height} vs ${tiny.height}`);
+  assert.ok(huge.w > tiny.w, 'radius carries the weak second signal');
+  // The ruler has to name the cap it applied, or a compressed height reads as measured.
+  const line = t.run(`cityScaleLine(cityLevelView(buildCityHierarchy(${JSON.stringify(nodes.concat(functions))}, []), "file").stats)`);
+  assert.match(line, /对数压缩/);
+  assert.match(line, /封顶/);
+  assert.match(line, /不是 LOC/);
+});
+
 let failed = 0;
 for (const [name, fn] of checks) {
   try {

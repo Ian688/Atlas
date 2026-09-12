@@ -60,6 +60,10 @@ CHECKS = [
     # the refusals, which are the part that keeps an old name off a new function.
     ("relocate", [sys.executable, "scripts/test_relocate.py"]),
     ("calculator", ["node", "examples/calculator/demo.mjs"]),
+    # Readability as a number: a column that carries functions must not be
+    # drawn invisibly, and the criterion must be able to fail (the linear scale
+    # it replaced is checked against the same bar). No store, no network.
+    ("view-readability", [sys.executable, "scripts/bench_view_readability.py", "--self-check"]),
     ("web-syntax", ["node", "--check", "web/app.js"]),
     # The shared hierarchy: both projections read it, so a parse error here
     # would take down both pages at once.

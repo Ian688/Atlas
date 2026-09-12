@@ -147,8 +147,13 @@ function cityInternalPairCount(hierarchy) {
   return Math.max(all - cross, 0);
 }
 
+/// Height in world units: the shared scale contract times one slab layer, plus
+/// the plinth. The scale is piecewise monotone (linear for the first eight
+/// layers, logarithmic and capped after that) because a linear height drew
+/// 92.1% of rxjs' non-empty files under 1% of the tallest column -- invisible --
+/// and let one 1056-function bundle flatten the whole picture.
 function cityBlockHeight(declared) {
-  return CITY_BASE_H + Math.max(declared, 1) * CITY_SLAB_H;
+  return CITY_BASE_H + atlasScaleHeight(declared) * CITY_SLAB_H;
 }
 
 /// The drawable view of one level. The same facts, grouped differently.
@@ -185,7 +190,15 @@ function cityLevelView(hierarchy, level, options) {
       file_id: block.fileId,
     };
     if (chosen === 'file') {
-      const visible = Math.min(block.functions.length, CITY_MAX_SLABS);
+      const compression = atlasScaleCompression(declared);
+      // A compressed column has fewer layer slots than the file has functions,
+      // so the drawn layers are bounded by the height that is actually there.
+      // Otherwise the layers would stack past the top of their own column.
+      const layerSlots = Math.max(Math.floor(compression.height), 1);
+      const visible = Math.min(block.functions.length, CITY_MAX_SLABS, layerSlots);
+      // Radius is a second, weaker channel: it must not become the thing a
+      // reader compares instead of the fact.
+      const radius = atlasScaleRadius(declared);
       return {
         ...block, ...common,
         loadedSlabs: block.functions.length,
@@ -193,8 +206,12 @@ function cityLevelView(hierarchy, level, options) {
         collapsedSlabs: Math.max(declared - visible, 0),
         slabsIncomplete: block.functions.length < declared,
         slabs: block.functions.slice(0, visible).map((s) => ({ id: s.id, name: s.name, start: s.start, end: s.end })),
-        w: CITY_COLUMN_W * 0.62, d: CITY_COLUMN_D * 0.62,
+        w: CITY_COLUMN_W * 0.62 * radius, d: CITY_COLUMN_D * 0.62 * radius,
         height: cityBlockHeight(declared),
+        tier: compression.tier,
+        compressed: compression.compressed,
+        scaleLayerHeight: compression.height,
+        linearLayerHeight: compression.linearHeight,
       };
     }
     if (chosen === 'district') {
@@ -244,6 +261,14 @@ function cityLevelView(hierarchy, level, options) {
 
   const totals = levelBlocks.totals;
   const drawnFunctions = columns.reduce((total, column) => total + column.functionCount, 0);
+  // Readability of the scale, over every file in the hierarchy rather than over
+  // the ones this budget happened to draw. It carries the linear result too, so
+  // the page shows what the previous scale would have produced instead of
+  // asking anyone to remember it.
+  const declaredCounts = hierarchy.files.map(
+    (file) => (hierarchy.byPath[file.path] ? hierarchy.byPath[file.path].facts.declaredFunctions : 0));
+  const scale = atlasScaleReport(declaredCounts);
+  const ruler = atlasScaleRuler(declaredCounts);
   const stats = {
     schema: 'atlas.city-level-stats.v1',
     level: chosen,
@@ -270,6 +295,8 @@ function cityLevelView(hierarchy, level, options) {
     internalPairs,
     omitted: { ...levelBlocks.omitted },
     budget: { ...levelBlocks.budget },
+    scale,
+    ruler,
     truncated: {
       files: levelBlocks.budget.files,
       pipes: levelBlocks.pairUniverse > pairs.length,
@@ -420,6 +447,27 @@ function cityObservedLine(observed) {
     : '';
   const line = `观测（运行入口）${observed.total}：${parts.join(' · ')} · 落在 ${blocks} 个柱体 / ${observed.records.length} 个文件${level}`;
   return observed.unplaced.length ? `${line} · 未落在当前布局 ${observed.unplaced.length}` : line;
+}
+
+/// The scale, stated. A reader who cannot see the mapping from N to height
+/// cannot tell a tall column from a compressed one, so the ruler travels with
+/// the picture and the compression is named.
+function cityScaleLine(stats) {
+  if (!stats || !stats.scale) return '尚未加载';
+  const scale = stats.scale;
+  const ticks = (stats.ruler && stats.ruler.ticks ? stats.ruler.ticks : [])
+    .map((tick) => `${tick.label}=${tick.height.toFixed(2)}层`).join(' · ');
+  const parts = [
+    `尺度 线性前 ${scale.scale.free} 层，其后对数压缩（每倍 +${scale.scale.gain} 层）`,
+    `标尺 ${ticks}`,
+    `中位柱/最高柱 ${scale.ratios.medianOverMax.toFixed(3)}`,
+    `不足最高柱 1% 的列 ${scale.under.onePct}/${scale.under.of}`,
+  ];
+  if (scale.linear.onePct) parts.push(`（线性尺度下会是 ${scale.linear.onePct}/${scale.under.of}）`);
+  if (scale.empty) parts.push(`N=0 矮柱 ${scale.empty}`);
+  parts.push(scale.monotone ? '单调 ✓' : '单调 ✗ 尺度函数有缺陷');
+  parts.push('压缩后的高度不是 LOC、耗时或质量分');
+  return parts.join(' · ');
 }
 
 function cityCoverageLine(stats) {
@@ -766,6 +814,9 @@ const CITY_PALETTE = {
   slabA: [0.30, 0.66, 0.76],
   slabB: [0.37, 0.72, 0.81],
   collapsed: [0.70, 0.66, 0.58],
+  // The compression ring is deliberately not a data colour: it is a statement
+  // about the scale, not about the code.
+  compression: [0.69, 0.54, 0.24],
   unanalyzed: [0.80, 0.78, 0.74],
   stub: [0.80, 0.63, 0.33],
   pipe: [0.33, 0.66, 0.76, 0.42],
@@ -816,13 +867,28 @@ function cityColumnInstances(layout, mode, selectedPath) {
         });
       });
       if (column.collapsedSlabs > 0) {
+        // The remainder runs to the top of the column that exists. On a
+        // compressed column that is far less than one layer per remaining
+        // function, and the marker below says so instead of leaving the reader
+        // to measure it.
         const bottom = CITY_BASE_H + column.visibleSlabs * CITY_SLAB_H;
-        const height = column.collapsedSlabs * CITY_SLAB_H;
+        const height = Math.max(column.height - bottom, 0);
         list.push({
           offset: [column.x, bottom + height / 2, column.z],
-          scale: [column.w * 0.86, height, column.d * 0.86],
+          scale: [column.w * 0.86, Math.max(height, 1e-3), column.d * 0.86],
           color: CITY_PALETTE.collapsed,
           glow: 0,
+        });
+      }
+      if (column.compressed) {
+        // "Compressed scale marker": a ring at the layer where linearity stops.
+        // A compressed height that is not drawn as compressed is a wrong number
+        // with a nicer finish.
+        list.push({
+          offset: [column.x, CITY_BASE_H + ATLAS_SCALE_FREE * CITY_SLAB_H, column.z],
+          scale: [column.w * 1.16, CITY_SLAB_H * 0.30, column.d * 1.16],
+          color: CITY_PALETTE.compression,
+          glow: 0.1,
         });
       }
     }
@@ -1085,6 +1151,7 @@ async function city3dStart(canvas) {
   function describeLevel() {
     if (!state.layout) return;
     cityText('city-level', cityLevelLine(state.layout.stats, state.layout.invariants));
+    cityText('city-scale', cityScaleLine(state.layout.stats));
   }
 
   function rebuildScene() {
