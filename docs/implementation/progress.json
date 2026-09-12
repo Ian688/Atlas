@@ -280,10 +280,20 @@
       ],
       "note": "把 import、运行时全局、真正自由标识符分开：导入不再被要求声明，内建不再被要求声明，真全局具名要求；worker/engine 用单一 producer 常量对齐并具名拒绝不兼容版本。",
       "report": "evidence/development/2026-09-12-w08-imports/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/ge2-rerun-0.2.2",
+      "status": "DELIVERED",
+      "work_items": [
+        "GE-2-regression-rerun-flow-0.2.2"
+      ],
+      "note": "在 flow 0.2.2 上复跑 rxjs@7.8.1：覆盖分母逐项相同（6573 flow 函数 / 0 partial / 167 unknown regions / 6568 SCC），四条承重断言全部成立，store +0.32%。耗时差异不作因果结论（单次测量、共享机器、首轮有并发负载）。",
+      "report": "evidence/development/2026-09-12-real-project-r2/REPORT.md",
+      "verification": "evidence/development/2026-09-12-real-project-r2/rxjs/bench.json"
     }
   ],
-  "next_work_item": "宿主侧 E2E 与旧入口切换（需要 Modus 检出）；或回到 W08/W09 的深化项",
-  "next_action": "W00–W10 的每一项目前都至少有一个真实纵向切片并纳入验证门。剩下的不是'没开始'，而是三类：(1) 需要本工作区之外的宿主检出才能做的 W10 宿主侧 E2E 与旧入口切换；(2) 明确登记的能力缺口：needs_context 上下文合成、Effect journal、依赖切片、行级覆盖与运行期调用图、owner 认证与服务端权限验证、patch verify 进持久作业队列与 Web 审阅界面、LOD 与 Run 图例；(3) 资格类工作：真实大仓库/多语言/并发/Windows 基准、断电耐久、迁移与回滚方案。",
+  "next_work_item": "W09 深化：嵌套闭包上下文 / 跨版本选区重定位 / LOD；或宿主侧 E2E（需要 Modus 检出）",
+  "next_action": "本轮把执行画像的'什么算外部'修对了（导入 / 运行时全局 / 自由标识符三分），并在真实项目上确认图未变。剩余可做项按价值排序：(1) needs_context 的嵌套闭包（需要闭包实例化，是算法级工作）；(2) 跨版本选区重定位（需要实体重命名/移动追踪）；(3) 3D 的 LOD 与正式层级；(4) 依赖切片（受控运行只物化目标闭包）；(5) GE-3 的规模资格：目前只有单项目单次测量，大仓库/多语言/并发/Windows 都未资格。W10 的宿主侧 E2E 仍被 Modus 检出缺席阻塞。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
