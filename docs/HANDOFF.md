@@ -61,7 +61,7 @@ AI Coding 第一条完整链应做到：选函数标注新增约束 → 导出�
 
 这些是接力任务，不是永久放弃。允许替换框架和目录，要求保留身份、授权、本地数据、明确未知、终止和真实验收。不要为了沿用旧代码而保留错误，也不要为展示进度而把未实现功能画成可用按钮。
 
-## 交接状态（2026-09-12，第 16 轮结束时）
+## 交接状态（2026-09-12，第 17 轮结束时）
 
 本节是**当前实际状态**，不是目标描述。全部数字都有 `evidence/development/` 下的窗口目录（`REPORT.md` + `verification.json` + 各检查日志）与 Git 提交对应。
 
@@ -77,16 +77,19 @@ AI Coding 第一条完整链应做到：选函数标注新增约束 → 导出�
 | W09 一键撤销 | `serve --allow-writes <DIR>` 才开放 HTTP 写；单目录 + 路径回显 | `2026-09-12-w09-http-writes` |
 | W09 写入锁 | `.atlas-apply.lock`（持有者 + 取锁时刻），`patch unlock` + 年龄门 | `2026-09-12-w09-apply-lock`、`-patch-unlock`、`-unlock-age-guard`、`-lock-timestamp` |
 | W07/W06 并发 | 写锁等待可取消 + 具名超时；3 并发同 id（真实 rxjs）；`job work --parallel 1..=4` 每槽位独立租约 | `2026-09-12-ge3-concurrency`、`2026-09-12-w06-bounded-parallel-jobs` |
+| W09 共享层级 | 2D/3D 共用一个几何无关的层级定义（`web/hierarchy.js`）；2D 获得层级切换 + 均匀网格空间索引；层级省略与预算截断分开报告 | `2026-09-12-w09-shared-hierarchy` |
 
-门禁状态：`python3 scripts/verify.py` = **22 项检查 + 1 项受控负对照 + 指纹配对**，最新为全绿（见 `evidence/development/2026-09-12-final-r15/verification.json`）。
+门禁状态：`python3 scripts/verify.py` = **23 项检查 + 1 项受控负对照 + 指纹配对**（含"二进制自称的指纹 == 从源码算出的指纹"），最新为全绿（见 `evidence/development/2026-09-12-w09-shared-hierarchy/verification.json`）。第 17 轮第一次运行**是红的**：`fingerprint pairing` 发现 `build.rs` 的指纹清单漏了 `web/hierarchy.js`，原始失败证据保留在该窗口 `runs/run-1-fingerprint-mismatch/`。
 
 ### 下一轮起点（按价值排序）
 
-1. **2D 画布的正式层级与空间索引**（W09）：3D 已有 `project→district→file` 与 LOD；2D 仍按 12 文件 / 每文件 20 函数的可读性预算绘制，且没有层级概念。可从 `web/city3d.js` 的 `buildCityHierarchy`/`cityLevelView` 借鉴同一套事实计数与守恒检查，让两个投影共享同一层级定义（当前是两份实现，存在漂移风险）。
-2. **大仓库 / monorepo 规模资格**（W07 GE-2/GE-3）：目前只有 rxjs@7.8.1（1255 源文件）的单包测量；需要另一个更大或 monorepo 形状的真实项目，记录冷/热/增量与并发数字。`scripts/bench_real_project.py` 与 `scripts/bench_concurrency.py` 可直接复用（`--package/--sha256/--project/--store`）。
-3. **合并与逐文件备份**（W09）：撤销来源是内容寻址的钉住 blob；检出被改动时 apply/revert 是拒绝而不是合并。
-4. **行级 / 调用级采样**（W09 城市运行层）：现在只有入口调用观测，因此城市里的运行信息是"哪些入口被跑过"，不是运行路径；这条需要真正的插桩设计。
-5. **Modus 宿主侧 E2E 与旧入口切换**（W10）：**环境性硬阻塞**——Modus 检出不在本工作区，无法构建或测试宿主侧；前置条件与回滚已写在 `docs/HOST_API.md`。
+1. **2D 层级只在已加载的一页上计算**（W09，本轮新增的限制）：3D 会翻页加载到 400 文件上限，2D 仍只用当前一页对象算层级，所以它现在会自报 `本页已加载 100/8938 对象` 与 `（仅已加载子集）`——数字是真的，但"项目/目录层级的全局视图"还没做到。下一步要么让 2D 也翻页（并明确上限），要么明确宣布 2D 的层级是本地子集视图。
+2. **层级不经 URL fragment 传递**（W09，本轮新增的限制）：选区可以在 2D/3D 之间传，层级还不能，所以在 3D 切到目录层再跳到 2D 会回到文件层。
+3. **2D 可交互布局**：空间索引只回答"这一点上是哪个块"（含具名未命中与 `scanned` 代价），不解决"块怎么排更好看"；自动避让/拖拽尚未实现。
+4. **大仓库 / monorepo 规模资格**（W07 GE-2/GE-3）：目前只有 rxjs@7.8.1（1255 源文件）的单包测量；需要另一个更大或 monorepo 形状的真实项目，记录冷/热/增量与并发数字。`scripts/bench_real_project.py` 与 `scripts/bench_concurrency.py` 可直接复用（`--package/--sha256/--project/--store`）。
+5. **合并与逐文件备份**（W09）：撤销来源是内容寻址的钉住 blob；检出被改动时 apply/revert 是拒绝而不是合并。
+6. **行级 / 调用级采样**（W09 城市运行层）：现在只有入口调用观测，因此城市里的运行信息是"哪些入口被跑过"，不是运行路径；这条需要真正的插桩设计。
+7. **Modus 宿主侧 E2E 与旧入口切换**（W10）：**环境性硬阻塞**——Modus 检出不在本工作区，无法构建或测试宿主侧；前置条件与回滚已写在 `docs/HOST_API.md`。
 
 ### 已知的真实限制（不得读成已实现）
 
@@ -95,6 +98,8 @@ AI Coding 第一条完整链应做到：选函数标注新增约束 → 导出�
 - 依赖切片是**静态**闭包：计算型动态 `import()` 与运行时数据文件不在副本里（记录里 `known_risk` 事先列出）。
 - 单文件超大模块（实测 14000 函数 / 1.15 MB）在 1 GiB heap 下 10 分钟未完成：按文件粒度的派生代价在该形状下不可接受。
 - `incremental_runs` / patch 派生的 analysis 只增不删，无回收策略。
+- 2D 的层级视图建立在**本页已加载的一页对象**上（3D 会翻页到 400 文件上限）：页面会自报 `（仅已加载子集）`，但"全局的项目/目录层级"在 2D 还没有。
+- 层级还不能像选区那样经 URL fragment 在 2D/3D 之间传递；2D 的空间索引只做"这一点上是哪个块"，不做布局避让。
 - W00–W10 的 `implementation` 多为 PARTIAL：自动化检查 PASS，但**资格（qualification）一律 NOT_QUALIFIED，且独立评审未做**。
 
 ### 复验入口（一条命令）

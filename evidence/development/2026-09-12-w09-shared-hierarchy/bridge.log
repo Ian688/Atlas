@@ -1,0 +1,39 @@
+test_a_different_entity_gets_a_different_selection_id (__main__.Cli.test_a_different_entity_gets_a_different_selection_id) ... ok
+test_a_live_lease_is_not_reaped_and_an_expired_one_is (__main__.Cli.test_a_live_lease_is_not_reaped_and_an_expired_one_is) ... ok
+test_a_patch_proposal_is_a_placeholder_and_never_applied (__main__.Cli.test_a_patch_proposal_is_a_placeholder_and_never_applied) ... ok
+test_a_request_against_an_unknown_analysis_is_rejected (__main__.Cli.test_a_request_against_an_unknown_analysis_is_rejected) ... ok
+test_a_selection_is_pinned_to_the_analysis_it_was_made_in (__main__.Cli.test_a_selection_is_pinned_to_the_analysis_it_was_made_in) ... ok
+test_an_action_with_a_missing_payload_fails_with_a_reason (__main__.Cli.test_an_action_with_a_missing_payload_fails_with_a_reason) ... ok
+test_an_intent_is_a_proposal_and_is_idempotent (__main__.Cli.test_an_intent_is_a_proposal_and_is_idempotent) ... ok
+test_an_unknown_entity_is_not_selected (__main__.Cli.test_an_unknown_entity_is_not_selected) ... ok
+test_an_unsupported_annotation_kind_is_refused (__main__.Cli.test_an_unsupported_annotation_kind_is_refused) ... ok
+test_annotate_action_registers_a_proposal (__main__.Cli.test_annotate_action_registers_a_proposal) ... ok
+test_annotations_are_scoped_to_their_entity (__main__.Cli.test_annotations_are_scoped_to_their_entity) ... ok
+test_inspect_returns_published_facts_and_claims_no_observation (__main__.Cli.test_inspect_returns_published_facts_and_claims_no_observation) ... ok
+test_only_bounded_actions_are_accepted (__main__.Cli.test_only_bounded_actions_are_accepted) ... ok
+test_only_the_lease_holder_can_finish (__main__.Cli.test_only_the_lease_holder_can_finish) ... ok
+test_request_identity_is_the_owner_and_key_pair (__main__.Cli.test_request_identity_is_the_owner_and_key_pair) ... ok
+test_a_page_cannot_claim_another_owner_or_author (__main__.Http.test_a_page_cannot_claim_another_owner_or_author) ... ok
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='UTF-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+test_a_proposal_from_the_page_is_attributed_to_the_session (__main__.Http.test_a_proposal_from_the_page_is_attributed_to_the_session) ... ok
+test_an_unbounded_action_is_refused_over_http (__main__.Http.test_an_unbounded_action_is_refused_over_http) ... ok
+test_selection_and_annotations_over_http (__main__.Http.test_selection_and_annotations_over_http) ... ok
+test_the_bridge_queue_over_http (__main__.Http.test_the_bridge_queue_over_http) ... ok
+test_the_page_cannot_pin_work_to_another_analysis (__main__.Http.test_the_page_cannot_pin_work_to_another_analysis) ... ok
+test_unauthenticated_bridge_calls_are_rejected (__main__.Http.test_unauthenticated_bridge_calls_are_rejected) ... ok
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:84: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='UTF-8'>
+  return self.run(*args, **kwds)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:84: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
+  return self.run(*args, **kwds)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+
+----------------------------------------------------------------------
+Ran 22 tests in 18.374s
+
+OK

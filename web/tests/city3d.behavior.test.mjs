@@ -17,6 +17,11 @@ import vm from 'node:vm';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CITY = path.join(HERE, '..', 'city3d.js');
+// Both pages load hierarchy.js before their own script, and the shared
+// definitions are what keep the two projections from drifting. The
+// harness loads them in the same order a browser would: without this
+// the shared names are simply undefined, which is how this was caught.
+const HIERARCHY = path.join(HERE, '..', 'hierarchy.js');
 
 const fileNode = (p, count) => ({
   id: `file:${p}`, kind: 'file', path: p, name: p.split('/').pop(),
@@ -39,6 +44,7 @@ function boot() {
     document: { getElementById: () => null, createElement: () => ({ style: {} }) },
   };
   const context = vm.createContext(sandbox);
+  vm.runInContext(readFileSync(HIERARCHY, 'utf8'), context, { filename: 'web/hierarchy.js' });
   vm.runInContext(readFileSync(CITY, 'utf8'), context, { filename: 'web/city3d.js' });
   return { run: (expr) => vm.runInContext(expr, context) };
 }
@@ -233,6 +239,7 @@ check('without WebGL2 it says so rather than showing an empty stage', async () =
     },
   };
   const context = vm.createContext(sandbox);
+  vm.runInContext(readFileSync(HIERARCHY, 'utf8'), context, { filename: 'web/hierarchy.js' });
   vm.runInContext(readFileSync(CITY, 'utf8'), context, { filename: 'web/city3d.js' });
   await vm.runInContext('city3dStart(document.getElementById("city-canvas"))', context);
   const status = el('city-status').textContent;

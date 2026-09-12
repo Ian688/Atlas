@@ -1356,6 +1356,18 @@ pub async fn serve(
                 )
             }),
         )
+        // The formal hierarchy is the one definition both projections read, so
+        // it is served like any other asset: the pages load it before their own
+        // script and neither page may carry a private copy of the levels.
+        .route(
+            "/hierarchy.js",
+            get(|| async {
+                asset(
+                    include_str!("../../../web/hierarchy.js"),
+                    "text/javascript; charset=utf-8",
+                )
+            }),
+        )
         .route(
             "/style.css",
             get(|| async {

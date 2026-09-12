@@ -56,6 +56,11 @@ fn main() {
     for relative in [
         "web/index.html",
         "web/app.js",
+        // The shared hierarchy is baked in like the rest: it is the one
+        // definition both projections read, so a change to it changes the
+        // binary, and leaving it out would let the UI change without the
+        // fingerprint moving.
+        "web/hierarchy.js",
         "web/style.css",
         "web/city3d.html",
         "web/city3d.js",

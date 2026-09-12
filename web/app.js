@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id);
-const state = {token:'',nodes:[],edges:[],nodePage:null,edgePage:null,selected:null,focus:null,request:0,exportUrl:null,execProfile:null,report:null,selection:null,pendingSelection:null,annotations:[],patches:[],execRender:0,ancestorChain:null,contract:null};
+const state = {token:'',nodes:[],edges:[],nodePage:null,edgePage:null,selected:null,focus:null,request:0,exportUrl:null,execProfile:null,report:null,selection:null,pendingSelection:null,annotations:[],patches:[],execRender:0,ancestorChain:null,contract:null,level:'file',hierarchy:null,levelView:null,index:null};
 const ns='http://www.w3.org/2000/svg';
 function svg(tag, attrs={}, text) {const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));if(text!==undefined)e.textContent=text;return e;}
 function text(tag,value,cls) {const e=document.createElement(tag);e.textContent=value;if(cls)e.className=cls;return e;}
@@ -358,31 +358,106 @@ function renderFocusGraph(graph,byId,root){
   $('graph-status').title=reach.semantics||'以选中函数为中心的静态调用候选，不是执行顺序。';
   return 62+Math.max(left,right,1)*46+30;
 }
+// How many blocks the 2D canvas draws at the file level. The city can afford
+// hundreds of columns; a workbench drawing one SVG group per block cannot, so
+// the two projections carry different budgets over one hierarchy. That is a
+// budget and it is reported as one -- never as a property of the level.
+const LEVEL_MAX_FILES = 60;
+const LEVEL_MAX_PIPES = 60;
+const LEVEL_LABELS = ATLAS_LEVEL_LABELS;
+const LEVELS = ATLAS_LEVELS;
+
+/// The block line under a box. Aggregates say they are aggregates: a box
+/// standing for a district must not read as a file with one source.
+function levelBlockSub(block, level){
+  if(level==='project')return `${block.facts.files} 文件 · 声明 ${block.facts.declaredFunctions} 函数 · 聚合，不是一个对象`;
+  if(level==='district'){
+    const one=block.filePaths.length===1?' · 仅一个文件，可读出源码':'';
+    return `${block.facts.files} 文件 · 声明 ${block.facts.declaredFunctions} 函数 · 聚合${one}`;
+  }
+  return `${block.path} · ${block.facts.declaredFunctions} 函数${block.analyzed?'':' · 未分析'}`;
+}
+
+/// What the level drew, what it did not enumerate, and what the budget cut.
+/// The last two are separate sentences on purpose.
+function levelStatusLine(view,index,shownPipes){
+  // This page holds one page of objects, not the whole analysis. Reporting the
+  // loaded subset as if it were the project total would be the same class of
+  // error as hiding a budget, so the loaded count travels with every number
+  // derived from it.
+  const loaded=state.nodes.length,total=state.nodePage?.total??state.nodes.length;
+  const partial=loaded<total;
+  const bits=[`层级 ${view.levelLabel}`,`块 ${view.blocks.length}`,
+    `声明函数 ${view.totals.declaredFunctions}${partial?'（仅已加载子集）':''}`];
+  if(partial)bits.push(`本页已加载 ${loaded}/${total} 对象，未加载的对象不在这个层级里`);
+  if(view.omitted.files)bits.push(`层级未展开 ${view.omitted.files} 文件（不是丢失）`);
+  if(view.budget.files)bits.push(`预算截断：文件层只画前 ${view.budget.maxFiles} 个文件（${view.totals.files} 中）`);
+  if(view.pairUniverse>shownPipes)bits.push(`预算截断：管道 ${shownPipes}/${view.pairUniverse}`);
+  bits.push(`索引 ${index.boxes} 盒 / ${index.cells} 格`);
+  return bits.join(' · ');
+}
+
+/// The point under the pointer, resolved through the spatial index. Exposed so
+/// the answer can be tested without a browser: it is the 2D counterpart of the
+/// city's ray/box picking, and it reports a miss instead of guessing.
+function levelHitAt(x,y){
+  const hit=atlasIndexHit(state.index,x,y);
+  if(!hit.inBounds)return {ok:false,code:'outside_the_index',scanned:hit.scanned};
+  if(!hit.hit)return {ok:false,code:'no_block_at_this_point',scanned:hit.scanned};
+  return {ok:true,blockId:hit.hit.id,path:hit.hit.path,fileId:hit.hit.fileId,
+    aggregate:hit.hit.aggregate,scanned:hit.scanned,candidates:hit.candidates};
+}
+
+/// Pick the block at a point and select it -- or say why nothing was selected.
+/// An aggregate has no single source to open, so it is named as an aggregate
+/// rather than opening one file of many and pretending it stands for the block.
+function levelPickAt(x,y){
+  const found=levelHitAt(x,y);
+  if(!found.ok){status(`未选中：${found.code}`);return found;}
+  if(!found.fileId){status(`该位置是聚合块 ${found.path}（${found.aggregate?'多个文件':'没有单一来源'}），不打开其中某个文件`);return found;}
+  const node=state.nodes.find(n=>n.id===found.fileId);
+  if(!node){status(`该位置的块 ${found.path} 不在已加载对象里`);return found;}
+  select(node);
+  return found;
+}
+
 function renderOverviewGraph(graph,byId){
-  const files=[...byId.values()].filter(n=>n.kind==='file'&&n.function_count>0).slice(0,12);
-  if(!files.length)return 430;
-  const fnFile=new Map();for(const n of byId.values())if(n.kind==='function')fnFile.set(n.id,n.parent);
-  const aggregated=new Map();
-  for(const e of state.edges){
-    const a=fnFile.get(e.source),b=e.target?fnFile.get(e.target):null;
-    if(!a||!b||a===b)continue;
-    const key=`${a}||${b}`;aggregated.set(key,(aggregated.get(key)||0)+1);
+  const hierarchy=buildAtlasHierarchy(state.nodes,state.edges);
+  state.hierarchy=hierarchy;
+  const view=atlasLevelBlocks(hierarchy,state.level,{maxFiles:LEVEL_MAX_FILES});
+  state.levelView=view;
+  const W=210,H=46,GX=40,GY=30,COLS=3;
+  const pos=new Map(),boxes=[];
+  let cursorY=62;
+  for(const plate of view.plates){
+    const blocks=plate.blockIds.map(id=>view.blocks.find(b=>b.id===id)).filter(Boolean);
+    graph.append(svg('text',{x:40,y:cursorY-6,class:'folder-caption'},`${plate.label} · ${blocks.length} 块`));
+    blocks.forEach((block,i)=>{
+      const x=40+(i%COLS)*(W+GX),y=cursorY+14+Math.floor(i/COLS)*(H+GY);
+      const selectedBlock=state.selected&&state.selected.id===block.fileId;
+      graphNode(graph,{x,y,label:block.name,sub:levelBlockSub(block,view.level),width:W,height:H,cls:selectedBlock?'selected':'',
+        onClick:()=>{
+          const node=block.fileId?state.nodes.find(n=>n.id===block.fileId):null;
+          if(node)select(node);
+          else status(`聚合块 ${block.path}：${block.filePaths.length} 个文件，不是一个可打开的对象`);
+        }});
+      const box={id:block.id,path:block.path,fileId:block.fileId,aggregate:block.filePaths.length>1,x,y:y-H/2,w:W,h:H};
+      boxes.push(box);pos.set(block.id,box);pos.set(block.path,box);
+    });
+    cursorY+=14+Math.ceil(blocks.length/COLS)*(H+GY)+14;
   }
-  const cols=3,W=210,H=46,GX=40,GY=30,pos=new Map();
-  files.forEach((file,i)=>{
-    const x=40+(i%cols)*(W+GX),y=62+Math.floor(i/cols)*(H+GY);
-    pos.set(file.id,graphNode(graph,{x,y,label:file.name,sub:`${file.path} · ${file.function_count} 函数`,width:W,height:H,cls:state.selected?.id===file.id?'selected':'',onClick:()=>select(file)}));
-  });
-  let drawn=0;
-  for(const [key,count] of aggregated){
-    const [a,b]=key.split('||');const pa=pos.get(a),pb=pos.get(b);if(!pa||!pb)continue;
-    drawn++;graphEdge(graph,pa,pb,`${count} 候选`);
+  state.index=atlasSpatialIndex(boxes);
+  const shown=view.pairs.slice(0,LEVEL_MAX_PIPES);
+  for(const pair of shown){
+    const pa=pos.get(pair.from)||pos.get(`file:${pair.from}`),pb=pos.get(pair.to)||pos.get(`file:${pair.to}`);
+    if(!pa||!pb||pa===pb)continue;
+    graphEdge(graph,pa,pb,`${pair.count} 候选`);
   }
-  graph.append(svg('text',{x:40,y:20,class:'frame-label'},'概览：文件之间的调用候选（聚合）'));
-  graph.append(svg('text',{x:40,y:38,class:'node-sub'},'选择一个函数，画布切换为以它为中心的调用候选焦点图'));
-  $('graph-status').textContent=`概览 ${files.length} 文件 · ${drawn} 条文件间候选 · 已加载关系 ${state.edges.length}/${state.edgePage?.total??0}`;
-  $('graph-status').title='文件层聚合视图；调用候选不是执行顺序。';
-  return 62+Math.ceil(files.length/cols)*(H+GY)+30;
+  graph.append(svg('text',{x:40,y:20,class:'frame-label'},`层级：${view.levelLabel} — ${view.blocks.length} 个块，块的含义随层级改变`));
+  graph.append(svg('text',{x:40,y:38,class:'node-sub'},view.level==='file'?'选择一个函数，画布切换为以它为中心的调用候选焦点图':'点击空白处用空间索引取块；粗层级的块没有单一源码'));
+  $('graph-status').textContent=levelStatusLine(view,state.index,shown.length);
+  $('graph-status').title=`同一份不可变分析的 ${view.levelLabel} 层视图；事实来自共享层级，预算、层级省略与"本页只加载了一页"分别报告。`;
+  return view.blocks.length?cursorY:430;
 }
 function render(){renderTree();renderGraph();}
 // Byte offsets from the engine are UTF-8; the loaded source is a JS string.
@@ -790,6 +865,26 @@ async function select(node){
 $('patch-propose').onclick=()=>proposePatch();
 $('annotation-add').onclick=()=>proposeAnnotation();
 $('exec-run').onclick=()=>runControlled();installBridge();$('connect-button').onclick=connect;$('token').onkeydown=e=>{if(e.key==='Enter')connect();};$('search').oninput=renderTree;
+// The level switch only changes which blocks the overview draws. It does not
+// clear the focus and does not re-anchor a selection: with a function focused
+// the canvas is the focus graph, and the status line says so instead of
+// silently swapping the picture under the cursor.
+function setLevel(level){
+  if(!LEVELS.includes(level)){status(`未知层级 ${level}`);return false;}
+  state.level=level;
+  for(const name of LEVELS){const b=$(`level-${name}`);if(b)b.setAttribute('aria-pressed',String(name===level));}
+  renderGraph();
+  if(state.selected&&state.selected.kind==='function')status(`层级已切到 ${LEVEL_LABELS[level]}；当前仍是焦点图，层级作用于概览（清除焦点后可见）`);
+  return true;
+}
+for(const name of LEVELS){const b=$(`level-${name}`);if(b)b.onclick=()=>setLevel(name);}
+const graphEl=$('graph');
+if(graphEl&&graphEl.addEventListener)graphEl.addEventListener('click',e=>{
+  if(state.selected&&state.selected.kind==='function')return;
+  const box=e.target&&e.target.getBoundingClientRect?e.target.getBoundingClientRect():{left:0,top:0,width:800,height:600};
+  const x=(e.clientX-box.left)*(800/Math.max(box.width,1)),y=(e.clientY-box.top)*(600/Math.max(box.height,1));
+  levelPickAt(x,y);
+});
 // Toggling the enclosing-function path changes whether a run is possible at
 // all, so the button follows it immediately instead of after a re-selection.
 if($('exec-via-enable'))$('exec-via-enable').onchange=()=>{const profile=state.execProfile;if(!profile)return;const wanted=Boolean(profile.enclosing_symbol&&$('exec-via-enable').checked);$('exec-run').disabled=!((profile.runnable||wanted)&&profile.arity!==null);};

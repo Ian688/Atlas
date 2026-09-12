@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/handoff-consolidation",
+    "window": "2026-09-12/w09-shared-hierarchy",
     "status": "DELIVERED",
-    "note": "交接状态固化：docs/HANDOFF.md 增加当前实际状态（已交付能力表、下一轮起点排序、已知真实限制、复验入口），与 evidence/ 窗口和 Git 提交一一对应。",
-    "evidence_dir": "evidence/development/2026-09-12-handoff-consolidation",
-    "verification": "evidence/development/2026-09-12-handoff-consolidation/verification.json"
+    "note": "把 项目→目录→文件 形式层级抽成两个投影共用的唯一定义（web/hierarchy.js），2D 画布获得真实层级切换与空间索引；消除 2D/3D 各自实现同一层级造成的不可见漂移。第一次门禁运行因 build.rs 指纹清单缺 web/hierarchy.js 而 FAIL（原始失败证据保留在窗口 runs/ 下），修复后 23/23 绿。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-shared-hierarchy",
+    "verification": "evidence/development/2026-09-12-w09-shared-hierarchy/verification.json"
   },
   "windows": [
     {
@@ -427,10 +427,20 @@
       ],
       "note": "把当前状态写进 docs/HANDOFF.md：本会话交付的 8 组能力与对应门禁窗口、按价值排序的下一轮起点（2D 层级 / 大仓库资格 / 合并备份 / 采样 / Modus 宿主侧阻塞）、已知限制清单、复验入口。这一轮是**状态固化**，不是能力切片，不声称新增能力。",
       "report": "evidence/development/2026-09-12-handoff-consolidation/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/w09-shared-hierarchy",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09"
+      ],
+      "note": "2D 与 3D 共用一个几何无关的层级定义（atlas.hierarchy.v1）：身份、成员、被计数事实、层级分组只在 web/hierarchy.js 写一次；cityLevelView 退化为\"共享块集 + 几何\"，2D 概览按层级绘制同一批块。层级省略（omitted）与渲染预算（budget）分开报告，2D 还自报\"只加载了一页对象\"。画布点选走均匀网格空间索引（命中/代价/具名未命中）。app 行为断言 32→40，city3d 25 项重构后不变（等价证据）；verify.py 新增 web-syntax-hierarchy 并把手资产计入指纹（含 build.rs 同步修复）。不声称：2D 未翻页、层级不经 fragment 传递、无行级采样。",
+      "report": "evidence/development/2026-09-12-w09-shared-hierarchy/REPORT.md",
+      "verification": "evidence/development/2026-09-12-w09-shared-hierarchy/verification.json"
     }
   ],
   "next_work_item": "2D 画布的正式层级与空间索引，或大仓库/monorepo 的规模资格",
-  "next_action": "本会话上下文预算已耗尽；下一轮（建议新会话）起点按价值：2D 画布正式层级与空间索引 → 大仓库/monorepo 资格 → 合并与逐文件备份 → 行级采样 → Modus 宿主侧（环境性阻塞）。",
+  "next_action": "按价值：2D 层级数据改为翻页取全（与 3D 一致，或明确上限）→ 层级经 URL fragment 在 2D/3D 间传递 → 大仓库/monorepo 资格（W07 GE-2，需要真实第二项目）→ 合并与逐文件备份（W09）→ 行级/调用级采样 → Modus 宿主侧 E2E（环境性硬阻塞：Modus 检出不在本工作区）。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",

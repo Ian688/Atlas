@@ -61,6 +61,9 @@ CHECKS = [
     ("relocate", [sys.executable, "scripts/test_relocate.py"]),
     ("calculator", ["node", "examples/calculator/demo.mjs"]),
     ("web-syntax", ["node", "--check", "web/app.js"]),
+    # The shared hierarchy: both projections read it, so a parse error here
+    # would take down both pages at once.
+    ("web-syntax-hierarchy", ["node", "--check", "web/hierarchy.js"]),
     ("city3d-syntax", ["node", "--check", "web/city3d.js"]),
     # Real behaviour, not just parseability: drives web/app.js in a DOM inside
     # node:vm. Both defects this replaced (a second connect() wiping the live
@@ -145,6 +148,7 @@ def source_fingerprint() -> str:
     for relative in (
         "web/index.html",
         "web/app.js",
+        "web/hierarchy.js",
         "web/style.css",
         "web/city3d.html",
         "web/city3d.js",

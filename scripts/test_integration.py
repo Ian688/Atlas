@@ -132,7 +132,7 @@ class Integration(unittest.TestCase):
             with request("api/report",auth) as r:self.assertEqual(json.load(r)["id"],a["id"])
             with request("api/context?entity=file%3Asrc%2Fmath.js",auth,"POST") as r:self.assertEqual(json.load(r)["context"]["analysis_id"],a["id"])
             with request("") as r:self.assertIn("frame-ancestors 'none'",r.headers["Content-Security-Policy"]);self.assertIn("ATLAS",r.read().decode())
-            for asset in ["app.js","style.css"]:
+            for asset in ["app.js","hierarchy.js","style.css"]:
                 with request(asset) as r:self.assertGreater(len(r.read()),100)
             proc.send_signal(signal.SIGINT);stdout,stderr=proc.communicate(timeout=10)
             self.assertEqual(proc.returncode,0,stderr);self.assertFalse(session_path.exists())

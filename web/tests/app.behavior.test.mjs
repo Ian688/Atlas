@@ -17,6 +17,11 @@ import vm from 'node:vm';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const APP = path.join(HERE, '..', 'app.js');
+// index.html loads hierarchy.js before app.js, and both projections read the
+// same hierarchy. The harness loads them in that order for the same reason the
+// city harness does: a shared name that is missing here is a broken page, not
+// a test detail.
+const HIERARCHY = path.join(HERE, '..', 'hierarchy.js');
 
 class El {
   constructor(id) {
@@ -90,6 +95,7 @@ function boot(routes, options = {}) {
   sandbox.URL.createObjectURL = () => 'blob:test';
   sandbox.URL.revokeObjectURL = () => {};
   const context = vm.createContext(sandbox);
+  vm.runInContext(readFileSync(HIERARCHY, 'utf8'), context, { filename: 'web/hierarchy.js' });
   vm.runInContext(readFileSync(APP, 'utf8'), context, { filename: 'web/app.js' });
   return {
     el,
@@ -253,8 +259,172 @@ check('the overview aggregates file-to-file candidates, not a function list', as
   t.el('token').value = 'TOKEN-1';
   await t.run('connect()');
   const texts = collect(t.el('graph')).map((n) => n.textContent || '').join(' | ');
-  assert.match(texts, /文件之间的调用候选/, 'the canvas must say it is a relationship view');
-  assert.match(t.el('graph-status').textContent, /1 条文件间候选/, 'the overview must count aggregated candidates');
+  assert.match(texts, /层级：文件/, 'the canvas must name the level it is drawing');
+  assert.match(texts, /1 候选/, 'the overview must count aggregated candidates');
+  assert.match(t.el('graph-status').textContent, /层级 文件/, 'the status line must name the level');
+  assert.match(t.el('graph-status').textContent, /索引 \d+ 盒 \/ \d+ 格/, 'the pick index must be reported, not assumed');
+});
+
+// ---------------------------------------------------------------------------
+// The level switch. The 2D canvas used to draw "the first twelve loaded files"
+// and had no notion of a level at all, while the 3D city had project ->
+// district -> file with conservation checks. Two definitions of the same thing
+// drift, and each view stays internally consistent while disagreeing, so what
+// is asserted here is that both levels come from one hierarchy and that the
+// aggregated facts do not move when the level does.
+const TWO_FILES = {
+  items: [
+    { id: 'file:lib/a.js', kind: 'file', name: 'a.js', path: 'lib/a.js', function_count: 2, disposition: 'captured' },
+    { id: 'file:lib/b.js', kind: 'file', name: 'b.js', path: 'lib/b.js', function_count: 3, disposition: 'captured' },
+    { id: 'file:top.js', kind: 'file', name: 'top.js', path: 'top.js', function_count: 1, disposition: 'captured' },
+    { ...FN_A, parent: 'file:lib/a.js', path: 'lib/a.js' },
+    { ...FN_B, parent: 'file:lib/a.js', path: 'lib/a.js' },
+    { ...FN_B, id: 'symbol:lib/b.js:0:5', parent: 'file:lib/b.js', path: 'lib/b.js', name: 'fnC', start: 0, end: 5 },
+    { ...FN_B, id: 'symbol:top.js:0:5', parent: 'file:top.js', path: 'top.js', name: 'fnD', start: 0, end: 5 },
+  ],
+  next_cursor: null, total: 7, analysis_id: report.id,
+};
+const CROSS = {
+  items: [{ id: 'call:1', kind: 'call_candidate', source: FN_A.id, target: 'symbol:lib/b.js:0:5', label: 'g', basis: 'lexical_declaration_candidate', path: 'lib/a.js', start: 1, end: 2 }],
+  next_cursor: null, total: 1, analysis_id: report.id,
+};
+
+async function bootLevels() {
+  const t = boot({ ...routeBase(), nodes: TWO_FILES, edges: CROSS });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  return t;
+}
+
+check('the same hierarchy backs both projections and conserves every counted fact', async () => {
+  const t = await bootLevels();
+  const hierarchy = t.evalIn('state.hierarchy');
+  assert.equal(hierarchy.schema, 'atlas.hierarchy.v1', 'both pages must read the shared hierarchy');
+  // The vm context has its own Array prototype, so compare the contents.
+  assert.equal(JSON.stringify(hierarchy.levels), JSON.stringify(['project', 'district', 'file']));
+  const invariants = t.evalIn('atlasLevelInvariants(state.hierarchy)');
+  assert.equal(invariants.ok, true, JSON.stringify(invariants.violations));
+  assert.equal(invariants.totals.declaredFunctions, 6, 'declared functions are the sum over all three files');
+  assert.equal(invariants.totals.files, 3);
+  assert.equal(invariants.totals.loadedFunctions, 4, 'and the loaded count is what this page actually has');
+});
+
+check('switching level changes what a block stands for, never what is counted', async () => {
+  const t = await bootLevels();
+  const totals = [];
+  const blocks = [];
+  for (const level of ['project', 'district', 'file']) {
+    assert.equal(t.run(`setLevel(${JSON.stringify(level)})`), true);
+    const view = t.evalIn('state.levelView');
+    assert.equal(view.level, level);
+    totals.push(JSON.stringify(view.totals));
+    blocks.push(view.blocks.length);
+    assert.match(t.el('graph-status').textContent, new RegExp(`层级 ${view.levelLabel}`));
+  }
+  // One block for the project, one per district, one per enumerated file: the
+  // block set is what the level decides, and it is the only thing it decides.
+  assert.equal(JSON.stringify(blocks), JSON.stringify([1, 2, 3]));
+  assert.equal(new Set(totals).size, 1, 'aggregated facts must be identical at every level');
+  // The same two calls are a drawn pipe between two files and an internal pair
+  // inside one district. Neither is a different number of calls.
+  assert.equal(t.run('setLevel("file") && state.levelView.pairs.length'), 1);
+  assert.equal(t.run('setLevel("district") && state.levelView.pairs.length'), 0);
+  assert.equal(t.run('state.levelView.internalPairs'), 1, 'the intra-district call is counted, not dropped');
+});
+
+check('a coarse block says it is an aggregate and refuses to open one file of many', async () => {
+  const t = await bootLevels();
+  t.run('setLevel("district")');
+  const view = t.evalIn('state.levelView');
+  const multi = view.blocks.find((b) => b.filePaths.length > 1);
+  assert.ok(multi, 'a district holding two files must exist');
+  assert.equal(multi.path, 'district:lib');
+  assert.equal(multi.fileId, null, 'an aggregate has no single source to open');
+  const single = view.blocks.find((b) => b.filePaths.length === 1);
+  assert.ok(single, 'a district holding exactly one file still exists');
+  assert.equal(single.fileId, `file:${single.filePaths[0]}`,
+    'a one-file district is that file, so its source stays readable');
+  const texts = collect(t.el('graph')).map((n) => n.textContent || '').join(' | ');
+  assert.match(texts, /聚合/, 'the block must be labelled as an aggregate');
+  const picked = t.run('levelPickAt(0, 0)');
+  assert.equal(picked.ok, false, 'a point outside every box is not a pick');
+  assert.equal(picked.code, 'outside_the_index');
+});
+
+check('the pick index answers a real query and reports a named miss', async () => {
+  const t = await bootLevels();
+  t.run('setLevel("file")');
+  const view = t.evalIn('state.levelView');
+  const index = t.evalIn('state.index');
+  assert.equal(index.boxes, view.blocks.length, 'one box per drawn block');
+  const first = view.blocks[0];
+  assert.equal(first.path, 'lib/a.js', 'file blocks are enumerated in path order');
+  // The layout places the first block at x=40..250 with its top at y=53.
+  const hit = t.run('levelHitAt(100, 80)');
+  assert.equal(hit.ok, true, JSON.stringify(hit));
+  assert.equal(hit.blockId, first.id);
+  assert.equal(hit.fileId, first.fileId, 'a file block carries the identity to open');
+  assert.ok(hit.scanned <= index.boxes, 'the index must not scan more boxes than exist');
+  const miss = t.run('levelHitAt(100000, 100000)');
+  assert.equal(miss.ok, false);
+  assert.equal(miss.code, 'outside_the_index');
+});
+
+check('a file-level budget is reported as a budget, not as level omission', async () => {
+  const t = await bootLevels();
+  // 60 is the canvas budget; a project with more files than that is the case
+  // where "not drawn" and "not enumerated by this level" must not be conflated.
+  const many = [];
+  for (let i = 0; i < 70; i++) many.push({ id: `file:f${i}.js`, kind: 'file', name: `f${i}.js`, path: `f${i}.js`, function_count: 1, disposition: 'captured' });
+  t.routes.nodes = { items: many, next_cursor: null, total: many.length, analysis_id: report.id };
+  t.routes.edges = { items: [], next_cursor: null, total: 0, analysis_id: report.id };
+  await t.run('connect()');
+  const view = t.evalIn('state.levelView');
+  assert.equal(view.blocks.length, 60, 'the budget decides what is drawn');
+  assert.equal(view.totals.files, 70, 'and it must not decide what is counted');
+  assert.equal(view.budget.files, true);
+  assert.match(t.el('graph-status').textContent, /预算截断：文件层只画前 60 个文件（70 中）/);
+  t.run('setLevel("project")');
+  const coarse = t.evalIn('state.levelView');
+  assert.equal(coarse.budget.files, false, 'the project level enumerates no file, so it truncates none');
+  assert.equal(coarse.enumeratedFiles, 70);
+  assert.match(t.el('graph-status').textContent, /层级 项目/);
+});
+
+check('a level over a partially loaded page says so instead of totalling the project', async () => {
+  const t = await bootLevels();
+  // The page holds one page of objects. The level must still aggregate what it
+  // has, and it must not present that subset as the project's totals.
+  t.routes.nodes = { items: TWO_FILES.items, next_cursor: 'cursor', total: 900, analysis_id: report.id };
+  await t.run('connect()');
+  const line = t.el('graph-status').textContent;
+  assert.match(line, /仅已加载子集/, 'aggregated facts must be labelled as a subset');
+  assert.match(line, /本页已加载 7\/900 对象/, 'and the loaded fraction must be stated');
+});
+
+check('the level switch never re-anchors a focused function', async () => {
+  const t = await bootLevels();
+  await t.run(`select(state.nodes.find(n => n.id === ${JSON.stringify(FN_A.id)}))`);
+  const before = t.evalIn('state.selected.id');
+  t.run('setLevel("project")');
+  assert.equal(t.evalIn('state.selected.id'), before, 'the selection must survive a level change');
+  assert.match(t.el('status').textContent, /当前仍是焦点图/, 'and the page must say the level did not replace it');
+  assert.equal(t.run('setLevel("nope")'), false, 'an unknown level is refused, not coerced');
+});
+
+check('neither page carries a private copy of the level definitions', () => {
+  const root = path.join(HERE, '..');
+  for (const [page, own] of [['index.html', '/app.js'], ['city3d.html', '/city3d.js']]) {
+    const html = readFileSync(path.join(root, page), 'utf8');
+    const shared = html.indexOf('/hierarchy.js');
+    assert.ok(shared !== -1, `${page} must load the shared hierarchy`);
+    assert.ok(shared < html.indexOf(own), `${page} must load it before ${own}`);
+  }
+  for (const file of ['app.js', 'city3d.js']) {
+    const source = readFileSync(path.join(root, file), 'utf8');
+    assert.doesNotMatch(source, /const\s+ATLAS_LEVELS\s*=\s*\[/, `${file} must not redefine the levels`);
+    assert.doesNotMatch(source, /const\s+ATLAS_FACT_KEYS\s*=\s*\[/, `${file} must not redefine the fact keys`);
+  }
 });
 
 // The state map is where a reader decides "is this value known here?". Three
