@@ -13,13 +13,39 @@ pub struct Store {
     pub root: PathBuf,
 }
 
+/// How long a writer may wait for the SQLite writer lock before giving up.
+///
+/// This is deliberately NOT the SQLite busy-handler timeout. The handler
+/// sleeps inside SQLite, where an operator's Ctrl-C cannot reach it; the retry
+/// loop below checks its control checkpoint between attempts, so a wait stays
+/// cancellable and can be generous. It has to be generous: publishing a real
+/// analysis holds the writer for as long as the publication takes, and a second
+/// process that gives up after a few seconds reports `database is locked` about
+/// a store that was never broken. `ATLAS_STORE_BUSY_TIMEOUT_MS` overrides it.
+pub fn writer_budget() -> Duration {
+    std::env::var("ATLAS_STORE_BUSY_TIMEOUT_MS")
+        .ok()
+        .and_then(|raw| raw.trim().parse::<u64>().ok())
+        .map(Duration::from_millis)
+        .unwrap_or(Duration::from_secs(180))
+}
+
 /// Retry an operation that can lose a race for the SQLite writer.
 ///
 /// A busy timeout alone is not enough: SQLite reports SQLITE_BUSY immediately
 /// for some lock states instead of consulting the busy handler, so the caller
 /// has to retry. This lives here rather than in one caller because the job
 /// store is exactly where two processes are expected to collide on purpose.
-pub(crate) fn retry_on_busy<T>(mut operation: impl FnMut() -> Result<T>) -> Result<T> {
+pub(crate) fn retry_on_busy<T>(operation: impl FnMut() -> Result<T>) -> Result<T> {
+    retry_on_busy_for(writer_budget(), operation)
+}
+
+/// `retry_on_busy` with an explicit budget, so a wait can be bounded on purpose
+/// (and so a test can bound it to milliseconds to prove the refusal is real).
+pub(crate) fn retry_on_busy_for<T>(
+    budget: Duration,
+    mut operation: impl FnMut() -> Result<T>,
+) -> Result<T> {
     let started = std::time::Instant::now();
     loop {
         match operation() {
@@ -28,9 +54,25 @@ pub(crate) fn retry_on_busy<T>(mut operation: impl FnMut() -> Result<T>) -> Resu
                 if matches!(
                     error.sqlite_error_code(),
                     Some(rusqlite::ErrorCode::DatabaseBusy | rusqlite::ErrorCode::DatabaseLocked)
-                ) && started.elapsed() < Duration::from_secs(5) =>
+                ) && started.elapsed() < budget =>
             {
                 std::thread::sleep(Duration::from_millis(5));
+            }
+            // Waiting is not the same as succeeding. When the budget runs out
+            // the refusal says what was waited for and what to do, instead of
+            // handing back the raw SQLite text as if the store were corrupt.
+            Err(Error::Sql(error))
+                if matches!(
+                    error.sqlite_error_code(),
+                    Some(rusqlite::ErrorCode::DatabaseBusy | rusqlite::ErrorCode::DatabaseLocked)
+                ) =>
+            {
+                return Err(invalid(&format!(
+                    "store_writer_timeout:budget_ms={}:waited_ms={}:another process holds the SQLite writer lock; \
+                     raise ATLAS_STORE_BUSY_TIMEOUT_MS to wait longer, or let the other run finish",
+                    budget.as_millis(),
+                    started.elapsed().as_millis()
+                )));
             }
             Err(error) => return Err(error),
         }
@@ -60,10 +102,39 @@ impl Store {
         };
         fs::create_dir_all(store.root.join("blobs"))?;
         let conn = store.connection()?;
-        // Idempotent schema creation still takes the writer for a moment, and
-        // two processes starting together must not read that race as an error.
-        retry_on_busy(|| {
-            conn.execute_batch("PRAGMA journal_mode=WAL;
+        // A store that already has its schema is opened with reads only. This
+        // matters under concurrency: `CREATE TABLE IF NOT EXISTS` still takes
+        // the writer lock even when it creates nothing, so running it on every
+        // command made every reader queue behind whoever was publishing.
+        //
+        // "Has its schema" means every promised table: creation used to run
+        // statement by statement, so a second process could see `analyses` and
+        // not yet `jobs`, then fail on a table that did not exist yet. The
+        // creation below is one transaction and the check is repeated inside
+        // it, so a store is either fully there or not there at all.
+        let schema_present = |conn: &Connection| -> Result<bool> {
+            let mut statement = conn.prepare(
+                "SELECT count(*) FROM sqlite_master WHERE type='table' \
+                 AND name IN ('analyses','jobs','scenario_results')",
+            )?;
+            let count: i64 = statement.query_row([], |row| row.get(0))?;
+            Ok(count == 3)
+        };
+        if !schema_present(&conn)? {
+            // Two processes starting on an empty store race here on purpose.
+            // The loser must wait for the winner, not report a broken store.
+            retry_on_busy(|| {
+                if schema_present(&conn)? {
+                    return Ok(());
+                }
+                // `journal_mode` is not a table and cannot be set inside the
+                // transaction that creates them.
+                conn.execute_batch("PRAGMA journal_mode=WAL;")?;
+                let tx = rusqlite::Transaction::new_unchecked(
+                    &conn,
+                    rusqlite::TransactionBehavior::Immediate,
+                )?;
+                tx.execute_batch("
           CREATE TABLE IF NOT EXISTS snapshots(id TEXT PRIMARY KEY, body TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS analyses(id TEXT PRIMARY KEY, snapshot TEXT NOT NULL, metadata TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS nodes(analysis TEXT NOT NULL,id TEXT NOT NULL,kind TEXT NOT NULL,path TEXT NOT NULL,body TEXT NOT NULL,PRIMARY KEY(analysis,id));
@@ -166,8 +237,21 @@ impl Store {
             body TEXT NOT NULL,
             created_at INTEGER NOT NULL);
           CREATE INDEX IF NOT EXISTS scenario_results_symbol ON scenario_results(analysis,symbol,created_at);")?;
-            Ok(())
-        })?;
+                tx.commit()?;
+                Ok(())
+            })?;
+        } else {
+            // WAL is a property of the file, not of this connection: reading it
+            // back is a query, and setting it is only needed on a store that
+            // was never opened by this version.
+            let mode: String = conn.query_row("PRAGMA journal_mode", [], |row| row.get(0))?;
+            if !mode.eq_ignore_ascii_case("wal") {
+                retry_on_busy(|| {
+                    conn.execute_batch("PRAGMA journal_mode=WAL;")?;
+                    Ok(())
+                })?;
+            }
+        }
         // Additive migration. A store created before the queue existed has a
         // jobs table without `priority` or `options`. Only additive, always-safe
         // changes are handled here; there is still no general migration or
@@ -194,19 +278,32 @@ impl Store {
         }
         // Anything that depends on a migrated column must come after the
         // migration, not in the batch above: an index over `priority` created
-        // before the column exists fails, and the store never opens.
-        retry_on_busy(|| {
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS jobs_queue ON jobs(state,priority,created_at)",
-                [],
-            )?;
-            Ok(())
-        })?;
+        // before the column exists fails, and the store never opens. Like the
+        // tables, it is only created when it is really missing: the check is a
+        // read, and an existing index must not cost a writer lock.
+        let indexed = {
+            let mut statement = conn
+                .prepare("SELECT 1 FROM sqlite_master WHERE type='index' AND name='jobs_queue'")?;
+            statement.exists([])?
+        };
+        if !indexed {
+            retry_on_busy(|| {
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS jobs_queue ON jobs(state,priority,created_at)",
+                    [],
+                )?;
+                Ok(())
+            })?;
+        }
         Ok(store)
     }
     pub fn connection(&self) -> Result<Connection> {
         let conn = Connection::open(self.root.join("atlas.db"))?;
-        conn.busy_timeout(Duration::from_secs(5))?;
+        // Deliberately short: waiting is done by `retry_on_busy`, which checks
+        // the control checkpoint between attempts and therefore stays
+        // cancellable. A long busy-handler timeout would sleep inside SQLite
+        // where Ctrl-C cannot reach it.
+        conn.busy_timeout(Duration::from_millis(25))?;
         Ok(conn)
     }
     pub fn blob_path(&self, hash: &str) -> Result<PathBuf> {

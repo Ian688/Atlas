@@ -37,6 +37,8 @@
 
 验收：两项目并发、同项目新旧请求交错、worker 崩溃/超时/输出超限、取消、重启、旧结果迟到、缓存污染、并行发布冲突。至少一个真实中型项目，再向原 GE 分级推进并记录冷/热/增量成本、RSS、磁盘、首屏/交互时延；1200 个合成函数不替代它。
 
+已交付的这一片：真实树（rxjs@7.8.1）上的并发资格——1/3/3 串并测量，3 并发共享 store 与 3 并发分 store 全部 exit 0 且发布与串行基线相同的 analysis id，事后读回计数一致（`scripts/bench_concurrency.py`，证据 `evidence/development/2026-09-12-real-project/rxjs/concurrency.json`）。并发最初是**失败**的：两个进程以 5 秒固定预算去撞发布者的写锁，直接以 `database is locked` 退出；现在等待是可取消的、预算可配、耗尽时是具名拒绝，且读取不再需要写锁。仍未资格：大仓库/monorepo、多语言、Windows、跨机器、并发度上限。
+
 ## 优先级 C：函数与场景的受控执行
 
 先做 ExecutionProfile 和充分性报告，将函数分为可纯调用、需上下文、需入口驱动、当前不支持。需要 this、数据库/网络/文件副作用时列出依赖与环境，不“new Function + 源码片段”强行执行。需要闭包时不构造作用域、也不接受函数值输入：`--via <enclosing-symbol>` 先调用**恰好是目标包含函数**的那个函数，再只调用它返回的、源码与目标钉住字节一致的那个实例（`closure_not_returned` / `closure_identity_mismatch` 是观测，更深的链静态拒绝）。

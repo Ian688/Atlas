@@ -1,0 +1,486 @@
+{
+  "schema": "atlas.concurrency-qualification.v1",
+  "label": "rxjs-7.8.1-concurrency",
+  "generated_at_utc": "2026-09-12T19:08:30.171142+00:00",
+  "repo_root": "/Users/yinsijie/CodeRepo/Atlas",
+  "project_spec": {
+    "package": "rxjs@7.8.1",
+    "tarball_sha256_expected": "c532167725ab7d085123209156c93cef22f2479cb9c8527060f1cd903aa9d149",
+    "tarball_sha256_actual": "c532167725ab7d085123209156c93cef22f2479cb9c8527060f1cd903aa9d149",
+    "tarball_sha256_match": true,
+    "tarball_path": "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/cache/rxjs-7.8.1.tgz",
+    "project_dir": "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/rxjs",
+    "shared_store_dir": "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/concurrency-store",
+    "serial_store_dir": "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/store",
+    "worker": "/Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs",
+    "node_command": "node",
+    "atlas_binary": "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+    "tree_digest": {
+      "algorithm": "sha256 over sorted 'relpath\\0sha256(content)' lines",
+      "digest": "b2bbb6a149d2cb15d561e44ce88a13f1a47ad8c8c65dc0e4e889fb53436d0ebe",
+      "files": 2277,
+      "symlinks_skipped": 0
+    },
+    "source_inventory": {
+      "extensions": [
+        ".js",
+        ".jsx",
+        ".mjs",
+        ".cjs",
+        ".ts",
+        ".tsx",
+        ".mts",
+        ".cts"
+      ],
+      "by_extension": {
+        ".js": {
+          "files": 754,
+          "bytes": 1310426
+        },
+        ".ts": {
+          "files": 501,
+          "bytes": 1220660
+        }
+      },
+      "file_count": 1255,
+      "total_bytes": 2531086
+    },
+    "tree_bytes": [
+      4501327,
+      2277
+    ]
+  },
+  "environment": {
+    "platform": "macOS-15.7.9-x86_64-i386-64bit-Mach-O",
+    "system": "Darwin",
+    "machine": "x86_64",
+    "processor": "i386",
+    "python_version": "3.14.7 (main, Aug  5 2026, 10:29:49) [Clang 17.0.0 (clang-1700.6.4.2)]",
+    "peak_rss_plan": {
+      "available": true,
+      "wrapper": [
+        "/usr/bin/time",
+        "-l"
+      ],
+      "method": "darwin /usr/bin/time -l: 'maximum resident set size' (bytes)"
+    },
+    "concurrency": {
+      "logical_cpus": 8,
+      "default_parallelism": 3,
+      "note": "parallelism is a choice this script was given, not a measured optimum",
+      "used": 3
+    },
+    "store_writer_budget_env": null,
+    "atlas_sha256": "2d36e536eaf569a1941606f89c9582262d60e37bff1a19bd5dfa0e2d4f989778"
+  },
+  "commands": {
+    "report_after_concurrency": {
+      "argv": [
+        "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+        "--store",
+        "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/concurrency-store",
+        "report",
+        "dc2f21c455cbaddecc9c41f29769331b14382eada80f12032f7d00659373bc7e"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    }
+  },
+  "runs": {
+    "serial_baseline": {
+      "label": "serial-baseline",
+      "argv": [
+        "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+        "--store",
+        "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/store",
+        "index",
+        "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/rxjs",
+        "--node",
+        "node",
+        "--worker",
+        "/Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs",
+        "--timeout-seconds",
+        "600",
+        "--scan-deadline-seconds",
+        "300",
+        "--index-deadline-seconds",
+        "1800"
+      ],
+      "executed_argv": [
+        "/usr/bin/time",
+        "-l",
+        "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+        "--store",
+        "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/store",
+        "index",
+        "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/rxjs",
+        "--node",
+        "node",
+        "--worker",
+        "/Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs",
+        "--timeout-seconds",
+        "600",
+        "--scan-deadline-seconds",
+        "300",
+        "--index-deadline-seconds",
+        "1800"
+      ],
+      "cwd": "/Users/yinsijie/CodeRepo/Atlas",
+      "exit_code": 0,
+      "seconds": 132.979061,
+      "timed_out": false,
+      "peak_rss": 534519808,
+      "peak_rss_unavailable": null,
+      "log": "/Users/yinsijie/CodeRepo/Atlas/evidence/development/2026-09-12-real-project/rxjs/concurrency/serial-baseline.log",
+      "analysis_id": "dc2f21c455cbaddecc9c41f29769331b14382eada80f12032f7d00659373bc7e"
+    },
+    "shared_store": {
+      "parallelism": 3,
+      "wall_seconds": 220.636221,
+      "runs": [
+        {
+          "label": "shared-store-1",
+          "argv": [
+            "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+            "--store",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/concurrency-store",
+            "index",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/rxjs",
+            "--node",
+            "node",
+            "--worker",
+            "/Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs",
+            "--timeout-seconds",
+            "600",
+            "--scan-deadline-seconds",
+            "300",
+            "--index-deadline-seconds",
+            "1800"
+          ],
+          "executed_argv": [
+            "/usr/bin/time",
+            "-l",
+            "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+            "--store",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/concurrency-store",
+            "index",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/rxjs",
+            "--node",
+            "node",
+            "--worker",
+            "/Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs",
+            "--timeout-seconds",
+            "600",
+            "--scan-deadline-seconds",
+            "300",
+            "--index-deadline-seconds",
+            "1800"
+          ],
+          "cwd": "/Users/yinsijie/CodeRepo/Atlas",
+          "exit_code": 0,
+          "seconds": 220.232816,
+          "timed_out": false,
+          "peak_rss": 524836864,
+          "peak_rss_unavailable": null,
+          "log": "/Users/yinsijie/CodeRepo/Atlas/evidence/development/2026-09-12-real-project/rxjs/concurrency/shared-store-1.log",
+          "analysis_id": "dc2f21c455cbaddecc9c41f29769331b14382eada80f12032f7d00659373bc7e",
+          "function_count": 6573
+        },
+        {
+          "label": "shared-store-2",
+          "argv": [
+            "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+            "--store",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/concurrency-store",
+            "index",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/rxjs",
+            "--node",
+            "node",
+            "--worker",
+            "/Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs",
+            "--timeout-seconds",
+            "600",
+            "--scan-deadline-seconds",
+            "300",
+            "--index-deadline-seconds",
+            "1800"
+          ],
+          "executed_argv": [
+            "/usr/bin/time",
+            "-l",
+            "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+            "--store",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/concurrency-store",
+            "index",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/rxjs",
+            "--node",
+            "node",
+            "--worker",
+            "/Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs",
+            "--timeout-seconds",
+            "600",
+            "--scan-deadline-seconds",
+            "300",
+            "--index-deadline-seconds",
+            "1800"
+          ],
+          "cwd": "/Users/yinsijie/CodeRepo/Atlas",
+          "exit_code": 0,
+          "seconds": 220.231146,
+          "timed_out": false,
+          "peak_rss": 518381568,
+          "peak_rss_unavailable": null,
+          "log": "/Users/yinsijie/CodeRepo/Atlas/evidence/development/2026-09-12-real-project/rxjs/concurrency/shared-store-2.log",
+          "analysis_id": "dc2f21c455cbaddecc9c41f29769331b14382eada80f12032f7d00659373bc7e",
+          "function_count": 6573
+        },
+        {
+          "label": "shared-store-3",
+          "argv": [
+            "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+            "--store",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/concurrency-store",
+            "index",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/rxjs",
+            "--node",
+            "node",
+            "--worker",
+            "/Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs",
+            "--timeout-seconds",
+            "600",
+            "--scan-deadline-seconds",
+            "300",
+            "--index-deadline-seconds",
+            "1800"
+          ],
+          "executed_argv": [
+            "/usr/bin/time",
+            "-l",
+            "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+            "--store",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/concurrency-store",
+            "index",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/rxjs",
+            "--node",
+            "node",
+            "--worker",
+            "/Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs",
+            "--timeout-seconds",
+            "600",
+            "--scan-deadline-seconds",
+            "300",
+            "--index-deadline-seconds",
+            "1800"
+          ],
+          "cwd": "/Users/yinsijie/CodeRepo/Atlas",
+          "exit_code": 0,
+          "seconds": 220.637433,
+          "timed_out": false,
+          "peak_rss": 522547200,
+          "peak_rss_unavailable": null,
+          "log": "/Users/yinsijie/CodeRepo/Atlas/evidence/development/2026-09-12-real-project/rxjs/concurrency/shared-store-3.log",
+          "analysis_id": "dc2f21c455cbaddecc9c41f29769331b14382eada80f12032f7d00659373bc7e",
+          "function_count": 6573
+        }
+      ],
+      "distinct_analysis_ids": [
+        "dc2f21c455cbaddecc9c41f29769331b14382eada80f12032f7d00659373bc7e"
+      ]
+    },
+    "separate_stores": {
+      "parallelism": 3,
+      "wall_seconds": 238.190094,
+      "stores": [
+        "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/concurrency-separate-1",
+        "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/concurrency-separate-2",
+        "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/concurrency-separate-3"
+      ],
+      "runs": [
+        {
+          "label": "separate-store-1",
+          "argv": [
+            "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+            "--store",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/concurrency-separate-1",
+            "index",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/rxjs",
+            "--node",
+            "node",
+            "--worker",
+            "/Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs",
+            "--timeout-seconds",
+            "600",
+            "--scan-deadline-seconds",
+            "300",
+            "--index-deadline-seconds",
+            "1800"
+          ],
+          "executed_argv": [
+            "/usr/bin/time",
+            "-l",
+            "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+            "--store",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/concurrency-separate-1",
+            "index",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/rxjs",
+            "--node",
+            "node",
+            "--worker",
+            "/Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs",
+            "--timeout-seconds",
+            "600",
+            "--scan-deadline-seconds",
+            "300",
+            "--index-deadline-seconds",
+            "1800"
+          ],
+          "cwd": "/Users/yinsijie/CodeRepo/Atlas",
+          "exit_code": 0,
+          "seconds": 237.308009,
+          "timed_out": false,
+          "peak_rss": 587202560,
+          "peak_rss_unavailable": null,
+          "log": "/Users/yinsijie/CodeRepo/Atlas/evidence/development/2026-09-12-real-project/rxjs/concurrency/separate-store-1.log",
+          "analysis_id": "dc2f21c455cbaddecc9c41f29769331b14382eada80f12032f7d00659373bc7e"
+        },
+        {
+          "label": "separate-store-2",
+          "argv": [
+            "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+            "--store",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/concurrency-separate-2",
+            "index",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/rxjs",
+            "--node",
+            "node",
+            "--worker",
+            "/Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs",
+            "--timeout-seconds",
+            "600",
+            "--scan-deadline-seconds",
+            "300",
+            "--index-deadline-seconds",
+            "1800"
+          ],
+          "executed_argv": [
+            "/usr/bin/time",
+            "-l",
+            "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+            "--store",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/concurrency-separate-2",
+            "index",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/rxjs",
+            "--node",
+            "node",
+            "--worker",
+            "/Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs",
+            "--timeout-seconds",
+            "600",
+            "--scan-deadline-seconds",
+            "300",
+            "--index-deadline-seconds",
+            "1800"
+          ],
+          "cwd": "/Users/yinsijie/CodeRepo/Atlas",
+          "exit_code": 0,
+          "seconds": 238.102353,
+          "timed_out": false,
+          "peak_rss": 582680576,
+          "peak_rss_unavailable": null,
+          "log": "/Users/yinsijie/CodeRepo/Atlas/evidence/development/2026-09-12-real-project/rxjs/concurrency/separate-store-2.log",
+          "analysis_id": "dc2f21c455cbaddecc9c41f29769331b14382eada80f12032f7d00659373bc7e"
+        },
+        {
+          "label": "separate-store-3",
+          "argv": [
+            "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+            "--store",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/concurrency-separate-3",
+            "index",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/rxjs",
+            "--node",
+            "node",
+            "--worker",
+            "/Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs",
+            "--timeout-seconds",
+            "600",
+            "--scan-deadline-seconds",
+            "300",
+            "--index-deadline-seconds",
+            "1800"
+          ],
+          "executed_argv": [
+            "/usr/bin/time",
+            "-l",
+            "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+            "--store",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/concurrency-separate-3",
+            "index",
+            "/Users/yinsijie/CodeRepo/Atlas/local-state/bench/rxjs",
+            "--node",
+            "node",
+            "--worker",
+            "/Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs",
+            "--timeout-seconds",
+            "600",
+            "--scan-deadline-seconds",
+            "300",
+            "--index-deadline-seconds",
+            "1800"
+          ],
+          "cwd": "/Users/yinsijie/CodeRepo/Atlas",
+          "exit_code": 0,
+          "seconds": 238.191239,
+          "timed_out": false,
+          "peak_rss": 557154304,
+          "peak_rss_unavailable": null,
+          "log": "/Users/yinsijie/CodeRepo/Atlas/evidence/development/2026-09-12-real-project/rxjs/concurrency/separate-store-3.log",
+          "analysis_id": "dc2f21c455cbaddecc9c41f29769331b14382eada80f12032f7d00659373bc7e"
+        }
+      ],
+      "distinct_analysis_ids": [
+        "dc2f21c455cbaddecc9c41f29769331b14382eada80f12032f7d00659373bc7e"
+      ]
+    },
+    "report_after_concurrency": {
+      "function_count": 6573,
+      "node_count": 8938,
+      "edge_count": 25969,
+      "coverage": {
+        "catalog_entries": 2365,
+        "disposition:captured": 2277,
+        "disposition:directory": 88,
+        "encountered_source_files": 1255,
+        "flow_complete_within_profile": 6573,
+        "flow_frontier_functions": 0,
+        "flow_functions": 6573,
+        "flow_partial": 0,
+        "flow_unknown_regions": 167,
+        "interproc_recursive_sccs": 19,
+        "interproc_sccs": 6568,
+        "parsed_source_files": 1255
+      }
+    }
+  },
+  "assertions": {
+    "serial_baseline_ok": true,
+    "shared_store_all_exited_zero": true,
+    "shared_store_single_analysis_id": true,
+    "shared_store_id_equals_serial": true,
+    "separate_stores_id_equals_serial": true,
+    "shared_store_counts_match_baseline": true,
+    "serial_store_counts_match_baseline": true,
+    "all": true
+  },
+  "errors": [],
+  "qualification": "Proves: on this one machine, against the pinned rxjs@7.8.1 tarball whose sha256 was verified before indexing, that N concurrent index runs over the same tree complete and publish the same analysis id as a serial baseline, into one shared store and into separate stores, with the measured wall seconds and peak process RSS of every run. Does NOT prove: large-repo or monorepo scale (one ~1k-file package), multi-language qualification (only JS/TS was indexed), bounded-parallelism qualification (N is what this script was told, not a measured optimum), queue-worker parallelism (the job queue is exercised sequentially elsewhere), Windows qualification, or cross-machine generalisation. Peak RSS is the OS-reported process maximum from time(1), not a heap profile. Id equality proves the concurrent runs agree with each other and with a serial run; it does NOT prove the analysis is semantically correct.",
+  "summary": {
+    "parallelism": 3,
+    "serial_wall_seconds": 132.979061,
+    "shared_store_wall_seconds": 220.636221,
+    "separate_stores_wall_seconds": 238.190094,
+    "serial_peak_rss": 534519808,
+    "shared_peak_rss_max": 524836864,
+    "note": "wall seconds describe this machine under this load; they are not a throughput model and no causal claim is made about them"
+  }
+}

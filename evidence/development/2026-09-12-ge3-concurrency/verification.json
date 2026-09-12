@@ -1,0 +1,383 @@
+{
+  "schema": "atlas.verification.v2",
+  "label": "ge3-concurrency",
+  "time_utc": "2026-09-12T19:19:36.972165+00:00",
+  "platform": "macOS-15.7.9-x86_64-i386-64bit-Mach-O",
+  "cwd": "/Users/yinsijie/CodeRepo/Atlas",
+  "out_dir": "evidence/development/2026-09-12-ge3-concurrency",
+  "commands": [
+    {
+      "name": "rust-format",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.64,
+      "log": "rust-format.log"
+    },
+    {
+      "name": "rust-clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 0.373,
+      "log": "rust-clippy.log"
+    },
+    {
+      "name": "rust-tests",
+      "argv": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "seconds": 9.684,
+      "log": "rust-tests.log"
+    },
+    {
+      "name": "rust-build",
+      "argv": [
+        "cargo",
+        "build",
+        "--workspace",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "seconds": 0.193,
+      "log": "rust-build.log"
+    },
+    {
+      "name": "worker-tests",
+      "argv": [
+        "npm",
+        "test",
+        "--prefix",
+        "workers/typescript"
+      ],
+      "exit_code": 0,
+      "seconds": 1.508,
+      "log": "worker-tests.log"
+    },
+    {
+      "name": "integration",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_integration.py"
+      ],
+      "exit_code": 0,
+      "seconds": 53.084,
+      "log": "integration.log"
+    },
+    {
+      "name": "cancellation",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_cancellation.py"
+      ],
+      "exit_code": 0,
+      "seconds": 10.598,
+      "log": "cancellation.log"
+    },
+    {
+      "name": "jobs",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_jobs.py"
+      ],
+      "exit_code": 0,
+      "seconds": 16.008,
+      "log": "jobs.log"
+    },
+    {
+      "name": "store-concurrency",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_store_concurrency.py"
+      ],
+      "exit_code": 0,
+      "seconds": 25.683,
+      "log": "store-concurrency.log"
+    },
+    {
+      "name": "incremental",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_incremental.py"
+      ],
+      "exit_code": 0,
+      "seconds": 19.837,
+      "log": "incremental.log"
+    },
+    {
+      "name": "semantic-contracts",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_semantic_contracts.py"
+      ],
+      "exit_code": 0,
+      "seconds": 6.718,
+      "log": "semantic-contracts.log"
+    },
+    {
+      "name": "execution",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_execution.py"
+      ],
+      "exit_code": 0,
+      "seconds": 49.714,
+      "log": "execution.log"
+    },
+    {
+      "name": "bridge",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_bridge.py"
+      ],
+      "exit_code": 0,
+      "seconds": 18.276,
+      "log": "bridge.log"
+    },
+    {
+      "name": "patch",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_patch.py"
+      ],
+      "exit_code": 0,
+      "seconds": 21.786,
+      "log": "patch.log"
+    },
+    {
+      "name": "host-adapter",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_host_adapter.py"
+      ],
+      "exit_code": 0,
+      "seconds": 10.475,
+      "log": "host-adapter.log"
+    },
+    {
+      "name": "relocate",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_relocate.py"
+      ],
+      "exit_code": 0,
+      "seconds": 16.959,
+      "log": "relocate.log"
+    },
+    {
+      "name": "calculator",
+      "argv": [
+        "node",
+        "examples/calculator/demo.mjs"
+      ],
+      "exit_code": 0,
+      "seconds": 0.103,
+      "log": "calculator.log"
+    },
+    {
+      "name": "web-syntax",
+      "argv": [
+        "node",
+        "--check",
+        "web/app.js"
+      ],
+      "exit_code": 0,
+      "seconds": 0.1,
+      "log": "web-syntax.log"
+    },
+    {
+      "name": "city3d-syntax",
+      "argv": [
+        "node",
+        "--check",
+        "web/city3d.js"
+      ],
+      "exit_code": 0,
+      "seconds": 0.098,
+      "log": "city3d-syntax.log"
+    },
+    {
+      "name": "web-behaviour",
+      "argv": [
+        "node",
+        "web/tests/app.behavior.test.mjs"
+      ],
+      "exit_code": 0,
+      "seconds": 0.187,
+      "log": "web-behaviour.log"
+    },
+    {
+      "name": "city3d-behaviour",
+      "argv": [
+        "node",
+        "web/tests/city3d.behavior.test.mjs"
+      ],
+      "exit_code": 0,
+      "seconds": 0.152,
+      "log": "city3d-behaviour.log"
+    },
+    {
+      "name": "whitespace",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.035,
+      "log": "whitespace.log"
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "entry-backfill-frontier",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_semantic_contracts.py"
+      ],
+      "env": {
+        "ATLAS_FORCE_ENTRY_BACKFILL": "1"
+      },
+      "why": "forces the V-09 job-level entry backfill; the frontier assertions must go red",
+      "exit_code": 1,
+      "controlled": true,
+      "seconds": 6.285,
+      "log": "negative-entry-backfill-frontier.log"
+    }
+  ],
+  "qualification": "scoped to the checks listed; not full AL/ET/GE/MT/HI/DV or mature Atlas acceptance",
+  "rustc": "rustc 1.96.1 (31fca3adb 2026-06-26) (Homebrew)",
+  "cargo": "cargo 1.96.1 (356927216 2026-06-26) (Homebrew)",
+  "node": "v26.5.1",
+  "npm": "12.0.2",
+  "python": "Python 3.14.7",
+  "git": {
+    "head_exists": true,
+    "head": "96b7f78 evidence: round-5 final verification on HEAD (21/21 exit 0, fingerprint matched)",
+    "whitespace_check_scope": "git diff --check covers uncommitted diffs of tracked files"
+  },
+  "concurrency": {
+    "lock": ".atlas-verify.lock",
+    "serialized": true,
+    "note": "serializes verify.py runs only. It cannot stop a writer editing sources mid-run; sources_changed_during_run is what covers that."
+  },
+  "fingerprint": {
+    "checked": true,
+    "match": true,
+    "expected": "8a06eaf573d607b41e337977b6145c70c4edd6feb0e7cb87f4b473e85beee09b",
+    "actual": "8a06eaf573d607b41e337977b6145c70c4edd6feb0e7cb87f4b473e85beee09b"
+  },
+  "source_hashes": {
+    "crates/.DS_Store": "2de118e858c4c8691832e5574192307a39b9019a07b6cdbfe969f00af50de4e4",
+    "crates/atlas-app/Cargo.toml": "3e725bddcf5bc2ff2d7b55e481a1217ec0e914216326a9c5c93b71c0a00f9ca1",
+    "crates/atlas-app/src/agent.rs": "5e07252e0f8c7c4bff5e6a99e3765c7c481094b08d4f6c146fb1e181a9b12a50",
+    "crates/atlas-app/src/main.rs": "16a17fd72ee9ab79623ea5982fe4da68d12f90c6d0f67ec7833683651f955d24",
+    "crates/atlas-app/src/patchwork.rs": "39a52f7ab4f7010baf763ec3546af68e9360523e95c62e4f1df1e37f9eac8ad2",
+    "crates/atlas-app/src/runner.rs": "1922ef9e6077861309c66af42ebd695a3028b082333f0a126f79fa968b92ee47",
+    "crates/atlas-app/src/server.rs": "5f3e4463909fe22ba8975cd7754ada2a77cc7d4111eef653f19cfcc48de5cfc0",
+    "crates/atlas-app/src/worker.rs": "dc7b45bedf81785db690e5710ef694548698d8c85a210dcd9e537aadb2ea4e6b",
+    "crates/atlas-contract/Cargo.toml": "04d5fed2ea665298fc0d439e2a219ea1a660fb90441a64bf3773c0526f779a41",
+    "crates/atlas-contract/src/flow.rs": "9fda4b0de090d7a6382b510b3d373ccaf4abce84977bb19bd6dbdf5eaa139abd",
+    "crates/atlas-contract/src/lib.rs": "1259522fc2bd60da9c93c87e44be47fbffe00be259496d29a4a3e00cc8792a89",
+    "crates/atlas-engine/Cargo.toml": "7fad0689ee50e57fa3247b1a7399e2f61a3ed861ef4f7e5b5a1194e0c0cf289d",
+    "crates/atlas-engine/build.rs": "a462ee2a1bcecb273b9dd7456b39eafc7e25479cad6127ad7bd1474c4c1997c6",
+    "crates/atlas-engine/src/analyze.rs": "564589438671ed0445e73c601dcc51f4a48b3ab705325e7287aa1d97e985dd64",
+    "crates/atlas-engine/src/bridge.rs": "0f8e9aeadd020db710bdbae33ba4606256a523afeb628c16a07bbb0b44c7d0a4",
+    "crates/atlas-engine/src/control.rs": "7a3e2d6d048ba20a948938f5d13dddca820ea8ff789ed4d487207c06680c7a18",
+    "crates/atlas-engine/src/exec.rs": "20b8afb965b85c036f7351cbc076be9092576175ac91634212002d6f236115d6",
+    "crates/atlas-engine/src/facts.rs": "170859c764da056d6a8f5056644eb2703a57d8c672cef77135036dfa97786319",
+    "crates/atlas-engine/src/flow.rs": "203667df01dc8d616a0e4ea75f3b79352a56e29dfa2d4ab1b28611c647bb6c58",
+    "crates/atlas-engine/src/incremental.rs": "33176a7fb6eac1267d73cf1bcdf5f8d647fde2941eee3e11840badb988d1d63a",
+    "crates/atlas-engine/src/inter.rs": "15167a5bd16dc7a1cf623674c9736d25e62dafb3a2f6ef5f8892b2a15883223b",
+    "crates/atlas-engine/src/job.rs": "2fd465d543a593d59884c2b657601d3b21c71c6f7bed40fb9d82d406a0353d62",
+    "crates/atlas-engine/src/lib.rs": "0a38f18b49aca31349c88aec56ad2db8da8183f945deb805d33878a4eee3d044",
+    "crates/atlas-engine/src/patch.rs": "fbb94294acf921d222bdc39abe3bc1ebc815a1dc6a8b3aeb68a99e38764b862e",
+    "crates/atlas-engine/src/query.rs": "b9c0949603b1d9467b64420a5fb8f63b0aac59bcc6b7d0ff63065e9c715c2f84",
+    "crates/atlas-engine/src/relocate.rs": "5207292d3ca1b009d9c41da9236f21ea31aa92c118bf0674f0c6ed3e2cd93986",
+    "crates/atlas-engine/src/scan.rs": "bea2c550515d1b4085561477300a670676bf20058fc82ff07d266103de43ef6f",
+    "crates/atlas-engine/src/solve.rs": "6ca89fede1e2b05775d8d61795ef92a1a559b4bfff30774460334703afa70e66",
+    "crates/atlas-engine/src/store.rs": "84d2cc282e9a700f7ea4779323b060e79f9a11fecad52896a94d4a6f9971cbc8",
+    "crates/atlas-engine/tests/cancellation.rs": "c1a7687100f54845843cb4eec711ddaaa3ee1b7424a08f5a213c2fabe28d72e0",
+    "crates/atlas-engine/tests/flow_semantics.rs": "f459ff93b0db221d1d18a8525829c3348d194e3f83bc9b8a8adf1dd45daadd4e",
+    "crates/atlas-engine/tests/foundation.rs": "cd3e24108c8db9df4dc807c107e4a6239e1bed8c5c48292380bcce5f69bba488",
+    "crates/atlas-engine/tests/interproc_context.rs": "47fa414f4bb1ceb2caaffd8c25aab72ae8d8551cab4be9ed5e1cb06bfa312404",
+    "workers/typescript/package-lock.json": "de737e95cf5db78a99014f6a9cafcc663aca8e0fe7e217e388ffba0a098af4cf",
+    "workers/typescript/package.json": "b24b7d09a5b158a0e9e5ec3cf17be3ef759ab71c2f2a9c93ae27a43ec9f036b7",
+    "workers/typescript/src/flow.mjs": "871b158dfa41cb82adb45729ebe50c75314064f508b45b363de358aa7d8ad795",
+    "workers/typescript/src/parse.mjs": "2dce90be926f5ea27aff1b6b94add41a9f61b5d7c32d52c5e60cc989bf0daf86",
+    "workers/typescript/tests/flow.test.mjs": "f3b9d3e8a182b4be9531b3ce482ce54e319168ece9942b159f63109d871ac202",
+    "workers/typescript/tests/parse.test.mjs": "4680f555e21a7d9153045f0bac4599d8365c07eccad224d66abe85b624d81807",
+    "workers/typescript/worker.mjs": "076c4ef9fc5237bddbceaf791ce9ddcde8cd175ca0b3a8bd3e5af34ed6f3a586",
+    "web/app.js": "28e5ef4243b047402e671135a2ff04464f0fd7118a72f1def2641736c046c73d",
+    "web/city3d.html": "d55fa465f35170d988d8d7c2f2b5c56502a171012f663e37b918f628ba3f8c95",
+    "web/city3d.js": "ce060163f0e397c25ed50776f5ec8d99af7612c6483e5071d7526179198a388c",
+    "web/index.html": "e8ee2225763713803a17db47f97cf17d9a2d04f90b8bbcc7326740d98a08f865",
+    "web/style.css": "fb07221702c21e3cf697c96ea90bf2da4a96f246695bd4fdc79400c2d4d92b5a",
+    "web/tests/app.behavior.test.mjs": "ab8ffc858ad1fb645dad46a152d5d67e1c209598a53ef39c4fd0f75d4d6b9b39",
+    "web/tests/city3d.behavior.test.mjs": "d8d40fea7720c5355651b494788f269ccec04254f0e7678b8343c69e7496a86e",
+    "examples/.DS_Store": "689ee7820e60f1c71e1b7c0ee534ab306ef696c4ab68deac43f0d2b524eca7f7",
+    "examples/calculator/.gitignore": "48a5d69ced95acba3b51635040c664e84e79d6ec7f91d7c02927065fc3dc9e2a",
+    "examples/calculator/README.md": "061b16d98c700007e588b69f2494ca2e509d3d332ac8cf795cba3cb7fed6994a",
+    "examples/calculator/demo.mjs": "cff0c35934621b282893bfa1a773dfef9269ca797dcc59cfeee11faa16eee170",
+    "examples/calculator/package.json": "c2abd626db4f519925ad38b72892cfe5d8c8c3535b3498fdbbad6067a2fb04d9",
+    "examples/calculator/src/calculator.js": "0afcaff7359a56df83327eef88d07ee970f0e4146ffdd747668bac38ab202bcf",
+    "examples/calculator/src/input.js": "2772513957918467a339c49809266743b5d67a77d573510c2a4fc8ec61d8d277",
+    "examples/calculator/src/math.js": "fb7e55d09f200ba621a410e03568c2673bf133de5eced1c41d9dbc0ec53f4f9d",
+    "examples/flow-lab/README.md": "0e34296db5addd3c8bb19f26824588c3ae298cdcd2f451d61d177fc8f7ff8e65",
+    "examples/flow-lab/src/pipeline.js": "5aebefe8e5a88ee9ed0af2cff73b157e947dcf8a2c1d3d00bf427bc44c618a2c",
+    "scripts/bench_concurrency.py": "cd530c45f7c837c87c96a000bc86e76182c13f0ecf1cfd37bd108b81a26e3227",
+    "scripts/bench_real_project.py": "7c5dedfb82029b31c48cebbe4ac14984d7c9fc7123839b5ee152f45d9908f2cd",
+    "scripts/demo.py": "25c6d6862c3f404ede40951bf65fe6fd882aae8b58483d19f5a4e8a33fcb1fd4",
+    "scripts/test_bridge.py": "36a567d6bd92d7fbdf8d648374b9799a9bd4c0d12b90875399828a90dcf315b8",
+    "scripts/test_cancellation.py": "9a5fb9cb260a6c528a34d2430137c836700b961d6894ae4d0b67b11270a9c68a",
+    "scripts/test_execution.py": "19f4e3b2f9a2033927a35351c9d5ffde73316b943cd52428741ac0f61cb28e2b",
+    "scripts/test_host_adapter.py": "4bfe2e66ff215fb24d0b3514c1c5b24424ae909c28cff0abf135f3b0ecb8a423",
+    "scripts/test_incremental.py": "1c470f38182dbd400cada3ab12c09c90abbb7634c7c2dceb2cfcc3e75984f71f",
+    "scripts/test_integration.py": "59dae1578ab2635d02706d2bacd3c4bbce30311f6e3d0932f92bdc58491fe6ae",
+    "scripts/test_jobs.py": "9b98eb4e7353d9b88ce55bdbc3a0ff2b8b93a018ee2de65c76c8fbd0ae9a1d36",
+    "scripts/test_patch.py": "40a024f84a61c2b11f359ca6d7e0d92a264a068cc268b089a14563874c8ccb4e",
+    "scripts/test_relocate.py": "7f9486110dc7d662496cd10c1434716b610f3330e9e5bbef8c3d0f6ad65d4af0",
+    "scripts/test_semantic_contracts.py": "4b8b35bca9fb62266369504eefe9ac9a67d2bac373aaf0a36c4803e7a15eeea6",
+    "scripts/test_store_concurrency.py": "4ddd7e9f07109e0fffd2572f462082fe5b4046636b7f025e35b502d6d129752c",
+    "scripts/verify.py": "447c7f36cef64b180d3906718d408739312643aa3ca9e3defbfb8f952db67766",
+    "Cargo.toml": "79776f36dc675c16f978e32dcb1ae8a4a342ccec008d614a25b62ec4565a98c9",
+    "Cargo.lock": "b03737eada5ff870cc6ec164d71a53d7c28a805aae09c7f03f6652ee5bdb7934",
+    "AGENTS.md": "b4b7f3b7285397745460cf33d365e3e9c8045459ee74758d34f4acb0095c1fe9",
+    "README.md": "5c31a60db9032c1d0b2fe652f05a4a9fa12c98f3c6a16208959477b11eb30a04"
+  },
+  "modus_protected_files": {
+    "checked": false
+  },
+  "current_document_links": {
+    "errors": [],
+    "scope": "new current entry docs only; original imported requirement links retain Modus context"
+  },
+  "sources_changed_during_run": {
+    "count": 0,
+    "paths": [],
+    "meaning": "sources moved while this run compiled them, so the result describes no single revision; a pass is refused and a failure may not reproduce. Re-run against a still tree."
+  },
+  "binary": {
+    "path": "target/debug/atlas",
+    "sha256": "2d36e536eaf569a1941606f89c9582262d60e37bff1a19bd5dfa0e2d4f989778",
+    "sources_newer_than_binary": [],
+    "meaning": "the artifact behind every CLI-derived number in this run"
+  },
+  "status": "PASS"
+}

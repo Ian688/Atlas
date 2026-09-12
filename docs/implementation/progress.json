@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w08-closure-via",
+    "window": "2026-09-12/ge3-concurrency",
     "status": "DELIVERED",
-    "note": "嵌套闭包经包含函数取得实例（--via）：闭包实例只能被真实产生、并按源码同一性核对；两层观测、命名空间查找区分阶段，更深的链具名拒绝。",
-    "evidence_dir": "evidence/development/2026-09-12-w08-closure-via",
-    "verification": "evidence/development/2026-09-12-w08-closure-via/verification.json"
+    "note": "并发资格：写锁等待可取消、预算可配、耗尽即具名拒绝；schema 创建原子、已初始化 store 只读打开。真实项目上 3 并发全部 exit 0 且与串行同 id。",
+    "evidence_dir": "evidence/development/2026-09-12-ge3-concurrency",
+    "verification": "evidence/development/2026-09-12-ge3-concurrency/verification.json"
   },
   "windows": [
     {
@@ -319,10 +319,19 @@
       ],
       "note": "needs_context 的最后一块：捕获绑定不可声明，只能由包含函数真实产生。--via 必须等于目标的包含符号；harness 分两阶段并只调用返回值中源码与目标钉住字节一致的那个函数；closure_not_returned / closure_identity_mismatch 作为观测保留；closure_depth_not_supported 静态拒绝更深链。",
       "report": "evidence/development/2026-09-12-w08-closure-via/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/ge3-concurrency",
+      "status": "DELIVERED",
+      "work_items": [
+        "GE-3-concurrency-qualification"
+      ],
+      "note": "并发第一次真实运行就以 database is locked 失败（两个进程用 5 秒固定预算撞发布者的写锁）。修复：等待改为可取消的可配预算 + 具名超时拒绝，schema 创建放进一个 IMMEDIATE 事务并在事务内重查，已初始化 store 只读打开（读取不再取写锁）。资格：rxjs@7.8.1 上串行 133.0s/534MB，3 并发共享 store 220.2–220.6s（各自 519–525MB），3 并发分 store 237.3–238.2s，全部 exit 0 且发布同一 analysis id dc2f21c4…；事后读回 6573 函数 / 8938 节点 / 25969 边与基线一致。",
+      "report": "evidence/development/2026-09-12-ge3-concurrency/REPORT.md"
     }
   ],
-  "next_work_item": "W08 深化：依赖切片（只物化目标闭包）与真正的多级 via 组合；或 3D 的 LOD 与正式层级",
-  "next_action": "本轮交付 --via（嵌套闭包经包含函数取得实例，源码同一性核对，两阶段记录，更深的链具名拒绝）。剩余可做项按价值：(1) 依赖切片——受控运行只物化目标闭包而不是整个快照（当前每个 run 都复制整个 snapshot，大树上是真实成本）；(2) 多级 via（outer→middle→inner）需要多阶段组合与逐级源码核对；(3) 3D 的 LOD 与正式层级（工作单要求 'LOD 不改变事实数量'）；(4) GE-3 规模资格：目前只有单项目单次测量，大仓库/多语言/并发/Windows 都未资格。W10 的宿主侧 E2E 与旧入口切换仍被 Modus 检出缺席阻塞。",
+  "next_work_item": "依赖切片（受控运行只物化目标闭包）或 W09 的 3D LOD/正式层级",
+  "next_action": "本轮交付 GE-3 并发资格：先发现真实缺陷（并发 index 以 database is locked 失败），再修（可取消的可配写锁预算 + 具名拒绝 + 原子 schema + 只读打开），再用真实项目资格（3 并发同 id、计数一致）。剩余按价值：(1) 依赖切片——受控运行仍物化整个快照；(2) 3D 的 LOD 与正式层级；(3) 并发的下一步：大仓库/monorepo、多语言、Windows、并发度上限与有界并行策略；(4) 多级 via 组合。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
@@ -643,7 +652,8 @@
         "成本记账：scan/worker/derivation 分阶段计时与 total，写入 incremental 字段",
         "热复用：字节与版本都未变时直接返回已发布分析，跳过全部派生",
         "store.put_blob 修复：内容寻址使发布幂等，已存在的 blob 不再写临时文件并 fsync；scan 3.1–4.9s → 0.049s（60–100×），全量 index 5.7s → 4.4s，且完整性校验保留",
-        "语言 worker 堆上限可配置：--worker-heap-mb（默认 1024，范围 128–8192），随作业行存储；耗尽时报 worker_heap_exhausted:limit_mb=…:raise --worker-heap-mb:stderr=…，而不是笼统的 worker_exit_failed"
+        "语言 worker 堆上限可配置：--worker-heap-mb（默认 1024，范围 128–8192），随作业行存储；耗尽时报 worker_heap_exhausted:limit_mb=…:raise --worker-heap-mb:stderr=…，而不是笼统的 worker_exit_failed",
+        "并发资格（GE-3 首片）：同一真实树（rxjs@7.8.1, b2bbb6a1…, 1255 源文件）上 1/3/3 串并测量——串行 133.0s/534MB，3 并发共享 store 各 220.2–220.6s，3 并发分 store 各 237.3–238.2s，全部 exit 0，全部发布同一 analysis id dc2f21c4…（与串行基线一致），共享 store 事后读回计数与基线一致"
       ],
       "evidence": [
         "crates/atlas-engine/src/incremental.rs（8 个单测：运行键/文件图/SCC/闭包传播/归因/撤回/空图/深链）",
@@ -655,10 +665,12 @@
       "blockers": [
         "局部改动不做增量派生：Rust 侧成本是 inter::analyze_interprocedural_controlled 的全程序 SCC 不动点，单函数求解依赖跨文件被调方摘要，因此按文件缓存派生结果在算法上不成立。实现增量不动点需要摘要稳定性追踪，未做",
         "只有全程序缓存命中（字节与版本均未变）时才跳过派生；热路径仍付一次 worker 启动（约 0.65s，node + TypeScript 加载固定开销）",
-        "121 文件为合成样本，不满足 GE-2/GE-3 的真实项目规模要求；真实中型项目的冷/热/增量成本仍未记录",
         "incremental_runs 表只增不删，无回收策略",
-        "单文件超大模块（实测 14000 个函数 / 1.15MB 单文件）是病态输入：128 MiB 上限下 1.5 秒耗尽；同一输入在 1 GiB 上限下 10 分钟未跑完。按文件粒度派生 Flow IR 的代价在该形状下不可接受，未做按函数分批或按文件切分"
-      ]
+        "单文件超大模块（实测 14000 个函数 / 1.15MB 单文件）是病态输入：128 MiB 上限下 1.5 秒耗尽；同一输入在 1 GiB 上限下 10 分钟未跑完。按文件粒度派生 Flow IR 的代价在该形状下不可接受，未做按函数分批或按文件切分",
+        "并发资格只到 N=3/单机/单语言（JS/TS）：大仓库与 monorepo、多语言、Windows、跨机器、以及并发度上限（是否该有界并行）都未资格；仍无按机器核数推导的并行策略",
+        "真实中型项目已记录（rxjs@7.8.1 冷/热/编辑/删除 + 并发），但它是单包而非 monorepo，且全部为单语言 JS/TS"
+      ],
+      "note": "并发资格 + 真实项目成本已记录；仍非 monorepo/多语言/Windows"
     },
     {
       "id": "W08",

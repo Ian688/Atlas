@@ -1,0 +1,1070 @@
+$ /usr/bin/time -l /Users/yinsijie/CodeRepo/Atlas/target/debug/atlas --store /Users/yinsijie/CodeRepo/Atlas/local-state/bench/store index /Users/yinsijie/CodeRepo/Atlas/local-state/bench/rxjs --node node --worker /Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs --timeout-seconds 600 --scan-deadline-seconds 300 --index-deadline-seconds 1800
+cwd: /Users/yinsijie/CodeRepo/Atlas
+--- stdout ---
+{
+  "binary_fingerprint": "8a06eaf573d607b41e337977b6145c70c4edd6feb0e7cb87f4b473e85beee09b",
+  "call_count": 14476,
+  "coverage": {
+    "catalog_entries": 2365,
+    "disposition:captured": 2277,
+    "disposition:directory": 88,
+    "encountered_source_files": 1255,
+    "flow_complete_within_profile": 6573,
+    "flow_frontier_functions": 0,
+    "flow_functions": 6573,
+    "flow_partial": 0,
+    "flow_unknown_regions": 167,
+    "interproc_recursive_sccs": 19,
+    "interproc_sccs": 6568,
+    "parsed_source_files": 1255
+  },
+  "diagnostics": [
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [23580,23657)",
+      "path": "dist/bundles/rxjs.umd.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [24292,24369)",
+      "path": "dist/bundles/rxjs.umd.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [24538,24648)",
+      "path": "dist/bundles/rxjs.umd.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [258741,258959)",
+      "path": "dist/bundles/rxjs.umd.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [264597,264767)",
+      "path": "dist/bundles/rxjs.umd.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [268035,268254)",
+      "path": "dist/bundles/rxjs.umd.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [1500,1583)",
+      "path": "dist/bundles/rxjs.umd.min.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [41744,41806)",
+      "path": "dist/bundles/rxjs.umd.min.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [43710,43769)",
+      "path": "dist/bundles/rxjs.umd.min.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [44579,44648)",
+      "path": "dist/bundles/rxjs.umd.min.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [44765,44834)",
+      "path": "dist/bundles/rxjs.umd.min.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [79576,79624)",
+      "path": "dist/bundles/rxjs.umd.min.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [400,522)",
+      "path": "dist/cjs/index.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [221,314)",
+      "path": "dist/cjs/internal/ajax/ajax.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [3297,3499)",
+      "path": "dist/cjs/internal/ajax/ajax.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [8807,8961)",
+      "path": "dist/cjs/internal/ajax/ajax.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/AsyncSubject.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/BehaviorSubject.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/observable/ConnectableObservable.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [221,314)",
+      "path": "dist/cjs/internal/observable/dom/fetch.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [473,578)",
+      "path": "dist/cjs/internal/observable/dom/fetch.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/observable/dom/WebSocketSubject.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [984,1077)",
+      "path": "dist/cjs/internal/observable/dom/WebSocketSubject.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [2559,2762)",
+      "path": "dist/cjs/internal/observable/dom/WebSocketSubject.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/operators/OperatorSubscriber.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/ReplaySubject.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/scheduler/Action.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/scheduler/AnimationFrameAction.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/scheduler/AnimationFrameScheduler.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/scheduler/AsapAction.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/scheduler/AsapScheduler.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/scheduler/AsyncAction.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/scheduler/AsyncScheduler.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/scheduler/QueueAction.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/scheduler/QueueScheduler.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/scheduler/VirtualTimeScheduler.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/Subject.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/Subscriber.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/testing/ColdObservable.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/testing/HotObservable.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [286,363)",
+      "path": "dist/cjs/internal/testing/TestScheduler.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [2594,2798)",
+      "path": "dist/esm/internal/ajax/ajax.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [7598,7754)",
+      "path": "dist/esm/internal/ajax/ajax.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [2236,2249)",
+      "path": "dist/esm/internal/Observable.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [569,576)",
+      "path": "dist/esm/internal/observable/bindCallbackInternals.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [840,847)",
+      "path": "dist/esm/internal/observable/bindCallbackInternals.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [1061,1068)",
+      "path": "dist/esm/internal/observable/bindCallbackInternals.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [1496,1506)",
+      "path": "dist/esm/internal/observable/bindCallbackInternals.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [532,539)",
+      "path": "dist/esm/internal/observable/combineLatest.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [151,158)",
+      "path": "dist/esm/internal/observable/concat.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [1189,1394)",
+      "path": "dist/esm/internal/observable/dom/WebSocketSubject.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [419,426)",
+      "path": "dist/esm/internal/observable/forkJoin.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [1562,1569)",
+      "path": "dist/esm/internal/observable/fromEvent.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [432,436)",
+      "path": "dist/esm/internal/observable/fromEventPattern.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [2512,2664)",
+      "path": "dist/esm/internal/observable/innerFrom.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [233,240)",
+      "path": "dist/esm/internal/observable/merge.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [95,102)",
+      "path": "dist/esm/internal/observable/of.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [283,293)",
+      "path": "dist/esm/internal/observable/onErrorResumeNext.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [239,249)",
+      "path": "dist/esm/internal/observable/race.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [321,328)",
+      "path": "dist/esm/internal/observable/zip.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [644,916)",
+      "path": "dist/esm/internal/operators/bufferCount.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [959,1100)",
+      "path": "dist/esm/internal/operators/bufferCount.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [1146,1232)",
+      "path": "dist/esm/internal/operators/bufferCount.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [400,412)",
+      "path": "dist/esm/internal/operators/bufferTime.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [1913,2105)",
+      "path": "dist/esm/internal/operators/bufferTime.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [1076,1157)",
+      "path": "dist/esm/internal/operators/bufferToggle.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [340,347)",
+      "path": "dist/esm/internal/operators/combineLatest.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [83,98)",
+      "path": "dist/esm/internal/operators/combineLatestWith.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [192,199)",
+      "path": "dist/esm/internal/operators/concat.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [62,77)",
+      "path": "dist/esm/internal/operators/concatWith.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [110,119)",
+      "path": "dist/esm/internal/operators/endWith.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [257,264)",
+      "path": "dist/esm/internal/operators/merge.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [59,74)",
+      "path": "dist/esm/internal/operators/mergeWith.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [178,188)",
+      "path": "dist/esm/internal/operators/onErrorResumeNextWith.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [51,64)",
+      "path": "dist/esm/internal/operators/pluck.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [117,124)",
+      "path": "dist/esm/internal/operators/race.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [157,172)",
+      "path": "dist/esm/internal/operators/raceWith.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [2516,2523)",
+      "path": "dist/esm/internal/operators/share.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [158,167)",
+      "path": "dist/esm/internal/operators/startWith.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [512,603)",
+      "path": "dist/esm/internal/operators/takeLast.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [555,636)",
+      "path": "dist/esm/internal/operators/windowCount.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [438,450)",
+      "path": "dist/esm/internal/operators/windowTime.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "destructuring_parameter [2022,2032)",
+      "path": "dist/esm/internal/operators/windowTime.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [1633,1718)",
+      "path": "dist/esm/internal/operators/windowToggle.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [321,330)",
+      "path": "dist/esm/internal/operators/withLatestFrom.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [114,124)",
+      "path": "dist/esm/internal/operators/zip.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [53,67)",
+      "path": "dist/esm/internal/operators/zipWith.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [655,662)",
+      "path": "dist/esm/internal/scheduler/animationFrameProvider.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [888,895)",
+      "path": "dist/esm/internal/scheduler/animationFrameProvider.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [151,158)",
+      "path": "dist/esm/internal/scheduler/immediateProvider.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [68,75)",
+      "path": "dist/esm/internal/scheduler/intervalProvider.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [66,73)",
+      "path": "dist/esm/internal/scheduler/timeoutProvider.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [1089,1196)",
+      "path": "dist/esm/internal/Subject.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [651,752)",
+      "path": "dist/esm/internal/Subscription.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [1333,1888)",
+      "path": "dist/esm/internal/Subscription.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [15672,16050)",
+      "path": "dist/esm/internal/testing/TestScheduler.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [15905,16001)",
+      "path": "dist/esm/internal/testing/TestScheduler.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "destructuring_parameter [16403,16410)",
+      "path": "dist/esm/internal/testing/TestScheduler.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "destructuring_parameter [16490,16498)",
+      "path": "dist/esm/internal/testing/TestScheduler.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "destructuring_parameter [16805,16813)",
+      "path": "dist/esm/internal/testing/TestScheduler.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "destructuring_parameter [17263,17271)",
+      "path": "dist/esm/internal/testing/TestScheduler.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [60,66)",
+      "path": "dist/esm/internal/util/pipe.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [2789,2991)",
+      "path": "dist/esm5/internal/ajax/ajax.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [8257,8411)",
+      "path": "dist/esm5/internal/ajax/ajax.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [1336,1539)",
+      "path": "dist/esm5/internal/observable/dom/WebSocketSubject.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [11939,12111)",
+      "path": "src/internal/ajax/ajax.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [18672,18804)",
+      "path": "src/internal/ajax/ajax.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [17218,17261)",
+      "path": "src/internal/Observable.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [726,740)",
+      "path": "src/internal/observable/bindCallbackInternals.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [1110,1124)",
+      "path": "src/internal/observable/bindCallbackInternals.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [1331,1345)",
+      "path": "src/internal/observable/bindCallbackInternals.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [2770,2787)",
+      "path": "src/internal/observable/bindCallbackInternals.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [9423,9437)",
+      "path": "src/internal/observable/combineLatest.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [4434,4448)",
+      "path": "src/internal/observable/concat.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [6201,6384)",
+      "path": "src/internal/observable/dom/WebSocketSubject.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [6969,6983)",
+      "path": "src/internal/observable/forkJoin.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [12673,12687)",
+      "path": "src/internal/observable/fromEvent.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [6652,6661)",
+      "path": "src/internal/observable/fromEventPattern.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [3905,4027)",
+      "path": "src/internal/observable/innerFrom.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [4536,4752)",
+      "path": "src/internal/observable/innerFrom.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [3956,4018)",
+      "path": "src/internal/observable/merge.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [2673,2706)",
+      "path": "src/internal/observable/of.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [2681,2754)",
+      "path": "src/internal/observable/onErrorResumeNext.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [2169,2226)",
+      "path": "src/internal/observable/race.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [1798,1816)",
+      "path": "src/internal/observable/zip.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [2795,3268)",
+      "path": "src/internal/operators/bufferCount.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [3460,3585)",
+      "path": "src/internal/operators/bufferCount.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [3720,3800)",
+      "path": "src/internal/operators/bufferCount.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [3004,3023)",
+      "path": "src/internal/operators/bufferTime.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [5620,5898)",
+      "path": "src/internal/operators/bufferTime.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [3211,3286)",
+      "path": "src/internal/operators/bufferToggle.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [1481,1542)",
+      "path": "src/internal/operators/combineLatest.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [1729,1774)",
+      "path": "src/internal/operators/combineLatestWith.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [815,829)",
+      "path": "src/internal/operators/concat.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [1310,1355)",
+      "path": "src/internal/operators/concatWith.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [2414,2449)",
+      "path": "src/internal/operators/endWith.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [1307,1325)",
+      "path": "src/internal/operators/merge.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [1444,1489)",
+      "path": "src/internal/operators/mergeWith.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [3564,3637)",
+      "path": "src/internal/operators/onErrorResumeNextWith.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [3896,3942)",
+      "path": "src/internal/operators/pluck.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [1057,1071)",
+      "path": "src/internal/operators/race.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [1094,1139)",
+      "path": "src/internal/operators/raceWith.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [10980,10990)",
+      "path": "src/internal/operators/share.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [2193,2207)",
+      "path": "src/internal/operators/startWith.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [2612,2697)",
+      "path": "src/internal/operators/takeLast.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [3184,3259)",
+      "path": "src/internal/operators/windowCount.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [4190,4209)",
+      "path": "src/internal/operators/windowTime.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "destructuring_parameter [6719,6729)",
+      "path": "src/internal/operators/windowTime.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [3701,3780)",
+      "path": "src/internal/operators/windowToggle.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [2623,2639)",
+      "path": "src/internal/operators/withLatestFrom.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [1194,1266)",
+      "path": "src/internal/operators/zip.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [1462,1506)",
+      "path": "src/internal/operators/zipWith.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [1292,1299)",
+      "path": "src/internal/scheduler/animationFrameProvider.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [1460,1467)",
+      "path": "src/internal/scheduler/animationFrameProvider.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [761,768)",
+      "path": "src/internal/scheduler/immediateProvider.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [704,711)",
+      "path": "src/internal/scheduler/intervalProvider.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [690,697)",
+      "path": "src/internal/scheduler/timeoutProvider.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [2566,2655)",
+      "path": "src/internal/Subject.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [2143,2222)",
+      "path": "src/internal/Subscription.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [2651,2998)",
+      "path": "src/internal/Subscription.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [17626,18290)",
+      "path": "src/internal/testing/TestScheduler.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "for_in_of_iteration [18181,18255)",
+      "path": "src/internal/testing/TestScheduler.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "destructuring_parameter [19745,19752)",
+      "path": "src/internal/testing/TestScheduler.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "destructuring_parameter [19826,19834)",
+      "path": "src/internal/testing/TestScheduler.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "destructuring_parameter [20091,20099)",
+      "path": "src/internal/testing/TestScheduler.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "destructuring_parameter [20702,20710)",
+      "path": "src/internal/testing/TestScheduler.ts"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "rest_parameter [2654,2692)",
+      "path": "src/internal/util/pipe.ts"
+    }
+  ],
+  "edge_count": 25969,
+  "engine": "foundation-flow-0.2.2",
+  "file_count": 2277,
+  "flow_digest": "d9af33781c5d7a1d5af887a716a36bd870d387d03c839a93dd0d24bf52810871",
+  "function_count": 6573,
+  "id": "dc2f21c455cbaddecc9c41f29769331b14382eada80f12032f7d00659373bc7e",
+  "limitations": [
+    "Lexical declaration candidates, not a complete runtime call graph or execution trace.",
+    "Snapshot captures files over an interval; it is not an atomic filesystem transaction.",
+    "Only captured UTF-8 JS/TS inputs; external dependencies, standard library and project tsconfig are not loaded.",
+    "Ignored directories are explicit boundaries; their unvisited descendants are not counted.",
+    "Local flow facts cover declared profile js-structured-control.v1 only; other constructs are explicit unknowns. Interprocedural summaries are symbolic per function, with up to 8 scalar-argument calling contexts per callee; other calls use the symbolic fallback. Captured origins are not re-substituted and unknown callees stay top."
+  ],
+  "node_count": 8938,
+  "producer": "typescript/5.9.3;worker/0.2.1",
+  "recursive_components": [
+    [
+      "symbol:dist/bundles/rxjs.umd.js:123679:124242"
+    ],
+    [
+      "symbol:dist/bundles/rxjs.umd.js:127672:129292"
+    ],
+    [
+      "symbol:dist/bundles/rxjs.umd.js:129875:130600"
+    ],
+    [
+      "symbol:dist/bundles/rxjs.umd.js:134941:135640"
+    ],
+    [
+      "symbol:dist/bundles/rxjs.umd.js:180647:181388",
+      "symbol:dist/bundles/rxjs.umd.js:181430:182156"
+    ],
+    [
+      "symbol:dist/bundles/rxjs.umd.js:183354:183879"
+    ],
+    [
+      "symbol:dist/bundles/rxjs.umd.js:184644:186651"
+    ],
+    [
+      "symbol:dist/bundles/rxjs.umd.js:186929:187755"
+    ],
+    [
+      "symbol:dist/bundles/rxjs.umd.js:29621:29703",
+      "symbol:dist/bundles/rxjs.umd.js:29713:29833",
+      "symbol:dist/bundles/rxjs.umd.js:29963:30045"
+    ],
+    [
+      "symbol:dist/bundles/rxjs.umd.min.js:15034:15237"
+    ],
+    [
+      "symbol:dist/bundles/rxjs.umd.min.js:15475:15970"
+    ],
+    [
+      "symbol:dist/bundles/rxjs.umd.min.js:16215:16445"
+    ],
+    [
+      "symbol:dist/bundles/rxjs.umd.min.js:16954:17099"
+    ],
+    [
+      "symbol:dist/bundles/rxjs.umd.min.js:30047:30223",
+      "symbol:dist/bundles/rxjs.umd.min.js:30226:30323"
+    ],
+    [
+      "symbol:dist/bundles/rxjs.umd.min.js:30512:30644"
+    ],
+    [
+      "symbol:dist/bundles/rxjs.umd.min.js:30860:31205"
+    ],
+    [
+      "symbol:dist/bundles/rxjs.umd.min.js:31265:31441"
+    ],
+    [
+      "symbol:dist/bundles/rxjs.umd.min.js:4159:4288",
+      "symbol:dist/bundles/rxjs.umd.min.js:4341:4403"
+    ],
+    [
+      "symbol:dist/cjs/internal/observable/fromEvent.js:1079:2641"
+    ],
+    [
+      "symbol:dist/cjs/internal/observable/fromEventPattern.js:269:979"
+    ],
+    [
+      "symbol:dist/cjs/internal/observable/onErrorResumeNext.js:699:1377"
+    ],
+    [
+      "symbol:dist/cjs/internal/operators/mergeMap.js:328:910"
+    ],
+    [
+      "symbol:dist/cjs/internal/operators/repeat.js:1673:2348",
+      "symbol:dist/cjs/internal/operators/repeat.js:909:1635"
+    ],
+    [
+      "symbol:dist/cjs/internal/operators/repeatWhen.js:1379:1877"
+    ],
+    [
+      "symbol:dist/cjs/internal/operators/retry.js:997:2898"
+    ],
+    [
+      "symbol:dist/cjs/internal/operators/retryWhen.js:495:1313"
+    ],
+    [
+      "symbol:dist/cjs/internal/util/isReadableStreamLike.js:2463:2545",
+      "symbol:dist/cjs/internal/util/isReadableStreamLike.js:2550:2670",
+      "symbol:dist/cjs/internal/util/isReadableStreamLike.js:2785:2867"
+    ],
+    [
+      "symbol:dist/esm/internal/observable/fromEvent.js:484:1694"
+    ],
+    [
+      "symbol:dist/esm/internal/observable/fromEventPattern.js:154:635"
+    ],
+    [
+      "symbol:dist/esm/internal/observable/onErrorResumeNext.js:449:1067"
+    ],
+    [
+      "symbol:dist/esm/internal/operators/combineLatest.js:310:637"
+    ],
+    [
+      "symbol:dist/esm/internal/operators/mergeMap.js:222:655"
+    ],
+    [
+      "symbol:dist/esm/internal/operators/repeat.js:1431:2073",
+      "symbol:dist/esm/internal/operators/repeat.js:720:1391"
+    ],
+    [
+      "symbol:dist/esm/internal/operators/repeatWhen.js:1199:1664"
+    ],
+    [
+      "symbol:dist/esm/internal/operators/retry.js:759:2556"
+    ],
+    [
+      "symbol:dist/esm/internal/operators/retryWhen.js:391:1071"
+    ],
+    [
+      "symbol:dist/esm5/internal/observable/fromEvent.js:510:1997"
+    ],
+    [
+      "symbol:dist/esm5/internal/observable/fromEventPattern.js:154:826"
+    ],
+    [
+      "symbol:dist/esm5/internal/observable/onErrorResumeNext.js:558:1189"
+    ],
+    [
+      "symbol:dist/esm5/internal/operators/mergeMap.js:222:756"
+    ],
+    [
+      "symbol:dist/esm5/internal/operators/repeat.js:1526:2180",
+      "symbol:dist/esm5/internal/operators/repeat.js:803:1488"
+    ],
+    [
+      "symbol:dist/esm5/internal/operators/repeatWhen.js:1235:1712"
+    ],
+    [
+      "symbol:dist/esm5/internal/operators/retry.js:889:2728"
+    ],
+    [
+      "symbol:dist/esm5/internal/operators/retryWhen.js:395:1149"
+    ],
+    [
+      "symbol:src/internal/observable/fromEvent.ts:10064:12934"
+    ],
+    [
+      "symbol:src/internal/observable/fromEventPattern.ts:6231:6850"
+    ],
+    [
+      "symbol:src/internal/observable/onErrorResumeNext.ts:2955:3452"
+    ],
+    [
+      "symbol:src/internal/operators/combineLatest.ts:1445:1877"
+    ],
+    [
+      "symbol:src/internal/operators/mergeMap.ts:3141:3828"
+    ],
+    [
+      "symbol:src/internal/operators/repeat.ts:4251:4759",
+      "symbol:src/internal/operators/repeat.ts:4796:5309"
+    ],
+    [
+      "symbol:src/internal/operators/repeatWhen.ts:3474:4828"
+    ],
+    [
+      "symbol:src/internal/operators/retry.ts:3913:6492"
+    ],
+    [
+      "symbol:src/internal/operators/retryWhen.ts:2534:4022"
+    ]
+  ],
+  "schema": "atlas.analysis.v1",
+  "snapshot_id": "cf411b4d511a3d4721cee2d1c2fe08d323dba80200a6630c4de6a499a05dfdf5",
+  "unresolved_call_count": 10775
+}
+--- stderr ---
+      132.97 real        79.76 user         6.14 sys
+           534519808  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              452542  page reclaims
+                 707  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   1  messages sent
+                   1  messages received
+                   1  signals received
+               13790  voluntary context switches
+              214462  involuntary context switches
+        439557422664  instructions retired
+        286981733319  cycles elapsed
+           392204288  peak memory footprint
+[exit code: 0]
+[wall seconds: 132.979061]
+[peak rss: 534519808 (measured)]

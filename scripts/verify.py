@@ -31,6 +31,11 @@ CHECKS = [
     ("integration", [sys.executable, "scripts/test_integration.py"]),
     ("cancellation", [sys.executable, "scripts/test_cancellation.py"]),
     ("jobs", [sys.executable, "scripts/test_jobs.py"]),
+    # Two processes, one store. The defect this pins was found by running three
+    # real concurrent indexes against rxjs: two died on a raw "database is
+    # locked". The writer lock must be waited for (cancellably), a spent budget
+    # must be a named refusal, and a reader must not queue behind a publisher.
+    ("store-concurrency", [sys.executable, "scripts/test_store_concurrency.py"]),
     # Incremental reuse is only sound if it publishes the same analysis a full
     # run would; every case here asserts that id equality, not just the hit rate.
     ("incremental", [sys.executable, "scripts/test_incremental.py"]),
