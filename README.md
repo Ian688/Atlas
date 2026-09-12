@@ -36,6 +36,11 @@ target/debug/atlas --store local-state serve <上一步返回的id>
 - 索引支持 SIGINT/SIGTERM 协作取消；扫描、worker、Rust 求解及发布锁等待共用控制，提交前接受取消会阻止新分析发布。计算预算耗尽可发布带 unknown、frontier 与实际预算计数的部分事实，deadline 耗尽则拒绝发布。持久作业队列与恢复租约仍待实现。
 - 用 Rust 构建包含关系、调用候选图、递归分量；按版本分页、多跳遍历、读取 UTF-8 源码窗口。
 - 在真实 2D 页面中浏览文件与函数，选中对象高亮相关候选，其他对象变淡，导出带分析版本的本地 JSON 上下文。函数详情面板显示所选函数的块级控制流与绑定值来源摘要（`atlas-local-absint`，仅声明 profile 内）。
+- 函数详情面板里的**绑定状态矩阵**把每个基本块×绑定的状态投影成表。三个视觉通道互相独立，所以没有事实会被另一个掩盖：填充表示值的种类，角标表示该值仍含未知分量，描边表示读取时可能未初始化；「该块无绑定记录」与「值为未知」是两个不同的标记。
+- **3D 代码城市**（`/city3d`）是同一份分析的第二种投影：目录为地块、文件为柱、函数为层、调用候选为地面管道。高度取自引擎声明的函数数量，未解析调用按事实画成琥珀矮桩而不丢弃，未分析的文件单独标识，覆盖与截断始终显示。渲染器是手写 WebGL2，无第三方依赖。
+- 索引可以作为**持久作业**提交：身份由 (owner, project, request_key) 三元组定义，同一请求幂等——已完成的请求重放原分析而不重跑，失败的可以重试并计入下一次 attempt。作业持有带心跳的租约；租约停止续期就是进程死亡的证据，`job reap` 收割它并判失败，`job work` 则换个人接着跑——崩溃不该让队列停摆，重跑在这里是安全的（发布幂等且不可变）。陈旧持有者无法伪造终态。
+- 作业可以**排队**而不是只能即刻执行：`job enqueue` 只登记请求（runner 参数随行存储，所以排队请求描述自己怎么跑），工人按优先级降序、同级最旧优先认领。排队中的作业可以取消；运行中的不行——它属于租约持有者。
+- `index --incremental` 在字节与版本都没变时直接返回已发布的分析，并报告一次局部改动会失效什么：每个文件按自身内容与依赖闭包（在导入图 SCC 凝聚上折叠）得到一个键，因此失效**不需要**额外的一遍扫描，且改叶子不会反向失效共享模块。`withdrawn` 列出上次分析过、这次已不存在的文件。**承重断言**：增量与全量必须发布同一个 analysis id，冷/热/编辑/删除四条路径都有测试。已知边界：局部改动仍需重新派生全部函数（Rust 侧是全程序 SCC 不动点）。
 - 外部 Agent 可以调用 CLI/本地 HTTP，或操作有语义标签的网页；导出上下文不会自动发送给任何模型。
 
 **当前连线是静态候选，不是数据流执行顺序或运行血流。** 计算器同时出现加、减、除候选，不能据此声称一次加法执行过所有分支。Flow 事实是声明 profile 内的静态推导：未知构造、外部调用效果与跨过程值流都保留为显式 unknown。当前按钮没有修改代码、运行任意函数或调用模型的能力。`examples/flow-lab` 是局部语义事实的集成测试样例（finally、短路、循环、分支候选、显式 unknown）。
@@ -62,8 +67,14 @@ cargo build --workspace --locked
 npm test --prefix workers/typescript
 python3 scripts/test_integration.py
 python3 scripts/test_cancellation.py
+python3 scripts/test_jobs.py
+python3 scripts/test_incremental.py
 python3 scripts/test_semantic_contracts.py
 node examples/calculator/demo.mjs
+node web/tests/app.behavior.test.mjs
+node web/tests/city3d.behavior.test.mjs
 ```
+
+自动化分别覆盖存储/遍历/边界、真实编译器材料、完整 CLI/HTTP 链路和独立计算器断言。`web/tests/app.behavior.test.mjs` 在 `node:vm` 的 DOM 里真正驱动 `web/app.js`（会话保持、失败路径清空、事实与选中的 symbol 一致性），因此工作台的行为不再只靠 `node --check` 的语法检查。
 
 自动化分别覆盖存储/遍历/边界、真实编译器材料、完整 CLI/HTTP 链路和独立计算器断言。120 文件、1,200 函数是合成分页与预算样本；10,000 节点 SCC 是图算法样本；两者均不构成大型真实项目资格。

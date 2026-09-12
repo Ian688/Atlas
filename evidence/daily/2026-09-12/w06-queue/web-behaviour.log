@@ -1,0 +1,10 @@
+ok   a second connect() with the emptied field keeps the live session
+ok   an empty field with no session asks for a token instead of querying
+ok   a failed selection clears the previous flow facts
+ok   a flow fact from another symbol is refused, not rendered
+ok   reset clears the inspector as one unit
+ok   the selection canvas draws resolved targets, unresolved targets and edge labels
+ok   the overview aggregates file-to-file candidates, not a function list
+ok   the block-by-binding state map marks each kind without inventing records
+
+all 8 web behaviour checks passed

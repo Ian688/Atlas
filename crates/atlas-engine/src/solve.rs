@@ -539,6 +539,11 @@ impl SolveOutput {
 pub struct SolveInternal {
     pub returns: Value,
     pub throws: Value,
+    /// Solved completely and never returned normally. Only a complete solve may
+    /// claim this: a cut or unconverged solve that merely lacks a `return`
+    /// statement proves nothing, and a caller that trusted it would drop a
+    /// possible normal successor and lose values.
+    pub never_returns: bool,
     pub effects: Effects,
     pub written: BTreeMap<(String, String), Value>,
     pub callsites: BTreeMap<u32, CallSiteObs>,
@@ -923,7 +928,7 @@ impl<'a> Solver<'a> {
             let visits = self.visits.entry(block).or_default();
             *visits += 1;
             let widen = *visits > MAX_BLOCK_VISITS;
-            let (out, at_throw) =
+            let (out, at_throw, forced_throw) =
                 self.transfer_block(block, &input, widen, self.cross_block_operands);
             if self.budget_exhausted {
                 self.queue.insert(block);
@@ -931,7 +936,7 @@ impl<'a> Solver<'a> {
             }
             self.block_effects.insert(block, out.effects.clone());
             self.block_written.insert(block, out.written.clone());
-            self.propagate(block, &out, &at_throw);
+            self.propagate(block, &out, &at_throw, forced_throw);
         }
     }
 
@@ -979,13 +984,17 @@ impl<'a> Solver<'a> {
     /// FIXED(R1): an earlier revision of this doc comment claimed a pre-state,
     /// which would roll back effects produced before the throw. That is
     /// forbidden; the implementation has always stored the post-state.
+    /// Returns the block output, the per-op post-states for exception edges, and
+    /// — when a call that provably cannot return was transferred — that op.
+    /// The third value says the rest of the block and its terminator are
+    /// unreachable; control leaves through the op's exception path.
     fn transfer_block(
         &mut self,
         block: BlockId,
         input: &State,
         widen: bool,
         cross_block_operands: &BTreeSet<u32>,
-    ) -> (State, BTreeMap<u32, State>) {
+    ) -> (State, BTreeMap<u32, State>, Option<u32>) {
         let mut state = input.clone();
         if widen {
             for slot in state.env.values_mut() {
@@ -1014,6 +1023,7 @@ impl<'a> Solver<'a> {
             .retain(|op, _| cross_block_operands.contains(op));
         let block_ops = self.lowered.cfg.blocks[block as usize].ops.clone();
         let mut at_throw: BTreeMap<u32, State> = BTreeMap::new();
+        let mut forced_throw: Option<u32> = None;
         for op_index in block_ops {
             if self.transfers >= self.transfer_limit || self.control.checkpoint().is_err() {
                 self.budget_exhausted = true;
@@ -1032,8 +1042,59 @@ impl<'a> Solver<'a> {
                 post.completion_value = None;
                 at_throw.insert(op_index, post);
             }
+            if self.call_never_returns(&state, op_index) {
+                // The callee has no normal return, so this call cannot fall
+                // through: every later op in the block and the terminator are
+                // unreachable and must not be transferred. Control leaves
+                // through this op's exception edge, exactly as a `throw` term
+                // would. Without this, a must-throw call looked like a normal
+                // call that also happened to throw, and the code after it was
+                // solved as reachable.
+                forced_throw = Some(op_index);
+                break;
+            }
         }
-        (state, at_throw)
+        (state, at_throw, forced_throw)
+    }
+
+    /// True when every resolved target of this call is a completely solved
+    /// callee that never returns normally. An unknown callee, no target, or a
+    /// single target that may return all mean the call can fall through.
+    fn call_never_returns(&self, state: &State, op_index: u32) -> bool {
+        let OpKind::Call { callee, args, .. } = &self.lowered.ops[op_index as usize].kind else {
+            return false;
+        };
+        let callee_value = self.value_of(state, *callee);
+        if callee_value.unknown || callee_value.targets.is_empty() {
+            return false;
+        }
+        // k=1: a context summary derived from THIS callsite's arguments is the
+        // most precise view, and it can prove no-return where the symbolic
+        // summary cannot -- e.g. `divider(1, 0)`, whose concrete argument prunes
+        // the branch that returns. The returns path already prefers this
+        // summary; the control-flow decision must prefer the same one.
+        if callee_value.targets.len() == 1 {
+            let arg_values: Vec<Value> =
+                args.iter().map(|arg| self.value_of(state, *arg)).collect();
+            if let Some(key) = context_key(
+                &callee_value.targets[0],
+                &self.function.symbol,
+                op_index,
+                &arg_values,
+            ) && let Some(summary) = self.summaries.get(&key)
+            {
+                // A context summary exists: it is strictly more precise than the
+                // symbolic one, so trust it either way. When no context summary
+                // exists (e.g. a zero-parameter callee), fall through to the
+                // symbolic view instead of concluding "returns".
+                return summary.never_returns;
+            }
+        }
+        callee_value.targets.iter().all(|target| {
+            self.summaries
+                .get(target.as_str())
+                .is_some_and(|summary| summary.never_returns)
+        })
     }
 
     fn transfer_op(&mut self, state: &mut State, op_index: u32) {
@@ -1787,8 +1848,22 @@ impl<'a> Solver<'a> {
         value.targets.iter().cloned().collect()
     }
 
-    fn propagate(&mut self, block: BlockId, out: &State, at_throw: &BTreeMap<u32, State>) {
-        let term = self.lowered.cfg.blocks[block as usize].term.clone();
+    fn propagate(
+        &mut self,
+        block: BlockId,
+        out: &State,
+        at_throw: &BTreeMap<u32, State>,
+        forced_throw: Option<u32>,
+    ) {
+        // A call that cannot return already left through the exception path, so
+        // this block's terminator is unreachable. `Sink` is the existing "no
+        // normal successor" terminator, so reuse it rather than duplicating the
+        // routing rules.
+        let term = if forced_throw.is_some() {
+            Term::Sink
+        } else {
+            self.lowered.cfg.blocks[block as usize].term.clone()
+        };
         match &term {
             Term::Goto(target) => self.send(*target, out.clone(), None),
             Term::Branch {
@@ -1939,6 +2014,23 @@ impl<'a> Solver<'a> {
                 self.send(handler, handler_state, None);
             }
         }
+        // A non-returning call with no handler in this function is this
+        // function's own exceptional completion, exactly like a `Term::Throw`
+        // with `handler: None`. Dropping it made the callee's definite throw
+        // invisible to callers, which then reported `no_throw_observed` and
+        // still believed the call could return.
+        if let Some(op) = forced_throw {
+            let handled = self
+                .exception_by_block
+                .get(&block)
+                .is_some_and(|edges| edges.iter().any(|(candidate, _)| *candidate == op));
+            if !handled {
+                let base = at_throw.get(&op).cloned().unwrap_or_else(|| out.clone());
+                let thrown = self.thrown_value_for_op(&base, op);
+                self.throw_values.insert(block, thrown);
+                self.has_throw = true;
+            }
+        }
     }
 
     fn send(&mut self, target: BlockId, state: State, _edge: Option<&'static str>) {
@@ -2064,9 +2156,29 @@ impl<'a> Solver<'a> {
             throws = throws.merge(&Value::top("analysis_work_incomplete"));
             effects.unknown_call = true;
         }
+        // KNOWN GAP, deliberately left alone here: this snapshot is taken BEFORE
+        // the `no_return_observed` / `no_throw_observed` markers below are
+        // applied, so a summary's `throws` reads as a "known empty" value rather
+        // than the explicit unknown the public fact carries. Moving the markers
+        // earlier fixes that, but it costs precision for a caller that catches a
+        // non-throwing callee -- `catcher()` goes from a definite `2` to
+        // `2 or unknown` -- because the exception edge stays reachable either
+        // way. `never_returns` is computed from `has_return` directly, so the
+        // must-throw fix below does not depend on the marker position.
         let internal = SolveInternal {
             returns: returns.clone(),
             throws: throws.clone(),
+            // Only a complete solve that never completes normally proves the
+            // call cannot fall through. `has_return` alone is NOT that test: a
+            // function with no `return` statement still falls off the end and
+            // returns undefined, which reaches `exit_normal`. So the signal is
+            // "no return term ran AND the normal exit block was never reached".
+            // `budget_exhausted` already fails the completeness test.
+            never_returns: !has_return
+                && states
+                    .get(&lowered.cfg.exit_normal)
+                    .is_none_or(|slot| slot.is_none())
+                && status == "complete_within_profile",
             effects: effects.clone(),
             written,
             callsites: self.callsites,
@@ -2490,6 +2602,10 @@ pub struct CallSiteObs {
 pub struct Summary {
     pub returns: Option<Value>,
     pub throws: Option<Value>,
+    /// The callee was solved completely and never returns normally, so a call
+    /// to it has no normal successor. Conservative under merge: only true when
+    /// every merged summary says so.
+    pub never_returns: bool,
     pub effects: Option<Effects>,
     /// Heap writes observed inside the function (`"*"` and `"param{i}"`
     /// sites are caller-visible; concrete sites stay callee-local).
@@ -2508,10 +2624,11 @@ impl Summary {
             })
             .unwrap_or_default();
         format!(
-            "r={:?} t={:?} e={:?} w={written:?}",
+            "r={:?} t={:?} e={:?} w={written:?} n={}",
             self.returns.as_ref().map(value_fingerprint),
             self.throws.as_ref().map(value_fingerprint),
-            self.effects.as_ref().map(|e| format!("{e:?}"))
+            self.effects.as_ref().map(|e| format!("{e:?}")),
+            self.never_returns
         )
     }
 
@@ -2541,6 +2658,9 @@ impl Summary {
                 (Some(a), Some(b)) => Some(a.join(b)),
                 (a, b) => a.clone().or_else(|| b.clone()),
             },
+            // Only "every merged view agrees it never returns" is safe: OR-ing
+            // would let one optimistic summary drop a real normal successor.
+            never_returns: self.never_returns && other.never_returns,
             written,
         }
     }

@@ -30,9 +30,22 @@ CHECKS = [
     ("worker-tests", ["npm", "test", "--prefix", "workers/typescript"]),
     ("integration", [sys.executable, "scripts/test_integration.py"]),
     ("cancellation", [sys.executable, "scripts/test_cancellation.py"]),
+    ("jobs", [sys.executable, "scripts/test_jobs.py"]),
+    # Incremental reuse is only sound if it publishes the same analysis a full
+    # run would; every case here asserts that id equality, not just the hit rate.
+    ("incremental", [sys.executable, "scripts/test_incremental.py"]),
     ("semantic-contracts", [sys.executable, "scripts/test_semantic_contracts.py"]),
     ("calculator", ["node", "examples/calculator/demo.mjs"]),
     ("web-syntax", ["node", "--check", "web/app.js"]),
+    ("city3d-syntax", ["node", "--check", "web/city3d.js"]),
+    # Real behaviour, not just parseability: drives web/app.js in a DOM inside
+    # node:vm. Both defects this replaced (a second connect() wiping the live
+    # session, and a failed query leaving the previous selection's flow facts
+    # under the new name) parse fine, which is why `--check` alone missed them.
+    ("web-behaviour", ["node", "web/tests/app.behavior.test.mjs"]),
+    # The 3D city's mapping is where a bug would draw a confident picture of
+    # something the analysis never said, so it is checked without a GPU.
+    ("city3d-behaviour", ["node", "web/tests/city3d.behavior.test.mjs"]),
     ("whitespace", ["git", "diff", "--check"]),
 ]
 
@@ -95,15 +108,26 @@ def digest(path: Path) -> str:
 
 def source_fingerprint() -> str:
     """Recompute the build fingerprint the same way crates/atlas-engine/build.rs
-    does: sha256 over `crates/**/*.rs` + `Cargo.lock`, keyed by
-    workspace-relative path. Content-derived (no timestamp), so it is stable
-    across rebuilds and can be compared against what the binary reports.
+    does: sha256 over `crates/**/*.rs`, `Cargo.lock`, and the workbench assets
+    that `include_str!` bakes into the binary, keyed by workspace-relative path.
+    Content-derived (no timestamp), so it is stable across rebuilds and can be
+    compared against what the binary reports.
     """
     entries = {
         str(p.relative_to(ROOT)).replace(os.sep, "/"): p
         for p in ROOT.glob("crates/**/*.rs")
     }
     entries["Cargo.lock"] = ROOT / "Cargo.lock"
+    for relative in (
+        "web/index.html",
+        "web/app.js",
+        "web/style.css",
+        "web/city3d.html",
+        "web/city3d.js",
+    ):
+        path = ROOT / relative
+        if path.is_file():
+            entries[relative] = path
     hasher = hashlib.sha256()
     for name in sorted(entries):
         hasher.update(name.encode())

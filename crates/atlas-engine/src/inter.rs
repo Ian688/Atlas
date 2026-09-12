@@ -155,6 +155,7 @@ fn summary(output: &SolveOutput) -> Summary {
     Summary {
         returns: Some(output.internal.returns.clone()),
         throws: Some(output.internal.throws.clone()),
+        never_returns: output.internal.never_returns,
         effects: Some(output.internal.effects.clone()),
         written: Some(output.internal.written.clone()),
     }

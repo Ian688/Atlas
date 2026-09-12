@@ -1,0 +1,34 @@
+✔ flow IR carries version, profile and per-function anchors (33.843821ms)
+✔ block shadowing produces distinct binding ids (D01) (5.677406ms)
+✔ TDZ use-before-declare still resolves to the real binding (D01) (18.483356ms)
+✔ short-circuit and conditional operators become structured control (D02) (3.65882ms)
+✔ try/catch/finally lowers with catch param binding and anchors (D03/D04) (2.477168ms)
+✔ labeled break/continue keep labels (D05) (2.955279ms)
+✔ unsupported constructs are explicit unknowns with reasons (profile boundary) (3.575777ms)
+✔ module peers resolve to bindings and are recorded as captures (D14 setup) (3.101979ms)
+✔ object and array literals keep field names and element anchors (4.211103ms)
+✔ destructuring declarations become explicit unknowns, not silent copies (profile) (2.45806ms)
+✔ alpha-renaming preserves flow structure modulo identity (D21) (7.61702ms)
+✔ a folded global name loses to a shadowing binding (V-08b) (9.111675ms)
+✔ the unshadowed global undefined still folds to a constant (V-08b) (1.013431ms)
+✔ non-finite numeric literals are explicit unknowns, not unwireable constants (1.087862ms)
+✔ finite numeric literals are unaffected by the non-finite guard (1.229615ms)
+✔ cross-file alias and re-export resolve using captured sources (75.13794ms)
+✔ lexical shadowing does not bind to a global namesake (4.317562ms)
+✔ reassigned function declarations are marked; indirect and constructor calls stay unknown (14.38888ms)
+✔ duplicate script declarations are ambiguous, not first-declaration wins (1.769737ms)
+✔ UTF-8 byte spans retain Chinese and emoji source anchors (2.764507ms)
+✔ nested calls with identical start offsets have distinct full-span IDs (2.221642ms)
+✔ compiler host never falls back to ambient source or config reads (4.206187ms)
+✔ syntax failures and dynamic language features are explicit (2.570257ms)
+✔ request isolation rejects traversal and duplicates; source is never evaluated (3.148733ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 606.984194
+npm notice run @atlas/typescript-worker@0.1.0 test
+npm notice run node --test tests/*.test.mjs

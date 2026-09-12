@@ -1,4 +1,4 @@
-use crate::{Result, control::ExecutionControl, digest, invalid};
+use crate::{Error, Result, control::ExecutionControl, digest, invalid};
 use atlas_contract::{Analysis, Snapshot, SourceFile};
 use rusqlite::{Connection, OptionalExtension, params};
 use std::{
@@ -13,32 +13,43 @@ pub struct Store {
     pub root: PathBuf,
 }
 
+/// Retry an operation that can lose a race for the SQLite writer.
+///
+/// A busy timeout alone is not enough: SQLite reports SQLITE_BUSY immediately
+/// for some lock states instead of consulting the busy handler, so the caller
+/// has to retry. This lives here rather than in one caller because the job
+/// store is exactly where two processes are expected to collide on purpose.
+pub(crate) fn retry_on_busy<T>(mut operation: impl FnMut() -> Result<T>) -> Result<T> {
+    let started = std::time::Instant::now();
+    loop {
+        match operation() {
+            Ok(value) => return Ok(value),
+            Err(Error::Sql(error))
+                if matches!(
+                    error.sqlite_error_code(),
+                    Some(rusqlite::ErrorCode::DatabaseBusy | rusqlite::ErrorCode::DatabaseLocked)
+                ) && started.elapsed() < Duration::from_secs(5) =>
+            {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
 /// Wait for the SQLite writer in short, cancellable intervals. Acquire the
 /// write lock before reading existing metadata to avoid a deferred transaction
 /// read-to-write upgrade racing another publisher.
-fn publication_transaction<'a>(
+pub(crate) fn publication_transaction<'a>(
     conn: &'a Connection,
     control: &ExecutionControl,
 ) -> Result<rusqlite::Transaction<'a>> {
     conn.busy_timeout(Duration::from_millis(25))?;
-    let started = std::time::Instant::now();
-    loop {
+    retry_on_busy(|| {
         control.checkpoint()?;
-        match rusqlite::Transaction::new_unchecked(conn, rusqlite::TransactionBehavior::Immediate) {
-            Ok(tx) => return Ok(tx),
-            Err(error) => {
-                control.checkpoint()?;
-                if !matches!(
-                    error.sqlite_error_code(),
-                    Some(rusqlite::ErrorCode::DatabaseBusy | rusqlite::ErrorCode::DatabaseLocked)
-                ) || started.elapsed() >= Duration::from_secs(5)
-                {
-                    return Err(error.into());
-                }
-                std::thread::sleep(Duration::from_millis(5));
-            }
-        }
-    }
+        rusqlite::Transaction::new_unchecked(conn, rusqlite::TransactionBehavior::Immediate)
+            .map_err(Into::into)
+    })
 }
 
 impl Store {
@@ -49,7 +60,10 @@ impl Store {
         };
         fs::create_dir_all(store.root.join("blobs"))?;
         let conn = store.connection()?;
-        conn.execute_batch("PRAGMA journal_mode=WAL;
+        // Idempotent schema creation still takes the writer for a moment, and
+        // two processes starting together must not read that race as an error.
+        retry_on_busy(|| {
+            conn.execute_batch("PRAGMA journal_mode=WAL;
           CREATE TABLE IF NOT EXISTS snapshots(id TEXT PRIMARY KEY, body TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS analyses(id TEXT PRIMARY KEY, snapshot TEXT NOT NULL, metadata TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS nodes(analysis TEXT NOT NULL,id TEXT NOT NULL,kind TEXT NOT NULL,path TEXT NOT NULL,body TEXT NOT NULL,PRIMARY KEY(analysis,id));
@@ -59,7 +73,69 @@ impl Store {
           CREATE INDEX IF NOT EXISTS edge_target ON edges(analysis,target,id);
           CREATE TABLE IF NOT EXISTS selections(id TEXT PRIMARY KEY,analysis TEXT NOT NULL,body TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS facts(analysis TEXT NOT NULL,symbol TEXT NOT NULL,kind TEXT NOT NULL,body TEXT NOT NULL,PRIMARY KEY(analysis,symbol,kind));
-          CREATE INDEX IF NOT EXISTS facts_kind ON facts(analysis,kind,symbol);")?;
+          CREATE INDEX IF NOT EXISTS facts_kind ON facts(analysis,kind,symbol);
+          CREATE TABLE IF NOT EXISTS jobs(
+            id TEXT PRIMARY KEY,
+            owner TEXT NOT NULL,
+            project TEXT NOT NULL,
+            request_key TEXT NOT NULL,
+            root TEXT NOT NULL,
+            options TEXT,
+            state TEXT NOT NULL,
+            attempt INTEGER NOT NULL DEFAULT 0,
+            priority INTEGER NOT NULL DEFAULT 0,
+            lease_holder TEXT,
+            lease_expires_at INTEGER,
+            heartbeat_at INTEGER,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            terminal_reason TEXT,
+            analysis_id TEXT,
+            UNIQUE(owner,project,request_key));
+          CREATE INDEX IF NOT EXISTS jobs_state ON jobs(state,lease_expires_at);
+          CREATE TABLE IF NOT EXISTS incremental_runs(
+            run_key TEXT PRIMARY KEY,
+            bundle TEXT NOT NULL,
+            snapshot_id TEXT NOT NULL,
+            analysis_id TEXT NOT NULL,
+            file_keys TEXT NOT NULL,
+            file_hashes TEXT NOT NULL,
+            source_files TEXT NOT NULL,
+            created_at INTEGER NOT NULL);
+          CREATE INDEX IF NOT EXISTS incremental_runs_recent ON incremental_runs(created_at);")?;
+            Ok(())
+        })?;
+        // Additive migration. A store created before the queue existed has a
+        // jobs table without `priority` or `options`. Only additive, always-safe
+        // changes are handled here; there is still no general migration or
+        // rollback strategy, and a change that is not purely additive would need
+        // one before it could ship.
+        for (column, definition) in [
+            ("priority", "priority INTEGER NOT NULL DEFAULT 0"),
+            ("options", "options TEXT"),
+        ] {
+            let present = {
+                let mut statement =
+                    conn.prepare("SELECT 1 FROM pragma_table_info('jobs') WHERE name=?1")?;
+                statement.exists([column])?
+            };
+            if !present {
+                retry_on_busy(|| {
+                    conn.execute(&format!("ALTER TABLE jobs ADD COLUMN {definition}"), [])?;
+                    Ok(())
+                })?;
+            }
+        }
+        // Anything that depends on a migrated column must come after the
+        // migration, not in the batch above: an index over `priority` created
+        // before the column exists fails, and the store never opens.
+        retry_on_busy(|| {
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS jobs_queue ON jobs(state,priority,created_at)",
+                [],
+            )?;
+            Ok(())
+        })?;
         Ok(store)
     }
     pub fn connection(&self) -> Result<Connection> {
@@ -80,6 +156,20 @@ impl Store {
     pub fn put_blob(&self, bytes: &[u8]) -> Result<String> {
         let hash = digest(bytes);
         let target = self.blob_path(&hash)?;
+        // Content addressing makes publication idempotent: the name is the
+        // hash, so a blob that already exists already holds exactly these
+        // bytes. Checking first is not a micro-optimisation -- writing a
+        // temporary file and fsyncing it only to discover the blob was already
+        // there cost one fsync per unchanged file, which is what made a re-scan
+        // of an unmodified tree take seconds instead of milliseconds.
+        if target.exists() {
+            // The integrity check is kept: a blob whose contents no longer
+            // match its name is corruption, and reading it must fail.
+            if digest(&fs::read(&target)?) != hash {
+                return Err(invalid("corrupt_existing_blob"));
+            }
+            return Ok(hash);
+        }
         let mut temporary = tempfile::NamedTempFile::new_in(self.root.join("blobs"))?;
         temporary.write_all(bytes)?;
         temporary.as_file().sync_all()?;

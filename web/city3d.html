@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Atlas · 3D 代码城市</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<header><div class="brand"><span class="mark">A</span><div><strong>ATLAS</strong><small>3D CODE CITY</small></div></div><div class="head-right"><span class="pill">本地解析 · 无 LLM</span><a class="version" href="/" title="返回 2D 工作台，读同一份分析">2D 工作台 →</a><span class="version">FOUNDATION / 02</span></div></header>
+
+<section class="connect"><label for="city-token">本地会话令牌</label><input id="city-token" type="password" autocomplete="off" placeholder="从启动命令返回的 session_file 读取"><button id="city-connect">连接</button><span id="city-analysis" class="subtle"></span></section>
+
+<section class="intro"><div><p class="eyebrow">SAME ANALYSIS, A SECOND PROJECTION</p><h1>目录是地块，文件是柱，函数是层。</h1><p class="subtitle">高度来自引擎声明的函数数量，不是视觉缩放。调用候选走地面管道；解析不出来的调用不会消失，它会变成柱边那根琥珀色的矮桩。</p></div></section>
+
+<main class="city-main">
+<section class="city-stage">
+  <canvas id="city-canvas" aria-label="目录、文件与调用候选的三维投影"></canvas>
+  <div id="city-labels" class="city-labels"></div>
+  <div class="city-toolbar">
+    <button id="city-shape">柱体：方柱</button>
+    <button id="city-reset">重置视角</button>
+    <span id="city-status" role="status">等待连接</span>
+  </div>
+  <div class="city-help">拖拽旋转 · 滚轮缩放 · 右键或 Shift 拖拽平移 · 点选柱体查看快照源码</div>
+  <div class="city-legend">
+    <span><i class="sw slab"></i>已解析的函数层</span>
+    <span><i class="sw stub"></i>未解析调用（柱高按数量，上限 6 根）</span>
+    <span><i class="sw collapsed"></i>未逐层画出的函数</span>
+    <span><i class="sw unanalyzed"></i>未分析的文件（忽略/超限/不可读）</span>
+    <span><i class="sw pipe"></i>文件之间的调用候选</span>
+  </div>
+  <div class="city-coverage-bar"><span class="subtle">覆盖</span><span id="city-coverage">尚未加载</span></div>
+</section>
+
+<aside class="city-inspector">
+  <p class="eyebrow">INSPECT / EVIDENCE</p>
+  <h2 id="city-selected">未选中对象</h2>
+  <p class="subtle">点选柱体查看它对应的文件。对象与关系都来自同一份不可变分析。</p>
+  <p class="source-label">快照源码 <span id="city-source-meta"></span></p>
+  <pre id="city-source"></pre>
+</aside>
+</main>
+
+<footer><span>柱体、管道与矮桩全部是静态候选的投影，不是执行顺序或运行轨迹。未解析调用按事实画出，不因渲染预算被丢弃。</span><span>INDEX → SNAPSHOT → FACTS → CITY</span></footer>
+<script src="/city3d.js" defer></script>
+</body></html>

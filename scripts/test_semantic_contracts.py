@@ -159,5 +159,32 @@ class SemanticContracts(unittest.TestCase):
             self.assertEqual(self.facts(analysis), facts, 'full recomputation must not rewrite partial history')
 
 
+    def test_a_call_that_cannot_return_has_no_normal_successor(self):
+        # P0 #2. `after()` never returns 'after': alwaysThrows() throws 1 and has
+        # no normal return, so everything after the call is unreachable. The
+        # regression published a definite 'after' with unknown=false and dropped
+        # the callee's definite throw from the caller's `throws`.
+        self.source.write_text(
+            'function alwaysThrows() { throw 1; }\n'
+            "export function after() { let x = 'before'; alwaysThrows(); x = 'after'; return x; }\n"
+            'function divideOrThrow(left, right) { if (right === 0) throw 2; return left / right; }\n'
+            "export function unreachable() { divideOrThrow(1, 0); return 'reached'; }\n"
+        )
+        facts = self.facts(self.cli('index', self.project))
+        after = facts['after']
+        self.assertNotIn('after', after['returns']['constants'],
+                         f'unreachable code must not produce a value: {after["returns"]}')
+        self.assertTrue(after['returns']['unknown'], after['returns'])
+        self.assertEqual(after['throws']['constants'], [1],
+                         'the callee throw becomes the caller exceptional result')
+        self.assertFalse(after['throws']['unknown'], after['throws'])
+        # The symbolic divideOrThrow() has a `return`; only the concrete argument
+        # prunes it, so this half proves the context summary is consulted.
+        unreachable = facts['unreachable']
+        self.assertNotIn('reached', unreachable['returns']['constants'],
+                         f'a context-proven no-return must remove the normal successor: {unreachable["returns"]}')
+        self.assertTrue(unreachable['returns']['unknown'], unreachable['returns'])
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

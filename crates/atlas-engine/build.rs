@@ -48,6 +48,24 @@ fn main() {
         sources.insert("Cargo.lock".into(), lock);
     }
 
+    // The workbench assets are compiled into the binary with `include_str!`, so
+    // they are build inputs exactly like the Rust sources. A fingerprint that
+    // ignores them cannot tell two different UIs apart, and the pairing check
+    // comparing binary against source would call a rebuilt-but-stale UI the
+    // source's own binary.
+    for relative in [
+        "web/index.html",
+        "web/app.js",
+        "web/style.css",
+        "web/city3d.html",
+        "web/city3d.js",
+    ] {
+        let path = root.join(relative);
+        if path.is_file() {
+            sources.insert(relative.into(), path);
+        }
+    }
+
     let mut hasher = Sha256::new();
     for (name, path) in &sources {
         hasher.update(name.as_bytes());

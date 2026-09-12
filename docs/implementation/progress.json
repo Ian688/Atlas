@@ -6,12 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-10/continuation",
+    "window": "2026-09-12/w07-incremental",
     "status": "DELIVERED",
-    "started_utc": "2026-09-09T17:36:50.761152+00:00",
-    "note": "本轮11/11验证通过、退出码0，完成标量context接续/预算frontier/全链取消及数值与捕获绑定修复；仍需独立复审，不声明完整Atlas验收。",
-    "evidence_dir": "evidence/development/2026-09-10-continuation",
-    "verification": "evidence/development/2026-09-10-continuation/verified/verification.json"
+    "note": "W07 推进到 PARTIAL：运行键/文件键/SCC 闭包/失效归因/撤回/成本记账接通，热复用 6.1×；承重断言是增量与全量的 analysis id 必须逐字节相同。实测暴露 store.put_blob 对已存在 blob 仍写盘并 fsync，修复后 scan 快 60–100×。局部改动仍需全程序重新派生，原因已实测并登记为 blocker。",
+    "evidence_dir": "evidence/daily/2026-09-12/w07-incremental",
+    "verification": "evidence/daily/2026-09-12/w07-incremental/verification.json"
   },
   "windows": [
     {
@@ -74,10 +73,63 @@
       ],
       "report": "evidence/development/2026-09-10-continuation/REPORT.md",
       "verification": "evidence/development/2026-09-10-continuation/verified/verification.json"
+    },
+    {
+      "id": "2026-09-12/consumer-layer",
+      "status": "DELIVERED",
+      "work_items": [
+        "consumer-flow-heat-matrix",
+        "consumer-city3d"
+      ],
+      "note": "非 W 项。两项都是已发布事实的投影：矩阵读 /api/flow，3D 城市读 /api/nodes、/api/edges、/api/source。新增 /city3d 与 /city3d.js 路由复用 asset() 边界；build.rs 与 verify.py 指纹清单已同步。三项不变量有测试：未解析调用必须画出、未分析文件必须区分、警告不得被值掩盖。",
+      "report": "evidence/daily/2026-09-12/city3d/REPORT.md",
+      "verification": "evidence/daily/2026-09-12/city3d/verification.json"
+    },
+    {
+      "id": "2026-09-12/w06-jobs",
+      "status": "DELIVERED",
+      "work_items": [
+        "W06-job-identity",
+        "W06-idempotent-submit",
+        "W06-lease-and-heartbeat",
+        "W06-crash-reap"
+      ],
+      "note": "W06 推进：持久 (owner,project,request_key) 身份、幂等重放、带心跳的租约、崩溃收割接通并纳入验证门。未推进任何分析算法。该窗口时仍缺持久队列与调度器，同日 w06-queue 随后补上；三个真实缺陷（身份双来源、并发 database is locked、心跳 join 阻塞 20s）由真实运行暴露并修复。",
+      "report": "evidence/daily/2026-09-12/w06-jobs/REPORT.md",
+      "verification": "evidence/daily/2026-09-12/w06-jobs/verification.json"
+    },
+    {
+      "id": "2026-09-12/w06-queue",
+      "status": "DELIVERED",
+      "work_items": [
+        "W06-durable-queue",
+        "W06-priority-scheduling",
+        "W06-worker-claim-and-resume",
+        "W06-queued-cancel",
+        "W06-additive-migration"
+      ],
+      "note": "W06 补完队列：enqueue 只入队不执行、优先级+最旧优先调度、job work 认领与续跑、排队取消、priority/options 纯增量加列迁移。迁移测试暴露“依赖新列的索引先于加列执行”缺陷并修复。W06 仍 PARTIAL（owner 未认证、无守护进程、断电耐久未验证）。",
+      "report": "evidence/daily/2026-09-12/w06-queue/REPORT.md",
+      "verification": "evidence/daily/2026-09-12/w06-queue/verification.json"
+    },
+    {
+      "id": "2026-09-12/w07-incremental",
+      "status": "DELIVERED",
+      "work_items": [
+        "W07-run-key",
+        "W07-file-keys-and-scc-closure",
+        "W07-invalidation-attribution",
+        "W07-withdrawal",
+        "W07-cost-accounting",
+        "store-put-blob-idempotent-publication"
+      ],
+      "note": "W07 推进到 PARTIAL。承重断言：增量与全量必须发布同一 analysis id，冷/热/编辑/删除四条路径全部相等。实测暴露 store.put_blob 对已存在 blob 仍写盘并 fsync（每次扫描每个未改动文件一次），修复后 scan 3.1–4.9s → 0.049s。局部改动仍需全程序重新派生：Rust 侧是全程序 SCC 不动点，按文件缓存派生结果在算法上不成立，已登记为 blocker。",
+      "report": "evidence/daily/2026-09-12/w07-incremental/REPORT.md",
+      "verification": "evidence/daily/2026-09-12/w07-incremental/verification.json"
     }
   ],
-  "next_work_item": "W06-持久作业所有权与租约",
-  "next_action": "在本轮全链取消与预算合同验证后，实现持久 owner/project/request 身份、幂等提交、租约与崩溃恢复，接入真实索引发布；然后推进 W07 增量。完整堆/闭包上下文仍未实现。",
+  "next_work_item": "GE-2/GE-3-真实中型项目规模与成本记录",
+  "next_action": "W07 的运行键、文件键、SCC 闭包失效、归因、撤回与成本记账已接通并纳入验证门，热复用 6.1×。W07 的标题还含“真实项目规模”，而当前唯一的成本数据来自 121 文件合成样本——这不足以满足 GE-2/GE-3，也不足以判断 W04/W05 的预算参数在大项目上的表现。下一步用一个真实中型 JS/TS 项目记录冷/热/增量成本、内存峰值与 coverage 分母，并把结论回填到 W04/W05/W07 的证据里；已知两次成本假设被实测推翻（一度以为派生占 84%，实为 scan 主导），因此不再靠推断。之后是 W08 受控执行与执行画像。完整堆/闭包上下文与增量不动点仍未实现。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
@@ -327,18 +379,36 @@
         "worker 崩溃矩阵集成测试:非零退出→零新增 Analysis,旧分析(含 flow facts)完整可读",
         "ExecutionControl贯穿scan/worker/Rust/事务：SIGINT/SIGTERM协作取消，无硬process exit；listener保留至全链结束",
         "扫描与整体deadline覆盖SQLite writer等待；25ms轮询检查取消；commit与取消接受串行化，先commit终态不反标取消",
-        "worker初始取消不spawn；false sender关闭不误取消；所有失败kill+wait回收直接子进程"
+        "worker初始取消不spawn；false sender关闭不误取消；所有失败kill+wait回收直接子进程",
+        "持久作业身份：id 由 (owner,project,request_key) 三元组定义，三元组为唯一权威（id 只是句柄，迁移/导入留下的异形 id 仍可寻址）；UNIQUE 约束保证一请求一行",
+        "幂等提交：completed 重放返回原 analysis 且不重跑（attempt 不增）；failed/cancelled 可重试并计入第 2 次 attempt；同一 key 不同 owner 是不同作业",
+        "租约与心跳：认领、心跳、终态均走同一个立即事务（复用 publication_transaction 的重试纪律）；心跳按 lease/3 续期，租约丢失时协作取消该次运行",
+        "崩溃恢复：租约停止续期是进程死亡的证据；reap 仅收割过期 running，标记 failed/lease_expired 并清空租约，随后该请求可重试",
+        "陈旧持有者无法伪造终态：finish/heartbeat 都要求 state='running' AND lease_holder=当前持有者，被接管后的迟到结果会被拒绝（recorded=false）",
+        "作业写入与 schema 创建共用 SQLite busy 重试纪律：并发两进程同 key 提交不再以 database is locked 失败",
+        "心跳线程短切片唤醒：join 不再等待整段租约间隔（0.75s 的作业从 20s 降到 1.4s 返回，幂等重放 0.03s）",
+        "持久队列：enqueue 只入队不执行（状态 queued、无租约、无 analysis），同请求重复入队仍是一行且可提优先级；runner 参数随作业行存储，排队请求自描述怎么运行",
+        "调度：job work 按优先级降序、同级按入队时间最旧优先认领；--once 只跑一个；租约过期的 running 由工人续跑（attempt+1），因为崩溃不该让队列停摆",
+        "排队取消：queued 可取消；running 不可被旁观者取消（属于租约持有者）。reap 是放弃这次运行，claim_next 是换人接着跑，两种意图分开",
+        "加列迁移：priority/options 以纯增量方式补齐旧库，且依赖新列的索引在迁移之后创建（此前索引先于加列执行会让旧库直接开不了）",
+        "请求身份收进 JobRequest：5 个同类型字符串不再靠参数位置区分 owner 与 project"
       ],
       "evidence": [
         "crates/atlas-engine/src/scan.rs deadline + tests",
+        "crates/atlas-engine/src/job.rs（9 个单测：幂等/重试/租约/接管/收割/身份）",
         "scripts/test_integration.py test_multi_project_store_isolation",
         "scripts/test_integration.py test_worker_crash_leaves_store_intact_and_old_analyses_readable",
         "crates/atlas-engine/tests/cancellation.rs",
         "scripts/test_cancellation.py",
+        "scripts/test_jobs.py（11 个 CLI 级用例：幂等重放/owner 隔离/重试/并发选主/崩溃收割/心跳推进/入队不执行/优先级调度/排队取消/拒绝非排队取消/旧库加列迁移）",
+        "evidence/daily/2026-09-12/w06-jobs/verification.json",
+        "evidence/daily/2026-09-12/w06-queue/verification.json",
         "evidence/development/2026-09-10-continuation/verified/verification.json"
       ],
       "blockers": [
-        "持久owner/project/request作业身份、队列/租约和进程崩溃重启恢复仍未实现；断电耐久未资格验证",
+        "owner 是未经认证的调用者声明；W06 合同要求的“服务端验证权限与版本”未实现，作业 API 尚未暴露到 HTTP（HTTP 层仍只有本地会话令牌）",
+        "无守护进程与并行 worker 池：job work 需人工触发，单 worker 串行，无重试退避、公平性或配额",
+        "迁移策略只覆盖纯增量变更；改列类型、拆表等非增量变更仍无迁移与回滚方案。断电耐久未资格验证",
         "协作取消不承诺中断进行中的单次OS I/O或磁盘commit；POSIX信号测试不替代Windows资格"
       ],
       "independent_review": {
@@ -361,14 +431,34 @@
         "GE-2",
         "GE-3"
       ],
-      "implementation": "NOT_IMPLEMENTED",
-      "automated_checks": "NOT_RUN",
+      "implementation": "PARTIAL",
+      "automated_checks": "PASS",
       "qualification": "NOT_QUALIFIED",
-      "review_status": "NOT_REQUESTED",
-      "features": [],
-      "evidence": [],
-      "blockers": []
-    },
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "features": [
+        "运行键 = H(版本包, 快照 id)；快照 id 本身是 digest(整个 Snapshot)，含 schema/scan_profile/limits/每个条目的 blob 哈希，因此同一运行键等价于同样的字节与同样的版本",
+        "版本包 = producer | ENGINE_VERSION | FACTS_SCHEMA | ANALYSIS_SCHEMA | FLOW_SCHEMA | FLOW_PROFILE | ALGORITHM_VERSION；任一升级即失效缓存（单测逐个常量钉住）",
+        "文件键 = H(版本包, 路径, 自身内容 hash, 依赖闭包摘要)，闭包摘要在导入图 SCC 凝聚上自底向上折叠；互相导入的文件作为一个单位失效，深链 2000 文件不递归溢出",
+        "失效无需额外扫描：文件键恰好在自身或其传递依赖改变时变化；改叶子不会反向失效共享模块（单测钉住依赖方向）",
+        "失效归因：own_content / by_dependency / new，并列出导致失效的直接依赖（via）",
+        "撤回：withdrawn 列出上次分析过而本次不存在的文件；分析始终从当前文件集合装配，从不合并旧结果",
+        "保守性与安全性：imports 只能连到已解析文件；未解析或无目标路径的 import 不构成边",
+        "成本记账：scan/worker/derivation 分阶段计时与 total，写入 incremental 字段",
+        "热复用：字节与版本都未变时直接返回已发布分析，跳过全部派生",
+        "store.put_blob 修复：内容寻址使发布幂等，已存在的 blob 不再写临时文件并 fsync；scan 3.1–4.9s → 0.049s（60–100×），全量 index 5.7s → 4.4s，且完整性校验保留"
+      ],
+      "evidence": [
+        "crates/atlas-engine/src/incremental.rs（8 个单测：运行键/文件图/SCC/闭包传播/归因/撤回/空图/深链）",
+        "scripts/test_incremental.py（6 个 CLI 级用例，每条只要可与全量比较就断言 analysis id 相等）",
+        "evidence/daily/2026-09-12/w07-incremental/verification.json"
+      ],
+      "blockers": [
+        "局部改动不做增量派生：Rust 侧成本是 inter::analyze_interprocedural_controlled 的全程序 SCC 不动点，单函数求解依赖跨文件被调方摘要，因此按文件缓存派生结果在算法上不成立。实现增量不动点需要摘要稳定性追踪，未做",
+        "只有全程序缓存命中（字节与版本均未变）时才跳过派生；热路径仍付一次 worker 启动（约 0.65s，node + TypeScript 加载固定开销）",
+        "121 文件为合成样本，不满足 GE-2/GE-3 的真实项目规模要求；真实中型项目的冷/热/增量成本仍未记录",
+        "incremental_runs 表只增不删，无回收策略"
+      ]
+      },
     {
       "id": "W08",
       "title": "执行画像与受控函数/场景测试",

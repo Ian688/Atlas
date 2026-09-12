@@ -647,3 +647,208 @@ fn probed_absent_records_resolved_targets_that_had_no_summary() {
         output.internal.read
     );
 }
+
+fn str_expr(value: &str) -> Expr {
+    expr(ExprKind::Const {
+        value: ConstValue::Str {
+            value: value.into(),
+        },
+    })
+}
+fn assign(binding_id: &str, value: Expr) -> Stmt {
+    stmt(StmtKind::Expression {
+        expr: expr(ExprKind::Assign {
+            op: "=".into(),
+            target: AssignTarget::Binding {
+                binding: binding_id.into(),
+            },
+            value: Box::new(value),
+        }),
+    })
+}
+fn divide(left: Expr, right: Expr) -> Expr {
+    expr(ExprKind::Binary {
+        op: "/".into(),
+        left: Box::new(left),
+        right: Box::new(right),
+    })
+}
+
+/// P0 #2: a callee that provably never returns normally gives its caller no
+/// normal successor, so the code after the call is unreachable.
+///
+/// JS: `alwaysThrows(){throw 1}`; `after(){let x='before'; alwaysThrows(); x='after'; return x;}`
+/// -> Node throws 1 and never returns.
+///
+/// The regression reported `正常返回: 常量 "after"` with `unknown=false`: the
+/// caller treated the call as returning, ran the unreachable assignment, and
+/// published a value that can never occur.
+#[test]
+fn a_call_that_cannot_return_has_no_normal_successor() {
+    let result = analyze(vec![
+        function("alwaysThrows", 0, vec![throw(num(1.0))]),
+        with_binding(
+            function(
+                "after",
+                0,
+                vec![
+                    stmt(StmtKind::VarDecl {
+                        keyword: "let".into(),
+                        declarators: vec![Declarator {
+                            binding: "after:x".into(),
+                            init: Some(str_expr("before")),
+                        }],
+                    }),
+                    stmt(StmtKind::Expression {
+                        expr: call("alwaysThrows", vec![]),
+                    }),
+                    assign("after:x", str_expr("after")),
+                    ret(binding("after:x")),
+                ],
+            ),
+            "after:x",
+            "let",
+        ),
+    ]);
+    let after = &result.functions["after"].output;
+    assert!(
+        !after.returns.constants.contains(&json!("after")),
+        "a value that can never be produced must not be reported: {:?}",
+        after.returns
+    );
+    assert!(
+        after.returns.unknown,
+        "the caller has no normal return, so its return value is unknown: {:?}",
+        after.returns
+    );
+    assert_eq!(
+        after.throws.constants,
+        vec![json!(1.0)],
+        "the callee's definite throw is now the caller's exceptional result"
+    );
+    assert!(
+        !after.throws.unknown,
+        "a known throw must not be reported as an unknown one: {:?}",
+        after.throws
+    );
+}
+
+/// The same rule, but the proof only exists in the k=1 context summary: the
+/// symbolic `divideOrThrow` has a `return`, and only the concrete `right = 0`
+/// argument prunes it. The control-flow decision must consult the same summary
+/// the returns path already prefers.
+#[test]
+fn a_context_that_proves_no_return_removes_the_normal_successor() {
+    let result = analyze(vec![
+        function(
+            "divideOrThrow",
+            2,
+            vec![
+                stmt(StmtKind::If {
+                    cond: expr(ExprKind::Binary {
+                        op: "===".into(),
+                        left: Box::new(local("divideOrThrow", 1)),
+                        right: Box::new(num(0.0)),
+                    }),
+                    then_body: vec![throw(object(vec![("v", num(1.0))]))],
+                    else_body: vec![],
+                }),
+                ret(divide(local("divideOrThrow", 0), local("divideOrThrow", 1))),
+            ],
+        ),
+        function(
+            "callerZero",
+            0,
+            vec![
+                stmt(StmtKind::Expression {
+                    expr: call("divideOrThrow", vec![num(1.0), num(0.0)]),
+                }),
+                ret(str_expr("after")),
+            ],
+        ),
+    ]);
+    let caller = &result.functions["callerZero"].output;
+    assert!(
+        !caller.returns.constants.contains(&json!("after")),
+        "the concrete argument prunes the returning branch, so the code after \
+         the call is unreachable: {:?}",
+        caller.returns
+    );
+    assert!(
+        caller.returns.unknown,
+        "no normal return survives: {:?}",
+        caller.returns
+    );
+}
+
+/// A callee with no `return` statement still falls off the end and returns
+/// undefined, so its caller keeps its normal successor.
+///
+/// This guards the exact mistake the must-throw fix first made: equating
+/// "`has_return` is false" with "does not return". That deleted live code after
+/// every call to a setter-style function and turned the existing `f2`/`r2`
+/// fixtures red.
+#[test]
+fn a_callee_without_a_return_statement_still_completes_normally() {
+    let result = analyze(vec![
+        function("noReturn", 1, vec![assign("noReturn:p0", num(2.0))]),
+        function(
+            "caller",
+            0,
+            vec![
+                stmt(StmtKind::Expression {
+                    expr: call("noReturn", vec![num(1.0)]),
+                }),
+                ret(str_expr("reached")),
+            ],
+        ),
+    ]);
+    assert!(
+        result.functions["caller"]
+            .output
+            .returns
+            .constants
+            .contains(&json!("reached")),
+        "falling off the end is a normal return, so the caller continues: {:?}",
+        result.functions["caller"].output.returns
+    );
+}
+
+/// The suppression must not fire for a callee that may return: dropping a real
+/// normal successor would lose values. `sometimes(0)` returns 2.
+#[test]
+fn a_callee_that_may_return_keeps_the_normal_successor() {
+    let result = analyze(vec![
+        function(
+            "sometimes",
+            1,
+            vec![
+                stmt(StmtKind::If {
+                    cond: local("sometimes", 0),
+                    then_body: vec![throw(num(1.0))],
+                    else_body: vec![],
+                }),
+                ret(num(2.0)),
+            ],
+        ),
+        function(
+            "caller",
+            0,
+            vec![
+                stmt(StmtKind::Expression {
+                    expr: call("sometimes", vec![num(0.0)]),
+                }),
+                ret(str_expr("reached")),
+            ],
+        ),
+    ]);
+    assert!(
+        result.functions["caller"]
+            .output
+            .returns
+            .constants
+            .contains(&json!("reached")),
+        "a callee that can return keeps its normal successor: {:?}",
+        result.functions["caller"].output.returns
+    );
+}

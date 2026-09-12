@@ -209,6 +209,27 @@ pub async fn serve(
                 )
             }),
         )
+        // The 3D city is a second projection of the same fixed Analysis, served
+        // through the same `asset()` so it inherits the CSP, the Host/Origin
+        // boundary and the session token without a second security path.
+        .route(
+            "/city3d",
+            get(|| async {
+                asset(
+                    include_str!("../../../web/city3d.html"),
+                    "text/html; charset=utf-8",
+                )
+            }),
+        )
+        .route(
+            "/city3d.js",
+            get(|| async {
+                asset(
+                    include_str!("../../../web/city3d.js"),
+                    "text/javascript; charset=utf-8",
+                )
+            }),
+        )
         .route("/api/report", get(report))
         .route("/api/nodes", get(nodes))
         .route("/api/edges", get(edges))

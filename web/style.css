@@ -5,3 +5,62 @@
 .flow-body{display:flex;flex-direction:column;gap:8px;max-height:260px;overflow:auto;font:10px/1.6 ui-monospace,monospace;color:#375a6d}
 .flow-head{color:#286c88}.flow-line{color:#375a6d}.flow-block{border-left:2px solid #9fc3d3;padding-left:8px}
 .flow-binding{color:#567687;padding-left:6px}.flow-unknown{color:#a2591f}
+/* Focus/overview canvas: relationship nodes carry a secondary line, edges carry
+   the call label, and unresolved targets are visually distinct from resolved
+   ones so "unknown" cannot be mistaken for a known call. */
+.node-sub{fill:#7b93a2;font-size:9px;pointer-events:none}
+.edge-label{fill:#6f8b9b;font-size:9px;pointer-events:none}
+.edge.unresolved{stroke:#c69b51;stroke-dasharray:4 3;stroke-width:1.6;opacity:.95}
+.node-group.unresolved .function-row{fill:#f6efe0;stroke:#d8b878}
+.node-group.unresolved .function-text{fill:#8a6a2c}
+/* Abstract-interpretation state map (blocks x bindings). The kind classes are
+   shared by the legend swatches and the cells, so a swatch can never drift
+   from the colour it explains. */
+.flow-heat{display:flex;flex-direction:column;gap:6px;padding:9px;border:1px solid #dbe4ea;border-radius:7px;background:#f6f9fb}
+.heat-head{color:#286c88}
+.heat-legend{display:flex;flex-wrap:wrap;gap:3px 10px;color:#6b8291}
+.heat-key{display:flex;align-items:center;gap:4px}
+.heat-key-label{font-size:9px}
+.heat-row{display:flex;align-items:center;gap:3px}
+.heat-row-label{flex:0 0 46px;width:46px;font-size:9px;color:#6b8291}
+.heat-row-truncated .heat-row-label{color:#a2591f;font-weight:600}
+.heat-swatch{width:10px;height:10px;border-radius:2px;border:1px solid #b9c9d3;display:inline-block}
+.heat-cell{flex:1 1 0;min-width:11px;height:14px;border-radius:2px;border:1px solid #e3e9ed;background:#eef1f3}
+.heat-note{color:#a2591f;font-size:9px}
+.heat-const{background:#d9ecf5;border-color:#7fb3cb}
+.heat-value{background:#e4eef2;border-color:#9dbfd0}
+.heat-origin{background:#f6ecd9;border-color:#d8b878}
+.heat-unknown{background:repeating-linear-gradient(45deg,#e8e2d4 0 4px,#f4f0e6 4px 8px);border-color:#c69b51}
+.heat-empty{background:#eef1f3;border-color:#e3e9ed}
+/* Additive marks: the fill carries the value, the corner wedge carries "this
+   value also has an unknown component", the inset outline carries the
+   initialization warning. Three independent channels, so no fact can erase
+   another by winning a single class. */
+.heat-partial{background-image:linear-gradient(135deg,transparent 0 60%,#c69b51 60% 100%)}
+.heat-init-none{box-shadow:inset 0 0 0 2px #cf8b9c}
+.heat-init-maybe{box-shadow:inset 0 0 0 2px #c9bda0}
+/* 3D code city. The canvas is a WebGL2 viewport; the chrome reuses the tokens
+   above so the two projections read as one product rather than two tools. */
+.city-main{display:grid;grid-template-columns:minmax(420px,1fr) 340px;gap:1px;background:#dce4e7;margin:0 24px;border:1px solid #dce4e7;border-radius:12px;overflow:hidden;min-height:640px}
+.city-stage{position:relative;background:#f6f9fb;min-width:0}
+#city-canvas{display:block;width:100%;height:min(600px,60vh);min-height:400px;cursor:grab;touch-action:none}
+#city-canvas:active{cursor:grabbing}
+.city-labels{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.city-label{position:absolute;left:0;top:0;font-size:10px;color:#54748a;background:#fbfdfee6;border:1px solid #d9e6ec;border-radius:5px;padding:2px 6px;white-space:nowrap}
+.city-toolbar{position:absolute;left:14px;top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:76%}
+#city-status{font-size:10px;color:#5c7889;background:#fbfdfed9;border-radius:5px;padding:3px 7px}
+.city-help{position:absolute;left:14px;bottom:46px;font-size:9.5px;color:#7b93a2}
+.city-legend{position:absolute;right:14px;top:12px;display:flex;flex-direction:column;gap:5px;font-size:9.5px;color:#5c7889;background:#fbfdfee6;border:1px solid #dbe7ec;border-radius:8px;padding:9px 11px}
+.city-legend i.sw{width:10px;height:10px;border-radius:2px;display:inline-block;vertical-align:-1px;margin-right:6px}
+.city-legend .slab{background:#54a8c2;border:1px solid #3f93ad}
+.city-legend .stub{background:#cda456;border:1px solid #b98f3c}
+.city-legend .collapsed{background:#b3aa96;border:1px solid #9c927c}
+.city-legend .unanalyzed{background:#ccc8c0;border:1px solid #b3aea4}
+.city-legend .pipe{background:#54a8c2;height:2px;border-radius:1px}
+.city-coverage-bar{position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;align-items:center;padding:10px 14px;background:#fbfdfef2;border-top:1px solid #e0eaee;font-size:10px;color:#4e6b7d}
+.city-coverage-bar .subtle{letter-spacing:1px}
+.city-inspector{padding:22px 20px;min-width:0;background:#f9fbfc}
+.city-inspector h2{font-size:17px;overflow-wrap:anywhere;margin:0 0 10px}
+.city-inspector pre{max-height:420px}
+@media(max-width:1150px){.city-main{grid-template-columns:1fr}.city-inspector{border-top:1px solid #e3eaed}}
+@media(max-width:760px){.city-main{margin:0 10px}#city-canvas{height:420px}.city-legend{display:none}}
