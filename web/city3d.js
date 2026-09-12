@@ -21,6 +21,10 @@ const CITY_SLAB_H = 0.85;
 const CITY_BASE_H = 1.3;
 const CITY_DISTRICT_PAD = 3.4;
 const CITY_DISTRICT_GAP = 7.0;
+// Breathing room between two blocks inside one plate. Without it a coarse
+// level whose blocks are exactly one cell wide would draw them touching, and
+// two files with different facts would read as one object.
+const CITY_BLOCK_GAP = 1.0;
 
 function cityTopDirectory(path) {
   const text = String(path == null ? '' : path);
@@ -38,15 +42,49 @@ function cityShortName(path) {
   return slash === -1 ? text : text.slice(slash + 1);
 }
 
-/// Pure mapping from published nodes/edges to a drawable city. Deterministic:
-/// the same facts always produce the same coordinates, so a picture can be
-/// compared across runs and versions.
-function buildCityLayout(nodes, edges, options) {
-  const opts = options || {};
-  const maxFiles = opts.maxFiles || CITY_MAX_FILES;
-  const maxPipes = opts.maxPipes || CITY_MAX_PIPES;
+// ---------------------------------------------------------------------------
+// The formal hierarchy and its levels of detail (LOD).
+//
+// The city used to be one fixed picture: directories were plates, files were
+// columns, functions were slabs. That is a *level*, not the model. This is the
+// model: project -> district -> file, with the facts each level aggregates, and
+// a view per level derived from it.
+//
+// The rule the work order states as "LOD must not change fact counts" is
+// enforced structurally rather than promised:
+//   * the hierarchy is uncapped -- no rendering budget appears in it;
+//   * `cityLevelInvariants` re-adds every level and refuses to call the
+//     aggregation consistent unless project == sum(districts) == sum(files) for
+//     every counted fact;
+//   * a level view reports what it did not draw (`omitted`) and what it left
+//     out as a *level* property rather than a budget one, so the two can never
+//     be confused.
+const CITY_LEVELS = ['project', 'district', 'file'];
+const CITY_LEVEL_LABELS = { project: '项目', district: '目录', file: '文件' };
+const CITY_LEVEL_DEPTH = { project: 0, district: 1, file: 2 };
+const CITY_FACT_KEYS = ['files', 'declaredFunctions', 'loadedFunctions', 'analyzedFiles',
+  'unanalyzedFiles', 'unresolvedCalls', 'callSites'];
 
-  const files = (nodes || []).filter((n) => n.kind === 'file');
+function cityLevelName(level) {
+  return CITY_LEVEL_LABELS[level] || CITY_LEVEL_LABELS.file;
+}
+
+function cityEmptyFacts() {
+  const facts = {};
+  for (const key of CITY_FACT_KEYS) facts[key] = 0;
+  return facts;
+}
+
+function cityAddFacts(target, source) {
+  for (const key of CITY_FACT_KEYS) target[key] += Number(source[key] || 0);
+  return target;
+}
+
+/// The uncapped hierarchy. A rendering budget may decide what is drawn from
+/// this; it can never decide what is counted here.
+function buildCityHierarchy(nodes, edges) {
+  const files = (nodes || []).filter((n) => n.kind === 'file')
+    .slice().sort((a, b) => String(a.path).localeCompare(String(b.path)));
   const functions = (nodes || []).filter((n) => n.kind === 'function');
   const calls = (edges || []).filter((e) => e.kind === 'call_candidate');
 
@@ -58,40 +96,157 @@ function buildCityLayout(nodes, edges, options) {
   for (const list of functionsByPath.values()) {
     list.sort((a, b) => (a.start - b.start) || String(a.name).localeCompare(String(b.name)));
   }
+  const pathOfOwner = new Map();
+  for (const fn of functions) pathOfOwner.set(fn.id, fn.path);
+  for (const file of files) pathOfOwner.set(file.id, file.path);
 
-  const ordered = files.slice().sort((a, b) => String(a.path).localeCompare(String(b.path)));
-  const shownFiles = ordered.slice(0, Math.max(maxFiles, 0));
-
-  const districtOrder = [];
-  const districtFiles = new Map();
-  for (const file of shownFiles) {
-    const key = cityTopDirectory(file.path);
-    if (!districtFiles.has(key)) { districtFiles.set(key, []); districtOrder.push(key); }
-    districtFiles.get(key).push(file);
+  const root = {
+    id: 'project:', kind: 'project', level: 'project', label: '项目', path: '',
+    parent: null, children: [], facts: cityEmptyFacts(),
+  };
+  const byPath = {};
+  for (const file of files) {
+    const list = functionsByPath.get(file.path) || [];
+    const declared = Number.isFinite(file.function_count) ? file.function_count : list.length;
+    const analyzed = file.disposition === 'captured';
+    byPath[file.path] = {
+      id: `file:${file.path}`, kind: 'file', level: 'file',
+      label: file.name || cityShortName(file.path), path: file.path,
+      parent: null, children: [], source: file, functions: list,
+      facts: {
+        files: 1,
+        declaredFunctions: Math.max(declared, 0),
+        loadedFunctions: list.length,
+        analyzedFiles: analyzed ? 1 : 0,
+        unanalyzedFiles: analyzed ? 0 : 1,
+        unresolvedCalls: 0,
+        callSites: 0,
+      },
+    };
   }
-  districtOrder.sort();
 
-  // Shelf packing: each district is one rectangular plate, districts are laid
-  // out left to right and wrapped, so no two plates can overlap.
-  const footprints = districtOrder.map((key) => {
-    const list = districtFiles.get(key);
-    const cols = Math.max(1, Math.ceil(Math.sqrt(list.length)));
-    const rows = Math.ceil(list.length / cols);
+  // Calls are counted where the facts are: at the file that made them. The
+  // district and project numbers are then sums, never a separate tally that
+  // could drift away from the files.
+  const filePairs = new Map();
+  const districtPairs = new Map();
+  let candidateCalls = 0;
+  for (const call of calls) {
+    const from = pathOfOwner.get(call.source);
+    if (from === undefined) continue;
+    candidateCalls++;
+    const owner = byPath[from];
+    if (owner) owner.facts.callSites += 1;
+    if (!call.target) {
+      if (owner) owner.facts.unresolvedCalls += 1;
+      continue;
+    }
+    const to = pathOfOwner.get(call.target);
+    if (to === undefined || to === from) continue;
+    const key = `${from}\u0000${to}`;
+    filePairs.set(key, (filePairs.get(key) || 0) + 1);
+    const fromKey = cityTopDirectory(from), toKey = cityTopDirectory(to);
+    if (fromKey === toKey) continue;
+    const districtKey = `${fromKey}\u0000${toKey}`;
+    districtPairs.set(districtKey, (districtPairs.get(districtKey) || 0) + 1);
+  }
+
+  const districts = {};
+  for (const file of files) {
+    const key = cityTopDirectory(file.path);
+    let district = Object.prototype.hasOwnProperty.call(districts, key) ? districts[key] : null;
+    if (!district) {
+      district = {
+        id: `district:${key}`, kind: 'district', level: 'district',
+        label: cityDistrictLabel(key), path: key, key,
+        parent: root.id, children: [], facts: cityEmptyFacts(),
+      };
+      districts[key] = district;
+      root.children.push(district.id);
+    }
+    const node = byPath[file.path];
+    node.parent = district.id;
+    district.children.push(node.id);
+    cityAddFacts(district.facts, node.facts);
+  }
+  const districtOrder = Object.keys(districts).sort();
+  for (const key of districtOrder) cityAddFacts(root.facts, districts[key].facts);
+
+  const order = [root];
+  for (const key of districtOrder) order.push(districts[key]);
+  for (const file of files) order.push(byPath[file.path]);
+
+  const pairsTo = (map) => [...map.entries()]
+    .map(([key, count]) => {
+      const split = key.split('\u0000');
+      return { from: split[0], to: split[1], count };
+    })
+    .sort((a, b) => (b.count - a.count) || a.from.localeCompare(b.from) || a.to.localeCompare(b.to));
+
+  return {
+    schema: 'atlas.city-hierarchy.v1',
+    levels: CITY_LEVELS.slice(),
+    root,
+    districts,
+    districtOrder,
+    byPath,
+    order,
+    files,
+    filePairs: pairsTo(filePairs),
+    districtPairs: pairsTo(districtPairs),
+    candidateCalls,
+    totals: { ...root.facts },
+  };
+}
+
+/// Re-add every level and report any fact whose parts do not sum to the whole.
+/// The point is that a wrong aggregation is a *shown* failure, not a picture
+/// that quietly disagrees with the analysis.
+function cityLevelInvariants(hierarchy) {
+  const sums = { project: cityEmptyFacts(), district: cityEmptyFacts(), file: cityEmptyFacts() };
+  if (hierarchy) {
+    for (const node of hierarchy.order || []) cityAddFacts(sums[node.level], node.facts);
+  }
+  const violations = [];
+  for (const key of CITY_FACT_KEYS) {
+    const project = hierarchy ? hierarchy.totals[key] : 0;
+    if (sums.district[key] !== project || sums.file[key] !== project) {
+      violations.push({ key, project, districts: sums.district[key], files: sums.file[key] });
+    }
+  }
+  return {
+    schema: 'atlas.city-level-invariants.v1',
+    ok: violations.length === 0,
+    checked: CITY_FACT_KEYS.slice(),
+    totals: hierarchy ? { ...hierarchy.totals } : cityEmptyFacts(),
+    violated: sums.project,
+    violations,
+  };
+}
+
+/// Pack plates that each hold a grid of blocks, without overlap.
+///
+/// The level views only differ in what a plate and a block stand for, so the
+/// packing is shared: one code path means a coarse level cannot quietly get
+/// different overlap behaviour from the file level.
+function cityPackPlates(plates) {
+  const footprints = plates.map((plate) => {
+    const cellW = Math.max(CITY_COLUMN_W * 0.62, ...plate.blocks.map((b) => b.w)) + CITY_BLOCK_GAP;
+    const cellD = Math.max(CITY_COLUMN_D * 0.62, ...plate.blocks.map((b) => b.d)) + CITY_BLOCK_GAP;
+    const cols = Math.max(1, Math.ceil(Math.sqrt(plate.blocks.length || 1)));
+    const rows = Math.ceil((plate.blocks.length || 1) / cols);
     return {
-      key, list, cols, rows,
-      w: cols * CITY_COLUMN_W + CITY_DISTRICT_PAD,
-      d: rows * CITY_COLUMN_D + CITY_DISTRICT_PAD,
+      plate, cellW, cellD, cols, rows,
+      w: cols * cellW + CITY_DISTRICT_PAD,
+      d: rows * cellD + CITY_DISTRICT_PAD,
     };
   });
   const shelfWidth = footprints.length
     ? Math.max(...footprints.map((f) => f.w)) * Math.ceil(Math.sqrt(footprints.length))
     : 0;
 
-  const districts = [];
-  const columns = [];
-  const columnByPath = new Map();
+  const districts = [], columns = [];
   let cursorX = 0, cursorZ = 0, rowDepth = 0;
-
   for (const fp of footprints) {
     if (cursorX > 0 && cursorX + fp.w > shelfWidth) {
       cursorZ += rowDepth + CITY_DISTRICT_GAP;
@@ -100,83 +255,158 @@ function buildCityLayout(nodes, edges, options) {
     }
     const originX = cursorX, originZ = cursorZ;
     districts.push({
-      name: fp.key,
-      label: cityDistrictLabel(fp.key),
-      x: originX + fp.w / 2,
-      z: originZ + fp.d / 2,
-      w: fp.w,
-      d: fp.d,
-      files: fp.list.length,
+      name: fp.plate.key, label: fp.plate.label,
+      x: originX + fp.w / 2, z: originZ + fp.d / 2,
+      w: fp.w, d: fp.d,
+      files: fp.plate.blocks.reduce((total, block) => total + block.files, 0),
+      level: fp.plate.level,
+      blocks: fp.plate.blocks.length,
     });
-
-    fp.list.forEach((file, index) => {
-      const gx = index % fp.cols;
-      const gz = Math.floor(index / fp.cols);
-      const fns = functionsByPath.get(file.path) || [];
-      // The engine's own count governs the height. Slab meshes only show what
-      // this page actually loaded, and the gap between the two is reported
-      // rather than smoothed over.
-      const declared = Number.isFinite(file.function_count) ? file.function_count : fns.length;
-      const visible = Math.min(fns.length, CITY_MAX_SLABS);
+    fp.plate.blocks.forEach((block, index) => {
+      const gx = index % fp.cols, gz = Math.floor(index / fp.cols);
       columns.push({
-        id: file.id,
-        path: file.path,
-        name: file.name || cityShortName(file.path),
-        // Every captured entry becomes a file node, including ones the scan
-        // deliberately ignored or could not read. Drawing those as ordinary
-        // columns would claim they were analysed, so the disposition travels
-        // with the column and the renderer gives them their own treatment.
-        analyzed: file.disposition === 'captured',
-        district: fp.key,
-        x: originX + CITY_DISTRICT_PAD / 2 + CITY_COLUMN_W * (gx + 0.5),
-        z: originZ + CITY_DISTRICT_PAD / 2 + CITY_COLUMN_D * (gz + 0.5),
-        w: CITY_COLUMN_W * 0.62,
-        d: CITY_COLUMN_D * 0.62,
-        functionCount: Math.max(declared, 0),
-        loadedSlabs: fns.length,
-        visibleSlabs: visible,
-        collapsedSlabs: Math.max(declared - visible, 0),
-        slabsIncomplete: fns.length < declared,
-        height: CITY_BASE_H + Math.max(declared, 1) * CITY_SLAB_H,
-        slabs: fns.slice(0, visible).map((s) => ({ id: s.id, name: s.name, start: s.start, end: s.end })),
-        unresolved: 0,
+        ...block,
+        // A block that stands for more than one file must never be mistaken for
+        // a file: it has no single source to read and no single identity to
+        // publish, and the view says so instead of guessing one. `slabDetail`
+        // is separate: it says whether the camera may expand this block into
+        // function layers at all, which is a property of the level.
+        aggregate: (block.filePaths || []).length > 1,
+        slabDetail: block.slabDetail === true,
+        district: fp.plate.key,
+        x: originX + CITY_DISTRICT_PAD / 2 + fp.cellW * (gx + 0.5),
+        z: originZ + CITY_DISTRICT_PAD / 2 + fp.cellD * (gz + 0.5),
       });
-      columnByPath.set(file.path, columns[columns.length - 1]);
     });
-
     cursorX += fp.w + CITY_DISTRICT_GAP;
     rowDepth = Math.max(rowDepth, fp.d);
   }
+  return { districts, columns };
+}
 
-  // Calls are aggregated to file level: a pipe answers "these two files are
-  // connected", and its label carries how many call sites say so.
-  const pathOfOwner = new Map();
-  for (const fn of functions) pathOfOwner.set(fn.id, fn.path);
-  for (const file of files) pathOfOwner.set(file.id, file.path);
+/// Resolved call pairs whose two ends would be one object at the district
+/// level. They are counted rather than drawn: a pipe from a district to itself
+/// would be a line from an object to itself, which says nothing.
+function cityInternalPairCount(hierarchy) {
+  const all = hierarchy.filePairs.reduce((total, pair) => total + pair.count, 0);
+  const cross = hierarchy.districtPairs.reduce((total, pair) => total + pair.count, 0);
+  return Math.max(all - cross, 0);
+}
 
-  const pairCount = new Map();
-  let unresolvedCalls = 0;
-  for (const call of calls) {
-    const from = pathOfOwner.get(call.source);
-    if (from === undefined) continue;
-    if (!call.target) {
-      unresolvedCalls++;
-      const column = columnByPath.get(from);
-      if (column) column.unresolved++;
-      continue;
+function cityBlockHeight(declared) {
+  return CITY_BASE_H + Math.max(declared, 1) * CITY_SLAB_H;
+}
+
+/// The drawable view of one level. The same facts, grouped differently.
+function cityLevelView(hierarchy, level, options) {
+  const opts = options || {};
+  const chosen = CITY_LEVEL_DEPTH[level] === undefined ? 'file' : level;
+  // An explicit 0 is a budget, not a missing value: `|| CITY_MAX_FILES` used to
+  // turn "draw nothing" into "draw everything", which is the opposite of what
+  // the caller asked for and invisible in the result.
+  const maxFiles = opts.maxFiles === undefined ? CITY_MAX_FILES : Math.max(opts.maxFiles, 0);
+  const maxPipes = opts.maxPipes === undefined ? CITY_MAX_PIPES : Math.max(opts.maxPipes, 0);
+  const totals = hierarchy.totals;
+
+  const plate = (key, label, blocks) => ({ key, label, blocks, level: chosen });
+  let plates = [];
+  let pairs = [];
+  let internalPairs = 0;
+  let shownFiles = 0;
+
+  if (chosen === 'project') {
+    // One block for the whole project: every file is represented, none is
+    // enumerated. Intra-project calls have no pipe to draw at this level.
+    plates = [plate('', '项目（全部目录）', [{
+      id: 'project:', path: 'project:', name: '项目', label: '项目',
+      analyzed: totals.analyzedFiles > 0, files: totals.files,
+      filePaths: hierarchy.files.map((file) => file.path),
+      functionCount: totals.declaredFunctions,
+      loadedSlabs: 0, visibleSlabs: 0, collapsedSlabs: 0, slabsIncomplete: false,
+      slabs: [], unresolved: totals.unresolvedCalls,
+      unanalyzedFiles: totals.unanalyzedFiles, analyzedFiles: totals.analyzedFiles,
+      w: CITY_COLUMN_W * 3.4, d: CITY_COLUMN_D * 3.4,
+      height: cityBlockHeight(totals.declaredFunctions),
+    }])];
+    shownFiles = totals.files;
+    internalPairs = hierarchy.filePairs.reduce((total, pair) => total + pair.count, 0);
+  } else if (chosen === 'district') {
+    // One block per district: the plates are the districts, and each holds its
+    // own aggregate. Cross-district calls remain pipes; calls inside one
+    // district are counted (`internalPairs`) and not drawn, because at this
+    // level they are not a connection between two drawn objects.
+    plates = hierarchy.districtOrder.map((key) => {
+      const district = hierarchy.districts[key];
+      const scale = 1.2 + Math.min(Math.sqrt(Math.max(district.facts.files, 1)), 4) * 0.45;
+      const filePaths = district.children.map((id) => id.replace(/^file:/, ''));
+      return plate(key, cityDistrictLabel(key), [{
+        id: district.id, path: `district:${key}`, name: cityDistrictLabel(key), label: cityDistrictLabel(key),
+        analyzed: district.facts.analyzedFiles > 0, files: district.facts.files,
+        // A district that happens to hold exactly one file *is* that file at
+        // this level, so its source stays readable instead of being refused.
+        file_id: filePaths.length === 1 ? `file:${filePaths[0]}` : null,
+        filePaths,
+        functionCount: district.facts.declaredFunctions,
+        loadedSlabs: 0, visibleSlabs: 0, collapsedSlabs: 0, slabsIncomplete: false,
+        slabs: [], unresolved: district.facts.unresolvedCalls,
+        unanalyzedFiles: district.facts.unanalyzedFiles, analyzedFiles: district.facts.analyzedFiles,
+        w: CITY_COLUMN_W * scale, d: CITY_COLUMN_D * scale,
+        height: cityBlockHeight(district.facts.declaredFunctions),
+      }]);
+    });
+    shownFiles = totals.files;
+    pairs = hierarchy.districtPairs.slice(0, Math.max(maxPipes, 0)).map((pair) => ({
+      ...pair, from: `district:${pair.from}`, to: `district:${pair.to}`,
+    }));
+    internalPairs = cityInternalPairCount(hierarchy);
+  } else {
+    // The file level: the picture the city has always drawn. Files are packed
+    // into their districts, slabs stand for loaded functions, and the gap
+    // between the engine's declared count and what this page loaded stays
+    // visible instead of being smoothed away.
+    const ordered = hierarchy.files.slice().sort((a, b) => String(a.path).localeCompare(String(b.path)));
+    const shown = ordered.slice(0, Math.max(maxFiles, 0));
+    shownFiles = shown.length;
+    const grouped = new Map();
+    for (const file of shown) {
+      const key = cityTopDirectory(file.path);
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push(file);
     }
-    const to = pathOfOwner.get(call.target);
-    if (to === undefined || to === from) continue;
-    const key = from + '\u0000' + to;
-    pairCount.set(key, (pairCount.get(key) || 0) + 1);
+    plates = [...grouped.keys()].sort().map((key) => plate(key, cityDistrictLabel(key),
+      grouped.get(key).map((file) => {
+        const node = hierarchy.byPath[file.path];
+        const list = node.functions;
+        const declared = node.facts.declaredFunctions;
+        const visible = Math.min(list.length, CITY_MAX_SLABS);
+        return {
+          id: file.id, path: file.path, name: file.name || cityShortName(file.path),
+          // Every captured entry becomes a file node, including ones the scan
+          // deliberately ignored or could not read. Drawing those as ordinary
+          // columns would claim they were analysed, so the disposition travels
+          // with the column and the renderer gives them their own treatment.
+          analyzed: file.disposition === 'captured',
+          files: 1, filePaths: [file.path],
+          functionCount: declared,
+          loadedSlabs: list.length,
+          visibleSlabs: visible,
+          collapsedSlabs: Math.max(declared - visible, 0),
+          slabsIncomplete: list.length < declared,
+          height: cityBlockHeight(declared),
+          slabs: list.slice(0, visible).map((s) => ({ id: s.id, name: s.name, start: s.start, end: s.end })),
+          unresolved: node.facts.unresolvedCalls,
+          unanalyzedFiles: node.facts.unanalyzedFiles,
+          analyzedFiles: node.facts.analyzedFiles,
+          slabDetail: true,
+          w: CITY_COLUMN_W * 0.62, d: CITY_COLUMN_D * 0.62,
+        };
+      })));
+    pairs = hierarchy.filePairs.slice(0, Math.max(maxPipes, 0));
+    internalPairs = cityInternalPairCount(hierarchy);
   }
-  const allPipes = [...pairCount.entries()]
-    .map(([key, count]) => {
-      const split = key.split('\u0000');
-      return { from: split[0], to: split[1], count };
-    })
-    .sort((a, b) => (b.count - a.count) || a.from.localeCompare(b.from) || a.to.localeCompare(b.to));
-  const pipes = allPipes.slice(0, Math.max(maxPipes, 0));
+
+  const packed = cityPackPlates(plates);
+  const districts = packed.districts, columns = packed.columns;
 
   // Centre the whole city on the origin so the camera can frame it.
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
@@ -189,34 +419,116 @@ function buildCityLayout(nodes, edges, options) {
   for (const d of districts) { d.x -= offsetX; d.z -= offsetZ; }
   for (const c of columns) { c.x -= offsetX; c.z -= offsetZ; }
 
+  const drawnFunctions = columns.reduce((total, column) => total + column.functionCount, 0);
   const stats = {
-    files: files.length,
-    shownFiles: shownFiles.length,
+    schema: 'atlas.city-level-stats.v1',
+    level: chosen,
+    levelLabel: cityLevelName(chosen),
+    // Aggregated facts: identical at every level, because they come from the
+    // hierarchy rather than from what this level happened to draw.
+    files: totals.files,
+    functions: totals.loadedFunctions,
+    declaredFunctions: totals.declaredFunctions,
+    loadedFunctions: totals.loadedFunctions,
+    analyzedFiles: totals.analyzedFiles,
+    unanalyzedFiles: totals.unanalyzedFiles,
+    unresolvedCalls: totals.unresolvedCalls,
+    callSites: totals.callSites,
+    calls: hierarchy.candidateCalls,
+    // Drawn facts: these are what the level decides.
+    shownFiles,
+    drawnBlocks: columns.length,
     districts: districts.length,
-    functions: functions.length,
-    loadedSlabs: columns.reduce((n, c) => n + c.loadedSlabs, 0),
-    drawnSlabs: columns.reduce((n, c) => n + c.visibleSlabs, 0),
-    declaredFunctions: columns.reduce((n, c) => n + c.functionCount, 0),
-    calls: calls.length,
-    resolvedPairs: allPipes.length,
-    shownPipes: pipes.length,
-    unresolvedCalls,
-    unanalyzedFiles: columns.filter((c) => !c.analyzed).length,
+    loadedSlabs: columns.reduce((total, column) => total + column.loadedSlabs, 0),
+    drawnSlabs: columns.reduce((total, column) => total + column.visibleSlabs, 0),
+    resolvedPairs: chosen === 'district' ? hierarchy.districtPairs.length : hierarchy.filePairs.length,
+    shownPipes: pairs.length,
+    internalPairs,
+    omitted: {
+      files: Math.max(totals.files - shownFiles, 0),
+      functions: Math.max(totals.declaredFunctions - drawnFunctions, 0),
+    },
     truncated: {
-      files: files.length > shownFiles.length,
-      pipes: allPipes.length > pipes.length,
+      files: totals.files > shownFiles,
+      pipes: (chosen === 'district' ? hierarchy.districtPairs.length : hierarchy.filePairs.length) > pairs.length,
       slabs: columns.some((c) => c.collapsedSlabs > 0 || c.slabsIncomplete),
     },
   };
 
   return {
+    schema: 'atlas.city-layout.v1',
+    level: chosen,
+    hierarchy,
     districts,
     columns,
-    pipes,
+    pipes: pairs,
     stats,
+    invariants: cityLevelInvariants(hierarchy),
     bounds: { minX, maxX, minZ, maxZ },
     radius: Math.max(maxX - minX, maxZ - minZ, 24) / 2,
   };
+}
+
+/// The file level of the same hierarchy: the layout the rest of the workbench
+/// and the 2D/3D agreement checks already consume.
+function buildCityLayout(nodes, edges, options) {
+  const opts = options || {};
+  const hierarchy = buildCityHierarchy(nodes, edges);
+  const layout = cityLevelView(hierarchy, opts.level || 'file', opts);
+  // Kept for callers that only ever wanted the drawable city.
+  return layout;
+}
+
+/// The state transition behind a level switch. Pure, so it can be tested
+/// without a GPU -- which is exactly where an untested branch would hide: the
+/// failure mode is a selection that silently re-anchors or a marker that stays
+/// on a block that no longer represents its file.
+function cityLevelSwitch(state, level, options) {
+  const hierarchy = state.hierarchy || (state.layout && state.layout.hierarchy);
+  if (!hierarchy) return { ok: false, code: 'no_layout', level };
+  const keep = state.selectedFile || state.selected || null;
+  const layout = cityLevelView(hierarchy, level, options || {});
+  const observed = state.observed ? cityRunMarkers(state.observedSource || [], layout) : null;
+  const column = keep
+    ? layout.columns.find((entry) => entry.path === keep || (entry.filePaths || []).includes(keep))
+    : null;
+  return {
+    ok: true,
+    level: layout.level,
+    layout,
+    observed,
+    runPaths: observed ? observed.paths : null,
+    column,
+    // The block to highlight, the object the user picked, and -- when the object
+    // is genuinely not in this level's picture (the file level is capped) -- the
+    // thing that was lost. Nothing is ever re-anchored to something else.
+    selected: column ? column.path : null,
+    selectedFile: column ? keep : null,
+    lost: keep && !column ? keep : null,
+  };
+}
+
+/// What the current level means, including anything it did not draw. A level is
+/// not a budget: the two are reported separately or a reader would take "not
+/// drawn at this level" for "not in the analysis".
+function cityLevelLine(stats, invariants) {
+  if (!stats) return '尚未加载';
+  const parts = [
+    `层级 ${stats.levelLabel || cityLevelName(stats.level)}`,
+    `声明函数 ${stats.declaredFunctions}`,
+    `柱体 ${stats.drawnBlocks}/${stats.files} 文件`,
+  ];
+  if (stats.level !== 'file') {
+    parts.push('本层级不画函数层与逐文件柱体：这是层级定义，不是渲染预算');
+  }
+  if (stats.omitted.functions) {
+    parts.push(`本层级未画出 ${stats.omitted.functions} 个函数（${stats.omitted.files} 个文件未入选）`);
+  }
+  if (stats.internalPairs) parts.push(`同层内部调用 ${stats.internalPairs} 未画成管道`);
+  const check = invariants || { ok: null };
+  parts.push(check.ok === true ? '层级聚合守恒 ✓'
+    : (check.ok === false ? `层级聚合不守恒：${(check.violations || []).map((v) => v.key).join('、')}` : '层级聚合未校验'));
+  return parts.join(' · ');
 }
 
 /// One line that states what the picture covers. A visual that cannot say how
@@ -230,24 +542,44 @@ function buildCityLayout(nodes, edges, options) {
 // "we ran something not shown here" is information.
 function cityRunMarkers(markers, layout) {
   const perPath = new Map();
+  const perColumn = new Map();
   const unplaced = [];
   const verdicts = {};
+  const columns = (layout && layout.columns) || [];
+  // A record names a file. At a coarse level that file is represented by an
+  // aggregate block, so the marker is *placed on* that block while the record
+  // still says which file it was. Aggregating silently would let one run on one
+  // file read as a run on the whole directory.
+  const columnOf = (path) => columns.find((entry) => entry.path === path
+    || (entry.filePaths || []).includes(path));
   for (const marker of markers || []) {
     const verdict = String(marker.verdict || 'unknown');
     verdicts[verdict] = (verdicts[verdict] || 0) + 1;
     const path = marker.path;
-    const column = layout && layout.columns.find(entry => entry.path === path);
+    const column = columnOf(path);
     if (!column) { unplaced.push(path || marker.symbol || '(unknown)'); continue; }
     if (!perPath.has(path)) perPath.set(path, { path, runs: 0, verdicts: {}, entries: [] });
     const record = perPath.get(path);
     record.runs += 1;
     record.verdicts[verdict] = (record.verdicts[verdict] || 0) + 1;
     record.entries.push({ symbol: marker.symbol, name: marker.name, verdict });
+    if (!perColumn.has(column.path)) {
+      perColumn.set(column.path, { path: column.path, runs: 0, files: [], aggregated: column.path !== path });
+    }
+    const block = perColumn.get(column.path);
+    block.runs += 1;
+    if (!block.files.includes(path)) block.files.push(path);
   }
   const placed = [...perPath.values()].sort((a, b) => b.runs - a.runs || a.path.localeCompare(b.path));
+  const blocks = [...perColumn.values()].sort((a, b) => b.runs - a.runs || a.path.localeCompare(b.path));
   return {
-    paths: new Set(perPath.keys()),
+    level: (layout && layout.level) || 'file',
+    // The set the renderer colours by: column paths, so a coarse level colours
+    // the block that really carries the run rather than nothing at all.
+    paths: new Set(blocks.map((block) => block.path)),
     records: placed,
+    columns: blocks,
+    aggregated: blocks.filter((block) => block.aggregated).length,
     counts: verdicts,
     total: (markers || []).length,
     placed: placed.reduce((sum, record) => sum + record.runs, 0),
@@ -260,7 +592,11 @@ function cityObservedLine(observed) {
   const parts = Object.entries(observed.counts)
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .map(([verdict, count]) => `${verdict} ${count}`);
-  const line = `观测（运行入口）${observed.total}：${parts.join(' · ')} · 落在 ${observed.records.length} 个文件`;
+  const blocks = observed.columns ? observed.columns.length : observed.records.length;
+  const level = observed.level && observed.level !== 'file'
+    ? `（层级 ${cityLevelName(observed.level)}：一个柱体代表多个文件，这是聚合，不是“整个目录都跑过”）`
+    : '';
+  const line = `观测（运行入口）${observed.total}：${parts.join(' · ')} · 落在 ${blocks} 个柱体 / ${observed.records.length} 个文件${level}`;
   return observed.unplaced.length ? `${line} · 未落在当前布局 ${observed.unplaced.length}` : line;
 }
 
@@ -296,13 +632,31 @@ function citySelectionTarget(pending, analysisId, nodes, layout) {
   }
   const node = (nodes || []).find(entry => entry.id === pending.entity_id);
   if (!node) return { ok: false, code: 'entity_not_loaded' };
-  const column = layout && layout.columns.find(entry => entry.path === node.path);
+  const column = layout && layout.columns.find((entry) => entry.path === node.path
+    || (entry.filePaths || []).includes(node.path));
   if (!column) return { ok: false, code: 'entity_not_in_layout', path: node.path };
-  return { ok: true, path: column.path, entity_id: node.id, name: node.name };
+  // At a coarse level the selected file is represented by an aggregate block.
+  // Highlighting it is correct *because the target is named*, and the answer
+  // says the block is an aggregate: a reader must not conclude that the
+  // directory itself is the object they picked in 2D.
+  return {
+    ok: true,
+    path: column.path,
+    file_path: node.path,
+    entity_id: node.id,
+    name: node.name,
+    level: (layout && layout.level) || 'file',
+    aggregated: (column.filePaths || [column.path]).length > 1,
+  };
 }
 
 function citySelectionQuery(column) {
   if (!column) return null;
+  // An aggregate block has no single object behind it, so there is no source to
+  // read and no entity id to publish. Returning one would make the inspector
+  // claim a directory is a file.
+  if (column.aggregate) return null;
+  if (column.file_id) return { entity: column.file_id, path: (column.filePaths || [])[0] || column.path, name: column.name };
   return { entity: column.id, path: column.path, name: column.name };
 }
 
@@ -613,7 +967,11 @@ function cityColumnInstances(layout, mode, selectedPath) {
     // A file that was never analysed keeps its own solid marker: still visible,
     // so it is not hidden from the picture, but plainly a different kind of
     // object from a column that carries analysed function layers.
-    if (mode === 'file' || unanalyzed) {
+    // A block with no function layers under it is drawn as a solid block at
+    // every camera distance. Without this a coarse level would collapse to a
+    // bare plinth as soon as the camera came near -- a level that disappears
+    // when you look at it is worse than no level at all.
+    if (mode === 'file' || unanalyzed || column.slabDetail === false) {
       list.push({
         offset: [column.x, column.height / 2, column.z],
         scale: [column.w, column.height, column.d],
@@ -889,15 +1247,23 @@ async function city3dStart(canvas) {
     // loaded, and a null camera used to throw before the next frame was even
     // scheduled, which killed the loop for the rest of the session.
     camera: cityDefaultCamera({ radius: 40 }),
-    shape: 'box', mode: 'function', selected: null,
+    shape: 'box', mode: 'function', level: 'file', selected: null,
     analysisId: null, selection: null, pendingSelection: null,
-    observed: null, runPaths: null,
+    observed: null, observedSource: [], runPaths: null,
     meshes: { solid: null, wire: null, grid: null, pipes: null },
+    // Everything the projection is allowed to know about the analysis, kept so
+    // a level switch re-reads the same facts instead of querying again.
+    hierarchy: null, nodes: [],
     labels: [],
     dragging: null, moved: 0,
   };
 
   const labelHost = typeof document === 'undefined' ? null : document.getElementById('city-labels');
+
+  function describeLevel() {
+    if (!state.layout) return;
+    cityText('city-level', cityLevelLine(state.layout.stats, state.layout.invariants));
+  }
 
   function rebuildScene() {
     if (!state.layout) return;
@@ -916,6 +1282,34 @@ async function city3dStart(canvas) {
         return { element, district };
       });
     }
+    describeLevel();
+  }
+
+  /// Switch the level of detail. The layout is rebuilt from the same hierarchy,
+  /// so the facts cannot change with the level; only what is drawn does. A
+  /// selection is kept and re-resolved at the new level rather than dropped:
+  /// the user's *object* did not change even though the picture did.
+  function setLevel(level) {
+    // The decision is the pure `cityLevelSwitch`; this only pushes the result
+    // into the scene.
+    const next = cityLevelSwitch(state, level);
+    state.level = next.level || level;
+    if (!next.ok) return;
+    state.layout = next.layout;
+    if (state.observed) {
+      state.observed = next.observed;
+      state.runPaths = next.runPaths;
+      const line = cityObservedLine(next.observed);
+      if (line) cityText('city-observed', line);
+    }
+    if (!next.column) {
+      state.selected = null;
+      state.selectedFile = null;
+      rebuildScene();
+      if (next.lost) cityText('city-selected', `原选区 ${next.lost} 不在当前层级的绘制范围内，已取消高亮；切换层级或重新选择。`);
+      return;
+    }
+    selectColumn(next.column, next.selectedFile);
   }
 
   function resize() {
@@ -1009,19 +1403,31 @@ async function city3dStart(canvas) {
       if (note) note.textContent = message;
       return;
     }
-    if (note) note.textContent = `共享选区来自 2D：${target.name} · ${target.path}`;
-    const column = state.layout.columns.find(entry => entry.path === target.path);
-    await selectColumn(column);
+    if (note) {
+      note.textContent = target.aggregated
+        ? `共享选区来自 2D：${target.name} · ${target.file_path}；当前层级（${cityLevelName(target.level)}）里它由聚合柱体代表，未做精确高亮。`
+        : `共享选区来自 2D：${target.name} · ${target.path}`;
+    }
+    const column = state.layout.columns.find((entry) => entry.path === target.path
+      || (entry.filePaths || []).includes(target.file_path || target.path));
+    await selectColumn(column, target.file_path || target.path);
     cityPublishSelection(target.entity_id);
   }
 
-  async function selectColumn(column) {
+  async function selectColumn(column, filePath) {
     state.selected = column ? column.path : null;
+    // What the user picked, which at a coarse level is not the block's own
+    // identity. Kept apart so switching levels can keep the *object* rather
+    // than the aggregate that happened to represent it.
+    state.selectedFile = column ? (filePath || (column.aggregate ? null : column.path)) : null;
     rebuildScene();
     const query = citySelectionQuery(column);
     if (!query) {
-      cityText('city-selected', '未选中对象。点选一根柱体，查看它对应的文件。');
+      cityText('city-selected', column && column.aggregate
+        ? `${column.name} · 聚合柱体（${column.files} 个文件，声明 ${column.functionCount} 函数，未解析调用 ${column.unresolved}）· 没有单一源码可读；切到「文件」层级再点选具体文件。`
+        : '未选中对象。点选一根柱体，查看它对应的文件。');
       cityText('city-source', '');
+      cityText('city-source-meta', '');
       return;
     }
     cityText('city-selected',
@@ -1090,6 +1496,29 @@ async function city3dStart(canvas) {
   if (resetButton) {
     resetButton.onclick = () => { if (state.layout) state.camera = cityDefaultCamera(state.layout); };
   }
+  // Formal LOD controls. Keyboard 1/2/3 and the buttons do the same thing, and
+  // the level is a property of the projection -- not of the camera -- so it
+  // survives a view reset.
+  const levelButtons = typeof document === 'undefined' ? [] : CITY_LEVELS
+    .map((level) => ({ level, element: document.getElementById(`city-level-${level}`) }))
+    .filter((entry) => entry.element);
+  function applyLevel(level) {
+    setLevel(level);
+    for (const entry of levelButtons) {
+      entry.element.setAttribute('aria-pressed', entry.level === state.level ? 'true' : 'false');
+    }
+  }
+  for (const entry of levelButtons) entry.element.onclick = () => applyLevel(entry.level);
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    document.addEventListener('keydown', (event) => {
+      if (event.target && /^(INPUT|TEXTAREA)$/.test(event.target.tagName || '')) return;
+      const index = ['1', '2', '3'].indexOf(event.key);
+      if (index === -1) return;
+      // 1 = project, 2 = district, 3 = file: coarsest first, matching the
+      // order in CITY_LEVELS.
+      applyLevel(CITY_LEVELS[index]);
+    });
+  }
 
   async function connect() {
     const field = document.getElementById('city-token');
@@ -1109,13 +1538,18 @@ async function city3dStart(canvas) {
       const nodes = await cityLoadPages(state.api, 'nodes', { kind: 'all' }, 8);
       const edges = await cityLoadPages(state.api, 'edges', { kind: 'call_candidate' }, 4);
       state.analysisId = report.id;
-      state.layout = buildCityLayout(nodes.items, edges.items);
+      state.nodes = nodes.items;
+      // One hierarchy, then a view per level: the level can change without
+      // re-querying, and cannot change what was counted.
+      state.hierarchy = buildCityHierarchy(nodes.items, edges.items);
+      state.layout = cityLevelView(state.hierarchy, state.level, {});
       // Observed runs are a separate query and a separate channel. If it fails,
       // the view says so rather than showing an empty observed layer, which
       // would read as "nothing has ever been run".
       try {
         const observedPage = await state.api('run-markers', { limit: 200 });
-        state.observed = cityRunMarkers(observedPage.markers, state.layout);
+        state.observedSource = observedPage.markers || [];
+        state.observed = cityRunMarkers(state.observedSource, state.layout);
         state.runPaths = state.observed.paths;
       } catch (error) {
         state.observed = null;
@@ -1125,6 +1559,7 @@ async function city3dStart(canvas) {
       state.camera = cityDefaultCamera(state.layout);
       state.mode = 'function';
       rebuildScene();
+      applyLevel(state.level);
       cityText('city-analysis', `分析版本 ${String(report.id).slice(0, 12)} · 文件 ${report.file_count} · 函数 ${report.function_count} · 调用点 ${report.call_count}`);
       const bounded = nodes.complete && edges.complete ? '' : '（分页达到上限，视图基于已加载的部分事实）';
       cityText('city-coverage', cityCoverageLine(state.layout.stats) + bounded);
@@ -1155,11 +1590,19 @@ async function city3dStart(canvas) {
       getSelection() { return state.selection ? { ...state.selection } : null; },
       async highlight(entityId) {
         if (!state.layout) return { ok: false, error: 'no_layout' };
-        const column = state.layout.columns.find(c => c.path === entityId || c.path === String(entityId).replace(/^file:/, ''));
-        if (!column) return { ok: false, error: 'entity_not_in_layout' };
-        await selectColumn(column);
+        // The bridge names an entity (a file or a function): resolve it through
+        // the layout's own node ids and file membership, so a coarse level
+        // highlights the block that really represents it and says it is an
+        // aggregate instead of reporting "not in layout".
+        const wanted = String(entityId).replace(/^file:/, '');
+        const node = (state.nodes || []).find((entry) => entry.id === entityId);
+        const path = node ? node.path : wanted;
+        const column = state.layout.columns.find((c) => c.id === entityId || c.path === path
+          || (c.filePaths || []).includes(path));
+        if (!column) return { ok: false, error: 'entity_not_in_layout', path };
+        await selectColumn(column, path);
         cityPublishSelection(entityId);
-        return { ok: true, path: column.path };
+        return { ok: true, path: column.path, aggregated: Boolean(column.aggregate), level: state.layout.level };
       },
       openProjection(view) {
         const target = view === '2d' ? '/' : '/city3d';

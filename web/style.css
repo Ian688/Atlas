@@ -57,7 +57,13 @@
 .city-legend .collapsed{background:#b3aa96;border:1px solid #9c927c}
 .city-legend .unanalyzed{background:#ccc8c0;border:1px solid #b3aea4}
 .city-legend .pipe{background:#54a8c2;height:2px;border-radius:1px}
+/* The active LOD level is a state, not a hover: a pressed level must be
+   readable at a glance, because a reader who cannot see which level they are
+   looking at cannot tell an aggregate from a file. */
+.city-toolbar button[aria-pressed="true"]{background:#1d4e63;color:#f7fbfc;border-color:#1d4e63}
+.city-toolbar button[aria-pressed="false"]{background:#fff;color:#38607a}
 .city-coverage-bar{position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;align-items:center;padding:10px 14px;background:#fbfdfef2;border-top:1px solid #e0eaee;font-size:10px;color:#4e6b7d}
+.city-coverage-bar + .city-coverage-bar{bottom:37px;border-top:none}
 .city-coverage-bar .subtle{letter-spacing:1px}
 .city-inspector{padding:22px 20px;min-width:0;background:#f9fbfc}
 .city-inspector h2{font-size:17px;overflow-wrap:anywhere;margin:0 0 10px}

@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/ge3-concurrency",
+    "window": "2026-09-12/w09-city-lod",
     "status": "DELIVERED",
-    "note": "并发资格：写锁等待可取消、预算可配、耗尽即具名拒绝；schema 创建原子、已初始化 store 只读打开。真实项目上 3 并发全部 exit 0 且与串行同 id。",
-    "evidence_dir": "evidence/development/2026-09-12-ge3-concurrency",
-    "verification": "evidence/development/2026-09-12-ge3-concurrency/verification.json"
+    "note": "3D 正式层级与 LOD：project→district→file 不可裁剪层级 + 每层视图；聚合守恒逐层重加并显示；层级省略与预算截断分开；聚合柱体不冒充文件。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-city-lod",
+    "verification": "evidence/development/2026-09-12-w09-city-lod/verification.json"
   },
   "windows": [
     {
@@ -328,10 +328,19 @@
       ],
       "note": "并发第一次真实运行就以 database is locked 失败（两个进程用 5 秒固定预算撞发布者的写锁）。修复：等待改为可取消的可配预算 + 具名超时拒绝，schema 创建放进一个 IMMEDIATE 事务并在事务内重查，已初始化 store 只读打开（读取不再取写锁）。资格：rxjs@7.8.1 上串行 133.0s/534MB，3 并发共享 store 220.2–220.6s（各自 519–525MB），3 并发分 store 237.3–238.2s，全部 exit 0 且发布同一 analysis id dc2f21c4…；事后读回 6573 函数 / 8938 节点 / 25969 边与基线一致。",
       "report": "evidence/development/2026-09-12-ge3-concurrency/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/w09-city-lod",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09-city-hierarchy-lod"
+      ],
+      "note": "城市从一张固定图变成 一个模型 + 每层一张视图：buildCityHierarchy（不可裁剪、目录/项目为子节点之和）、cityLevelView（项目/目录/文件三种画法，共享打包路径避免层级间不一致）、cityLevelInvariants（逐层重加，project==Σdistrict==Σfile 才算守恒，页面上显示）。LOD 不改变事实数量因此是结构性保证；层级省略与预算截断分开报；聚合柱体 aggregate=true、无单一源码、共享选区落到粗层级指名真实文件并标注聚合；运行标记按 filePaths 落在聚合柱体上并写明是聚合。顺带修掉 maxFiles=0 被 || 缺省吞掉的预算 bug。city3d 行为用例 17→23。",
+      "report": "evidence/development/2026-09-12-w09-city-lod/REPORT.md"
     }
   ],
-  "next_work_item": "依赖切片（受控运行只物化目标闭包）或 W09 的 3D LOD/正式层级",
-  "next_action": "本轮交付 GE-3 并发资格：先发现真实缺陷（并发 index 以 database is locked 失败），再修（可取消的可配写锁预算 + 具名拒绝 + 原子 schema + 只读打开），再用真实项目资格（3 并发同 id、计数一致）。剩余按价值：(1) 依赖切片——受控运行仍物化整个快照；(2) 3D 的 LOD 与正式层级；(3) 并发的下一步：大仓库/monorepo、多语言、Windows、并发度上限与有界并行策略；(4) 多级 via 组合。",
+  "next_work_item": "依赖切片（受控运行只物化目标闭包）或多级 via 组合",
+  "next_action": "本轮交付 3D 正式层级与 LOD：形式层级不可裁剪、聚合守恒可检查、层级省略与预算截断分开、聚合永不冒充文件。剩余按价值：(1) 依赖切片——受控运行仍物化整个快照；(2) 多级 via 组合（outer→middle→inner）；(3) 2D 画布的正式层级与更大的空间索引；(4) 并发的下一步：大仓库/monorepo、多语言、Windows、并发度上限；(5) 城市里的运行激活路径需要行级/调用级采样，Atlas 目前只有入口观测，不能诚实画出。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
@@ -790,7 +799,8 @@
         "补丁验证可排队：patch verify --enqueue --owner X 生成 kind=patch_verify 作业，job work 用同一个 verify_proposal 执行（前台与排队不是两条路径）；终态 artifact 是补丁树派生的 analysis；同一 (owner,project,request_key) 幂等，完成后重排报告 already_completed",
         "HTTP 身份：注解与提案的作者由服务端按会话写入（请求类型无 proposed_by），页面无法把提案归到别人名下",
         "观测层与静态层分开：GET /api/run-markers 由已发布执行记录投影；3D 用独立描边色与独立图例行（结论分布 + 落点文件数），cityRunMarkers 为纯函数且测试断言不改变布局，落不进布局的记录报数不丢弃，查询失败显示不可用",
-        "跨版本选区重定位（atlas relocate / GET /api/relocate）：依据 path_and_name → identical_bytes → name_only 按强度排序并公开；entity_withdrawn（文件没了）与 no_counterpart（文件还在实体没了）分开；歧义拒绝；邻居只作上下文不作候选；只返回建议与钉在目标版本的选区，不修改已存记录"
+        "跨版本选区重定位（atlas relocate / GET /api/relocate）：依据 path_and_name → identical_bytes → name_only 按强度排序并公开；entity_withdrawn（文件没了）与 no_counterpart（文件还在实体没了）分开；歧义拒绝；邻居只作上下文不作候选；只返回建议与钉在目标版本的选区，不修改已存记录",
+        "3D 正式层级与 LOD：不可裁剪的形式层级 project→district→file（atlas.city-hierarchy.v1），每节点同一组事实计数、目录与项目为子节点之和；每层视图（atlas.city-layout.v1）只决定画什么（项目 1 根聚合柱体 / 每目录 1 根 / 每文件 1 根）；cityLevelInvariants 逐层重加、project==Σdistrict==Σfile 才算守恒并报出 violations；聚合柱体 aggregate=true 且无单一源码（citySelectionQuery 返回 null）；共享选区落到粗层级指名真实文件并标注聚合；运行标记按 filePaths 落在聚合柱体上并在观测行写明这是聚合；显式 maxFiles=0 是预算而非缺省值"
       ],
       "evidence": [
         "crates/atlas-engine/src/patch.rs（11 个 diff 单测 + 提案存储与状态迁移）",
@@ -813,7 +823,7 @@
       "blockers": [
         "AI Coding 链没有图形化的一键撤销：apply/revert 只有 CLI；提案形式只支持统一 diff（新建/删除/重命名文件不支持）",
         "重定位只覆盖可判定的依据：同路径同名、字节完全相同、仅同名。**改名且内容也变了**的对象无法识别（名字是字节的一部分），这种情况如实拒绝；跨文件的复杂移动链（A→B→C）也没有追踪",
-        "LOD（细节层级切换）未实现：城市仍按固定规则投影，没有随距离改变几何密度。观测层已接通，但它标的是**已运行的入口**，不是运行路径——Atlas 没有行级/调用级采样，所以「激活路径来自 Run」仍无法诚实地画出来",
+        "层级形式化与 LOD 已实现（buildCityHierarchy + cityLevelView + cityLevelInvariants，project/district/file 三层，聚合守恒逐层重加并在页面显示；层级省略与预算截断分开报）。仍未实现：\"激活路径来自 Run\" 需要行级/调用级采样，Atlas 只有入口调用的观测，所以城市里的运行信息仍然是\"哪些入口被跑过\"，不是运行路径；相机驱动的细节切换（远=文件级、近=函数层）保留，但它与正式层级是两件事",
         "Agent Bridge 没有 owner 认证：owner 是调用者声明；服务端验证权限与版本仍未实现（与 W06 同一缺口）",
         "bridge 的 inspect 直接展开已发布上下文，没有按请求方做最小披露裁剪；请求预算与配额未实现",
         "没有被同一 analysis 之外的投影状态持久化：选区只在 fragment 与内存里，刷新页面依赖 URL",

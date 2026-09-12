@@ -325,7 +325,7 @@ check('the observed line names the verdicts and admits what it could not place',
   assert.match(line, /观测（运行入口）3/);
   assert.match(line, /returned 2/);
   assert.match(line, /timeout 1/);
-  assert.match(line, /落在 1 个文件/);
+  assert.match(line, /落在 1 个柱体 \/ 1 个文件/);
   assert.match(line, /未落在当前布局 1/, 'a record outside the layout must be visible');
   // And with nothing run, there is no line to misread.
   assert.equal(t.run('cityObservedLine(cityRunMarkers([], ' + JSON.stringify(layout) + '))'), null);
@@ -344,6 +344,239 @@ check('observed runs and static candidates use different wire colours', () => {
   const selected = t.run(`cityWireInstances(${JSON.stringify(layout)}, 'src/a.js', new Set(['src/a.js']))`);
   assert.notEqual(JSON.stringify(selected[0].color), JSON.stringify(withRuns[0].color),
     'selection and "has been run" are different claims and must not share a colour');
+});
+
+// --- W09: the formal hierarchy, and LOD that cannot change fact counts -------
+// The work order states the rule as "LOD must not change fact counts". These
+// checks make that a property of the data rather than a promise: the hierarchy
+// is uncapped and re-added at every level, and a coarse view must report what it
+// did not draw instead of absorbing it.
+check('the hierarchy survives a bounded file budget: caps change what is drawn, not what is counted', () => {
+  const t = boot();
+  const nodes = [];
+  for (let i = 0; i < 10; i++) nodes.push(fileNode(`src/f${i}.js`, i + 1));
+  const edges = [call('c1', 'file:src/f0.js', 'file:src/f1.js')];
+  const bounded = t.run(`buildCityLayout(${JSON.stringify(nodes)}, ${JSON.stringify(edges)}, {maxFiles: 3})`);
+  const full = t.run(`buildCityLayout(${JSON.stringify(nodes)}, ${JSON.stringify(edges)})`);
+  assert.equal(bounded.stats.files, 10, 'the real file count survives the cap');
+  assert.equal(full.stats.files, 10);
+  assert.equal(bounded.stats.declaredFunctions, full.stats.declaredFunctions,
+    'the declared function total must not depend on the file budget');
+  assert.equal(bounded.stats.declaredFunctions, 55, '1+2+...+10');
+  assert.equal(bounded.stats.shownFiles, 3);
+  assert.ok(bounded.stats.omitted.functions > 0, 'what was not drawn must be reported');
+  assert.equal(bounded.invariants.ok, true, JSON.stringify(bounded.invariants.violations));
+  // The invariant is about the hierarchy, so it holds even when nothing is drawn.
+  const none = t.run(`buildCityLayout(${JSON.stringify(nodes)}, [], {maxFiles: 0})`);
+  assert.equal(none.stats.shownFiles, 0);
+  assert.equal(none.stats.declaredFunctions, 55, 'an empty picture is not an empty analysis');
+  assert.equal(none.invariants.ok, true);
+});
+
+check('every level aggregates to the same facts, and says so', () => {
+  const t = boot();
+  const nodes = [fileNode('src/a.js', 3), fnNode('src/a.js', 'fnA', 0), fileNode('src/b.js', 2),
+    fileNode('web/c.js', 1), fileNode('root.js', 0)];
+  const edges = [call('c1', 'file:src/a.js', 'file:web/c.js'), call('c2', 'file:src/b.js', 'symbol:src/a.js:0:10')];
+  const hierarchy = t.run(`buildCityHierarchy(${JSON.stringify(nodes)}, ${JSON.stringify(edges)})`);
+  const invariants = t.run(`cityLevelInvariants(${JSON.stringify(hierarchy)})`);
+  assert.equal(invariants.ok, true, JSON.stringify(invariants.violations));
+  assert.equal(invariants.totals.files, 4);
+  assert.equal(invariants.totals.declaredFunctions, 6);
+  assert.equal(invariants.totals.analyzedFiles, 4);
+
+  const totals = {};
+  const blocks = {};
+  for (const level of ['project', 'district', 'file']) {
+    const view = t.run(`cityLevelView(${JSON.stringify(hierarchy)}, ${JSON.stringify(level)})`);
+    totals[level] = JSON.stringify({
+      declared: view.stats.declaredFunctions, files: view.stats.files,
+      unresolved: view.stats.unresolvedCalls, analyzed: view.stats.analyzedFiles,
+      loaded: view.stats.loadedFunctions,
+    });
+    blocks[level] = view.stats.drawnBlocks;
+    assert.equal(view.level, level);
+    assert.equal(view.invariants.ok, true);
+  }
+  // The facts are equal across levels; what is drawn is not, and that
+  // difference is the whole point of a level.
+  assert.equal(totals.project, totals.district, 'project and district must agree on the facts');
+  assert.equal(totals.project, totals.file, 'and the file level too');
+  assert.equal(blocks.project, 1, 'the project level draws one block');
+  assert.equal(blocks.district, 3, 'the district level draws one block per district');
+  assert.ok(blocks.file > blocks.district, 'the file level draws more objects');
+});
+
+check('a coarse level reports the facts it did not draw as a level property', () => {
+  const t = boot();
+  const nodes = [fileNode('src/a.js', 4), fnNode('src/a.js', 'fnA', 0), fileNode('src/b.js', 1)];
+  const edges = [call('c1', 'file:src/a.js', 'file:src/b.js'), call('noTarget', 'file:src/a.js', null)];
+  const hierarchy = t.run(`buildCityHierarchy(${JSON.stringify(nodes)}, ${JSON.stringify(edges)})`);
+  const project = t.run(`cityLevelView(${JSON.stringify(hierarchy)}, "project")`);
+  const district = t.run(`cityLevelView(${JSON.stringify(hierarchy)}, "district")`);
+  const file = t.run(`cityLevelView(${JSON.stringify(hierarchy)}, "file")`);
+
+  // Facts that are NOT rendering choices must be identical at every level.
+  for (const view of [project, district, file]) {
+    assert.equal(view.stats.unresolvedCalls, 1, 'an unresolved call is a fact at every level');
+    assert.equal(view.stats.declaredFunctions, 5);
+    assert.equal(view.stats.unanalyzedFiles, 0);
+  }
+  // Aggregation is visible, not implied: both files are inside one district, so
+  // at the district level the call between them has no pipe to draw -- and it
+  // is counted rather than dropped.
+  assert.equal(district.stats.internalPairs, 1, 'an intra-district call must be counted, not lost');
+  assert.equal(district.pipes.length, 0, 'there is no pipe between two objects that are one object here');
+  assert.equal(file.stats.resolvedPairs, 1);
+  assert.equal(file.pipes.length, 1);
+  assert.equal(project.stats.internalPairs, 1, 'at the project level every call is internal');
+  assert.equal(project.pipes.length, 0);
+  // The blocks say they are aggregates, and an aggregate has no single source.
+  assert.equal(district.columns[0].aggregate, true);
+  assert.equal(district.columns[0].files, 2);
+  assert.deepEqual(JSON.parse(JSON.stringify(district.columns[0].filePaths)), ['src/a.js', 'src/b.js']);
+  assert.equal(t.run(`citySelectionQuery(${JSON.stringify(district.columns[0])})`), null,
+    'an aggregate must not offer a source read');
+  assert.equal(file.columns[0].aggregate, false);
+  assert.equal(t.run(`citySelectionQuery(${JSON.stringify(file.columns[0])})`).path, 'src/a.js');
+  // And the level line says which of the two happened.
+  const line = t.run(`cityLevelLine(${JSON.stringify(district.stats)}, ${JSON.stringify(district.invariants)})`);
+  assert.match(line, /层级 目录/);
+  assert.match(line, /层级定义，不是渲染预算/, 'a level omission must not read as a budget cut');
+  assert.match(line, /同层内部调用 1/);
+  assert.match(line, /层级聚合守恒/);
+});
+
+check('a level view cannot disagree with the hierarchy it came from', () => {
+  const t = boot();
+  const nodes = [fileNode('src/a.js', 5), fnNode('src/a.js', 'fnA', 0), fileNode('web/c.js', 2),
+    { ...fileNode('src/ignored.js', 9), disposition: 'ignored' }];
+  const hierarchy = t.run(`buildCityHierarchy(${JSON.stringify(nodes)}, [])`);
+  // Break the total so it no longer equals the sum of its parts. An invariant
+  // that cannot fail is not evidence, so this one is made to fail on purpose.
+  const broken = JSON.parse(JSON.stringify(hierarchy));
+  broken.totals.declaredFunctions = broken.totals.declaredFunctions - 1;
+  const check = t.run(`cityLevelInvariants(${JSON.stringify(broken)})`);
+  assert.equal(check.ok, false, 'a wrong aggregation must be reported, not smoothed over');
+  assert.ok(check.violations.some((v) => v.key === 'declaredFunctions'),
+    JSON.stringify(check.violations));
+  // And the same for a fact that only the file level carries.
+  const brokenCalls = JSON.parse(JSON.stringify(hierarchy));
+  brokenCalls.totals.unresolvedCalls = 5;
+  const callCheck = t.run(`cityLevelInvariants(${JSON.stringify(brokenCalls)})`);
+  assert.equal(callCheck.ok, false);
+  assert.ok(callCheck.violations.some((v) => v.key === 'unresolvedCalls'));
+  // A non-captured file is a fact too: it must not be counted as analysed.
+  const invariants = t.run(`cityLevelInvariants(${JSON.stringify(hierarchy)})`);
+  assert.equal(invariants.totals.unanalyzedFiles, 1);
+  assert.equal(invariants.totals.files, 3);
+  assert.equal(invariants.totals.declaredFunctions, 16);
+});
+
+check('a run marker at a coarse level is placed, and named as an aggregate', () => {
+  const t = boot();
+  const nodes = [fileNode('src/a.js', 2), fnNode('src/a.js', 'fnA', 0), fileNode('web/c.js', 1)];
+  const hierarchy = t.run(`buildCityHierarchy(${JSON.stringify(nodes)}, [])`);
+  const district = t.run(`cityLevelView(${JSON.stringify(hierarchy)}, "district")`);
+  const markers = [
+    { path: 'src/a.js', name: 'fnA', verdict: 'returned' },
+    { path: 'src/gone.js', name: 'ghost', verdict: 'refused' },
+  ];
+  const observed = t.run(`cityRunMarkers(${JSON.stringify(markers)}, ${JSON.stringify(district)})`);
+  assert.equal(observed.level, 'district');
+  assert.equal(observed.placed, 1);
+  assert.equal(observed.aggregated, 1, 'the block it landed on stands for more than one file');
+  assert.equal(observed.records[0].path, 'src/a.js', 'the record still names the real file');
+  assert.equal(observed.columns[0].path, 'district:src', 'but it is placed on the aggregate block');
+  assert.deepEqual(JSON.parse(JSON.stringify(observed.unplaced)), ['src/gone.js']);
+  const line = t.run(`cityObservedLine(${JSON.stringify(observed)})`);
+  assert.match(line, /层级 目录/);
+  assert.match(line, /这是聚合，不是“整个目录都跑过”/);
+});
+
+check('a selection at a coarse level names the file and admits the aggregation', () => {
+  const t = boot();
+  // Two files in one district, so the block really is an aggregation rather
+  // than a district that happens to hold a single file.
+  const nodes = [fileNode('src/a.js', 2), fnNode('src/a.js', 'fnA', 0), fileNode('src/b.js', 1)];
+  const hierarchy = t.run(`buildCityHierarchy(${JSON.stringify(nodes)}, [])`);
+  const district = t.run(`cityLevelView(${JSON.stringify(hierarchy)}, "district")`);
+  const pending = { entity_id: 'symbol:src/a.js:0:10', analysis: 'A1' };
+  const target = t.run(`citySelectionTarget(${JSON.stringify(pending)}, "A1", ${JSON.stringify(nodes)}, ${JSON.stringify(district)})`);
+  assert.equal(target.ok, true, JSON.stringify(target));
+  assert.equal(target.path, 'district:src', 'the block that really represents it');
+  assert.equal(target.file_path, 'src/a.js', 'and the file the user actually picked');
+  assert.equal(target.aggregated, true);
+  assert.equal(target.level, 'district');
+  // A stale version is still refused first: level handling must not weaken the
+  // rule that a selection is pinned to an analysis.
+  const stale = t.run(`citySelectionTarget(${JSON.stringify({ ...pending, analysis: 'OLD' })}, "A1", ${JSON.stringify(nodes)}, ${JSON.stringify(district)})`);
+  assert.equal(stale.ok, false);
+  assert.equal(stale.code, 'stale_selection_version');
+  // And an entity that is not in the analysis at all is still refused.
+  const gone = t.run(`citySelectionTarget(${JSON.stringify({ entity_id: 'file:other/z.js', analysis: 'A1' })}, "A1", ${JSON.stringify([fileNode('other/z.js', 1)])}, ${JSON.stringify(district)})`);
+  assert.equal(gone.ok, false);
+  assert.equal(gone.code, 'entity_not_in_layout');
+});
+
+check('a coarse block is drawn, and a one-file district is still that file', () => {
+  const t = boot();
+  const single = [fileNode('src/a.js', 4)];
+  const pair = [fileNode('src/a.js', 4), fileNode('src/b.js', 1)];
+  const oneView = t.run(`cityLevelView(buildCityHierarchy(${JSON.stringify(single)}, []), "district")`);
+  const pairView = t.run(`cityLevelView(buildCityHierarchy(${JSON.stringify(pair)}, []), "district")`);
+  // Drawn solid at every camera distance: a coarse level that vanished when the
+  // camera came near would make the level unusable exactly when it is examined.
+  for (const view of [oneView, pairView]) {
+    const solid = t.run(`cityColumnInstances(${JSON.stringify(view)}, "function", null)`);
+    assert.ok(solid.some((instance) => instance.scale[1] > 2),
+      'the block must keep its height in near view, not collapse to a plinth');
+    assert.equal(view.columns[0].slabDetail, false, 'a coarse block has no layers to expand');
+  }
+  // A district that holds exactly one file *is* that file at this level.
+  assert.equal(oneView.columns[0].aggregate, false);
+  assert.equal(t.run(`citySelectionQuery(${JSON.stringify(oneView.columns[0])})`).entity, 'file:src/a.js',
+    'one file is not an aggregation, so its source stays readable');
+  // Two files are an aggregation, and an aggregation has no single source.
+  assert.equal(pairView.columns[0].aggregate, true);
+  assert.equal(t.run(`citySelectionQuery(${JSON.stringify(pairView.columns[0])})`), null);
+  // The file level always expands: that is what it is for.
+  const fileView = t.run(`cityLevelView(buildCityHierarchy(${JSON.stringify(pair)}, []), "file")`);
+  assert.equal(fileView.columns[0].slabDetail, true);
+});
+
+check('switching level keeps the object, re-derives the markers and never re-anchors', () => {
+  const t = boot();
+  const nodes = [fileNode('src/a.js', 3), fnNode('src/a.js', 'fnA', 0), fileNode('src/b.js', 1)];
+  const markers = [{ path: 'src/a.js', name: 'fnA', verdict: 'returned' }];
+  const state = {
+    hierarchy: t.run(`buildCityHierarchy(${JSON.stringify(nodes)}, [])`),
+    layout: null, selected: 'src/a.js', selectedFile: 'src/a.js',
+    observed: t.run(`cityRunMarkers(${JSON.stringify(markers)}, buildCityLayout(${JSON.stringify(nodes)}, []))`),
+    observedSource: markers,
+  };
+  const toDistrict = t.run(`cityLevelSwitch(${JSON.stringify(state)}, "district")`);
+  assert.equal(toDistrict.ok, true);
+  assert.equal(toDistrict.level, 'district');
+  assert.equal(toDistrict.selected, 'district:src', 'the block that represents the selected file');
+  assert.equal(toDistrict.selectedFile, 'src/a.js', 'the object the user picked is kept');
+  assert.equal(toDistrict.lost, null);
+  assert.equal(toDistrict.observed.placed, 1, 'the marker is re-derived for the new layout');
+  assert.equal(toDistrict.observed.columns[0].path, 'district:src');
+  assert.equal(toDistrict.runPaths.has('district:src'), true, 'the wire colour follows the block');
+
+  // A budget that hides the selected file must drop it and say so, not
+  // highlight some other column.
+  const capped = { ...state, selected: 'src/b.js', selectedFile: 'src/b.js' };
+  const toCapped = t.run(`cityLevelSwitch(${JSON.stringify(capped)}, "file", {maxFiles: 0})`);
+  assert.equal(toCapped.ok, true);
+  assert.equal(toCapped.column, undefined);
+  assert.equal(toCapped.selected, null);
+  assert.equal(toCapped.lost, 'src/b.js', 'the lost object must be named');
+  // And a level switch with no hierarchy at all is refused rather than guessed.
+  const none = t.run(`cityLevelSwitch({ layout: null }, "district")`);
+  assert.equal(none.ok, false);
+  assert.equal(none.code, 'no_layout');
 });
 
 let failed = 0;

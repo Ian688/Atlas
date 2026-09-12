@@ -6,7 +6,7 @@
 
 <section class="connect"><label for="city-token">本地会话令牌</label><input id="city-token" type="password" autocomplete="off" placeholder="从启动命令返回的 session_file 读取"><button id="city-connect">连接</button><span id="city-analysis" class="subtle"></span></section>
 
-<section class="intro"><div><p class="eyebrow">SAME ANALYSIS, A SECOND PROJECTION</p><h1>目录是地块，文件是柱，函数是层。</h1><p class="subtitle">高度来自引擎声明的函数数量，不是视觉缩放。调用候选走地面管道；解析不出来的调用不会消失，它会变成柱边那根琥珀色的矮桩。</p></div></section>
+<section class="intro"><div><p class="eyebrow">SAME ANALYSIS, A SECOND PROJECTION</p><h1>目录是地块，文件是柱，函数是层。</h1><p class="subtitle">高度来自引擎声明的函数数量，不是视觉缩放；同一份事实有三个层级（项目 / 目录 / 文件），切换层级只改变画什么，不改变计数什么。调用候选走地面管道；解析不出来的调用不会消失，它会变成柱边那根琥珀色的矮桩。</p></div></section>
 
 <main class="city-main">
 <section class="city-stage" id="city-stage">
@@ -14,6 +14,10 @@
   <div id="city-selection-note" class="subtle" role="status"></div>
   <div id="city-labels" class="city-labels"></div>
   <div class="city-toolbar">
+    <span class="subtle">层级</span>
+    <button id="city-level-project" aria-pressed="false" title="整个项目聚合为一根柱体（快捷键 1）">项目</button>
+    <button id="city-level-district" aria-pressed="false" title="每个目录一根聚合柱体（快捷键 2）">目录</button>
+    <button id="city-level-file" aria-pressed="true" title="每个文件一根柱体，函数是层（快捷键 3）">文件</button>
     <button id="city-shape">柱体：方柱</button>
     <button id="city-reset">重置视角</button>
     <span id="city-status" role="status">等待连接</span>
@@ -25,8 +29,10 @@
     <span><i class="sw collapsed"></i>未逐层画出的函数</span>
     <span><i class="sw unanalyzed"></i>未分析的文件（忽略/超限/不可读）</span>
     <span><i class="sw pipe"></i>文件之间的调用候选</span>
+    <span><i class="sw collapsed"></i>聚合柱体（层级 &lt; 文件：一个柱体代表多个文件，不是一次运行）</span>
   </div>
   <div class="city-coverage-bar"><span class="subtle">覆盖</span><span id="city-coverage">尚未加载</span></div>
+  <div class="city-coverage-bar"><span class="subtle">层级</span><span id="city-level">尚未加载</span></div>
   <div class="city-coverage-bar"><span class="subtle">观测</span><span id="city-observed">尚未加载</span></div>
 </section>
 
