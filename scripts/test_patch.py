@@ -22,6 +22,7 @@ from pathlib import Path
 import selectors
 import subprocess
 import tempfile
+import time
 import unittest
 import urllib.error
 import urllib.request
@@ -439,6 +440,79 @@ class Queued(Base):
         self.assertEqual(outcome["outcome"], "failed")
         self.assertIn("stored_verify_deadlines_out_of_range", outcome["error"])
         self.assertEqual(self.cli("patch", "status", proposal["id"])["state"], "proposed")
+
+
+class Parallel(Base):
+    """Bounded parallel job execution.
+
+    Two slots must never share a lease -- a lease identifies one runner -- and
+    the bound must be a policy, not a hope. These cases make the overlap
+    visible rather than inferred: a declared test sleeps long enough that
+    polling the queue catches two jobs running at once.
+    """
+
+    SLEEP = '["node","-e","setTimeout(() => {}, 1200)"]'
+
+    def proposal_with_slow_test(self, marker):
+        diff = self.diff_file(f"p-{marker}.patch", (
+            "--- a/src/math.js\n+++ b/src/math.js\n@@ -1,1 +1,1 @@\n"
+            "-export function add(left, right) { return left + right; }\n"
+            f"+export function add(left, right) {{ return left + right + {marker}; }}\n"
+        ))
+        return self.cli("patch", "propose", self.analysis, "add", "--diff", diff)["proposal"]
+
+    def running_holders(self):
+        rows = self.cli("job", "list", "--state", "running")
+        return [row["lease_holder"] for row in rows]
+
+    def test_parallel_slots_overlap_and_never_share_a_lease(self):
+        for index in range(3):
+            proposal = self.proposal_with_slow_test(index)
+            self.cli("patch", "verify", proposal["id"], "--enqueue",
+                     "--owner", "owner-1", "--request-key", f"slow-{index}",
+                     "--test-argv", self.SLEEP)
+        worker = subprocess.Popen(
+            [str(BIN), "--store", str(self.store), "job", "work", "--parallel", "3"],
+            cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        observed = []
+        deadline = time.time() + 60
+        while worker.poll() is None and time.time() < deadline:
+            holders = self.running_holders()
+            if holders:
+                observed.append(holders)
+            time.sleep(0.1)
+        stdout, stderr = worker.communicate(timeout=60)
+        self.assertEqual(worker.returncode, 0, stderr)
+        summary = json.loads(stdout)
+        self.assertEqual(summary["ran"], 3)
+        self.assertEqual(summary["parallelism"], 3)
+        self.assertGreaterEqual(
+            max((len(holders) for holders in observed), default=0), 2,
+            f"no two jobs were ever running at once: {observed}",
+        )
+        # Every slot claimed under its own holder id, and no holder was reused.
+        self.assertEqual(len(summary["holders"]), 3)
+        self.assertEqual(len(set(summary["holders"])), 3, summary["holders"])
+        self.assertEqual(sorted(outcome["outcome"] for outcome in summary["outcomes"]),
+                         ["completed", "completed", "completed"])
+        states = {row["state"] for row in self.cli("job", "list")}
+        self.assertEqual(states, {"completed"}, "every job must reach one terminal state")
+
+    def test_the_bound_is_enforced_and_one_shot_with_parallelism_is_refused(self):
+        for parallel in ("0", "5", "99"):
+            result = subprocess.run(
+                [str(BIN), "--store", str(self.store), "job", "work", "--parallel", parallel],
+                cwd=ROOT, capture_output=True, text=True, timeout=60,
+            )
+            self.assertNotEqual(result.returncode, 0, f"--parallel {parallel} was accepted")
+            self.assertIn("job_parallelism_out_of_range", result.stderr)
+        result = subprocess.run(
+            [str(BIN), "--store", str(self.store), "job", "work", "--once", "--parallel", "2"],
+            cwd=ROOT, capture_output=True, text=True, timeout=60,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("job_once_with_parallelism", result.stderr)
 
 
 class Http(Base):

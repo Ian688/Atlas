@@ -17,7 +17,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::Duration,
 };
@@ -449,6 +449,11 @@ enum JobAction {
         /// Claim and run at most one job, then stop.
         #[arg(long)]
         once: bool,
+        /// How many jobs this process runs at once. Each slot claims under its
+        /// own holder id, so two slots can never share a lease. Bounded on
+        /// purpose: there is no unbounded fan-out.
+        #[arg(long, default_value_t = 1)]
+        parallel: usize,
         #[arg(long, default_value_t = 60)]
         lease_seconds: u64,
         /// Stop after this many jobs; 0 means "until the queue is empty".
@@ -935,6 +940,121 @@ fn claimed_kind(row: &job::Job) -> Result<Claimed, Box<dyn std::error::Error>> {
 /// Returns the outcome object and whether the job itself succeeded. The outer
 /// error is reserved for failures of the job store, which are a different kind
 /// of problem from the job failing.
+/// How many jobs one process may run at once. A bound, not a measurement.
+const MAX_JOB_PARALLELISM: usize = 4;
+
+/// Run up to `parallel` jobs at once, until the queue is empty or `max` jobs
+/// have been attempted.
+///
+/// Every slot claims under its **own** holder id: a lease identifies a single
+/// runner, so two slots sharing one would make "who is running this" false and
+/// would let one slot's heartbeat keep the other's lease alive. The store's
+/// writer is serialised (see `Store`), so the slots contend for the database
+/// rather than corrupt it.
+async fn work_in_parallel(
+    store: &Store,
+    lease_ms: i64,
+    max: usize,
+    parallel: usize,
+) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    let outcomes: Arc<tokio::sync::Mutex<Vec<serde_json::Value>>> =
+        Arc::new(tokio::sync::Mutex::new(Vec::new()));
+    let claimed_total = Arc::new(AtomicUsize::new(0));
+    let holders: Arc<tokio::sync::Mutex<Vec<String>>> =
+        Arc::new(tokio::sync::Mutex::new(Vec::new()));
+    let mut slots = Vec::new();
+    for slot in 0..parallel {
+        let store = store.clone();
+        let outcomes = outcomes.clone();
+        let claimed_total = claimed_total.clone();
+        let holders = holders.clone();
+        slots.push(tokio::spawn(async move {
+            loop {
+                // The cap is checked and taken in one step, so two slots cannot
+                // both observe room for the last allowed job.
+                if max > 0 && claimed_total.fetch_add(1, Ordering::SeqCst) >= max {
+                    claimed_total.fetch_sub(1, Ordering::SeqCst);
+                    break;
+                }
+                let holder = format!("{}-slot{slot}", new_holder());
+                let row = match store.claim_next(&holder, lease_ms) {
+                    Ok(Some(row)) => row,
+                    Ok(None) => {
+                        if max > 0 {
+                            claimed_total.fetch_sub(1, Ordering::SeqCst);
+                        }
+                        break;
+                    }
+                    Err(error) => {
+                        // `error` is not Send, so it must not be held across the
+                        // await below; the message is what the record needs.
+                        let message = error.to_string();
+                        outcomes.lock().await.push(serde_json::json!({
+                            "outcome": "failed", "error": message, "slot": slot,
+                        }));
+                        break;
+                    }
+                };
+                holders.lock().await.push(holder.clone());
+                // The stored-spec error is not `Send`; converting it here keeps
+                // it out of the awaited part of the slot's future.
+                let claimed = match claimed_kind(&row).map_err(|error| error.to_string()) {
+                    Ok(claimed) => claimed,
+                    Err(message) => {
+                        let recorded = store.finish_job(
+                            &row.id,
+                            &holder,
+                            STATE_FAILED,
+                            Some("job_options_unusable"),
+                            None,
+                        )?;
+                        outcomes.lock().await.push(serde_json::json!({
+                            "outcome": "failed", "recorded": recorded,
+                            "job": store.job(&row.id)?, "error": message, "slot": slot,
+                        }));
+                        continue;
+                    }
+                };
+                let outcome = match run_claimed_job(&store, &row, &claimed, lease_ms, &holder).await
+                {
+                    Ok((outcome, _succeeded)) => outcome,
+                    Err(error) => {
+                        let message = error.to_string();
+                        serde_json::json!({
+                            "outcome": "failed",
+                            "job": store.job(&row.id)?,
+                            "error": message,
+                            "slot": slot,
+                        })
+                    }
+                };
+                outcomes.lock().await.push(outcome);
+            }
+            Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
+        }));
+    }
+    for slot in slots {
+        // A slot that died takes its job down with it; the lease expires and
+        // `job reap` returns it to the queue, so the failure is reported rather
+        // than hidden.
+        if let Err(error) = slot.await {
+            outcomes.lock().await.push(serde_json::json!({
+                "outcome": "failed", "error": format!("job_slot_task_failed:{error}"),
+            }));
+        }
+    }
+    let outcomes = outcomes.lock().await.clone();
+    Ok(serde_json::json!({
+        "ran": outcomes.len(),
+        "parallelism": parallel,
+        // The distinct holders are the evidence that the slots really claimed
+        // separately, rather than one slot doing everything.
+        "holders": holders.lock().await.clone(),
+        "max_parallelism": MAX_JOB_PARALLELISM,
+        "outcomes": outcomes,
+    }))
+}
+
 async fn run_claimed_job(
     store: &Store,
     job: &job::Job,
@@ -1272,11 +1392,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 once,
                 lease_seconds,
                 max,
+                parallel,
             } => {
                 if !(5..=3600).contains(&lease_seconds) {
                     return Err("lease must be 5..3600 seconds".into());
                 }
+                if !(1..=MAX_JOB_PARALLELISM).contains(&parallel) {
+                    return Err(
+                        format!("job_parallelism_out_of_range:1..={MAX_JOB_PARALLELISM}").into(),
+                    );
+                }
+                if once && parallel > 1 {
+                    // "one job, then stop" and "N at once" are different
+                    // requests; running them together would silently pick one.
+                    return Err("job_once_with_parallelism".into());
+                }
                 let lease_ms = (lease_seconds as i64) * 1000;
+                if parallel > 1 {
+                    print(work_in_parallel(&store, lease_ms, max, parallel).await?)?;
+                    return Ok(());
+                }
                 let mut outcomes = Vec::new();
                 loop {
                     if max > 0 && outcomes.len() >= max {

@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-http-writes",
+    "window": "2026-09-12/w06-bounded-parallel-jobs",
     "status": "DELIVERED",
-    "note": "图形化一键撤销：写路径由 serve --allow-writes <DIR> 显式开启，只有那一个目录、必须回显路径、请求不能指定目录；HTTP 与 CLI 共用同一段写入代码并记录 actor。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-http-writes",
-    "verification": "evidence/development/2026-09-12-w09-http-writes/verification.json"
+    "note": "有界并行作业执行：job work --parallel N（1..=4），每槽位独立租约 holder，越界与 --once 组合具名拒绝，输出给出实际 holders。",
+    "evidence_dir": "evidence/development/2026-09-12-w06-bounded-parallel-jobs",
+    "verification": "evidence/development/2026-09-12-w06-bounded-parallel-jobs/verification.json"
   },
   "windows": [
     {
@@ -373,10 +373,19 @@
       ],
       "note": "页面可以一键 apply/revert，但仍然只有一个由操作者显式打开的目录：serve --allow-writes <DIR>（默认关闭，403 http_writes_disabled）；目录启动时 canonicalize，请求体没有 target/root 字段、注入了也不读；confirm_path 必须逐字相同（400 confirmation_mismatch，且不写任何文件）；revert 只撤销记录里那个目录；写入与 CLI 共用同一实现并把 actor（HTTP 为会话身份）写进 terminal_reason；契约新增 writes 段供页面判断是否显示按钮。patch 用例 31→37（新增 HttpWrites 5 条 + Http 1 条），web 31→32。",
       "report": "evidence/development/2026-09-12-w09-http-writes/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/w06-bounded-parallel-jobs",
+      "status": "DELIVERED",
+      "work_items": [
+        "W06-bounded-parallelism"
+      ],
+      "note": "job work --parallel N：每槽位自己的 holder（租约不共用），上限 1..=4 是策略；越界与 --once 组合具名拒绝；输出 parallelism/holders 作为证据；用例用 1.2 秒的声明测试让重叠可见（观察到 >=2 个 running 与 3 个不同 holder），顺序模式从不重叠。patch 用例 37->39。",
+      "report": "evidence/development/2026-09-12-w06-bounded-parallel-jobs/REPORT.md"
     }
   ],
-  "next_work_item": "并发下一步（大仓库/monorepo、多语言、Windows、并发度上限与有界并行）或 2D 画布的正式层级与空间索引",
-  "next_action": "本轮交付图形化一键撤销（显式写边界）：单目录 + 路径回显 + 请求不能指定目录 + 与 CLI 共用写入实现 + 记录 actor。剩余按价值：(1) 并发的下一步：大仓库/monorepo、多语言、Windows、并发度上限与有界并行策略；(2) 2D 画布的正式层级与空间索引；(3) apply 的备份/合并/文件锁；(4) 城市里的运行激活路径需要行级/调用级采样。",
+  "next_work_item": "2D 画布的正式层级与空间索引；或 apply 的备份/合并/文件锁",
+  "next_action": "本轮交付有界并行作业执行（W06）：--parallel 1..=4、每槽位独立租约、越界具名拒绝、输出给出实际 holders、重叠有可见证据。剩余按价值：(1) 2D 画布的正式层级与空间索引；(2) apply 的备份/合并/文件锁；(3) 大仓库/monorepo、多语言、Windows 的并发资格；(4) 城市运行激活路径需要行级/调用级采样。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
@@ -640,7 +649,8 @@
         "加列迁移：priority/options 以纯增量方式补齐旧库，且依赖新列的索引在迁移之后创建（此前索引先于加列执行会让旧库直接开不了）",
         "请求身份收进 JobRequest：5 个同类型字符串不再靠参数位置区分 owner 与 project",
         "队列按 kind 分派：jobs.kind（index|patch_verify，增量加列默认 index）；job work 依据行自身 kind 选择执行路径，两种作业共用身份三元组/优先级/租约/心跳/收割；一行无法自述怎么跑时判失败而不是用本 worker 默认参数顶替",
-        "HTTP 上 owner 由服务端按会话钉定（请求类型里没有 owner 字段），页面无法以他人名义入队；CLI 的 --owner 仍是本机操作者的自我声明"
+        "HTTP 上 owner 由服务端按会话钉定（请求类型里没有 owner 字段），页面无法以他人名义入队；CLI 的 --owner 仍是本机操作者的自我声明",
+        "有界并行执行：job work --parallel N（1..=4，默认 1），每个槽位独立 holder（<pid>-<uuid>-slotN）领取租约；上限是策略（越界 job_parallelism_out_of_range、--once 与并行组合 job_once_with_parallelism）；输出含 parallelism 与 holders 作为并行证据；槽位任务失败以 job_slot_task_failed 报出，租约过期由 job reap 收回"
       ],
       "evidence": [
         "crates/atlas-engine/src/scan.rs deadline + tests",
