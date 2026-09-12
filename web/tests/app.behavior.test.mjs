@@ -506,10 +506,17 @@ check('a nested closure is offered only through its real enclosing function', as
       symbol: 'symbol:a.js:40:80', path: 'a.js', name: 'makeCounter',
       source_binding: { path: 'a.js', blob: 'c'.repeat(64), start: 40, end: 80, bytes_verified: true },
       decision: { allowed: true, refusal: null },
+      chain: ['symbol:a.js:40:80'], chain_length: 1, ancestors: [],
       stage_report: {
-        stage: 'enclosing', export_name: 'makeCounter', matched_by: 'source_identity',
+        stage: 'enclosing', stage_count: 1, failed_stage: null,
+        export_name: 'makeCounter', matched_by: 'source_identity',
         awaited: false, thrown: null, value: { kind: 'function', name: 'increment' },
         closure: { matched_by: 'source_identity', name: 'increment', observed_source: 'function increment(step) {}' },
+        stages: [{
+          stage: 'enclosing', index: 0, name: 'increment', args: [100],
+          awaited: false, thrown: null, value: { kind: 'function', name: 'increment' },
+          closure: { matched_by: 'source_identity', name: 'increment', expected: 'increment', observed_source: 'function increment(step) {}' },
+        }],
       },
     },
   });
@@ -534,8 +541,77 @@ check('a nested closure is offered only through its real enclosing function', as
   assert.deepEqual(body.args, [5], 'the closure keeps its own arguments');
 
   const shown = t.el('exec-body').textContent;
-  assert.match(shown, /阶段 1 包含函数 makeCounter/, 'the enclosing stage must be shown, not hidden');
-  assert.match(shown, /源码同一性 source_identity/, 'the closure instance must be shown as identity-checked');
+  assert.match(shown, /阶段 1 调用 increment/, 'the enclosing stage must be shown, not hidden');
+  assert.match(shown, /下一级源码同一性 source_identity/, 'the closure instance must be shown as identity-checked');
+});
+
+check('a closure nested three levels deep discovers its ancestors and posts the chain', async () => {
+  const t = boot(routeBase());
+  const enclosing = 'symbol:a.js:40:80';
+  const ancestor = 'symbol:a.js:90:140';
+  t.routes.profile = profile({
+    classification: 'needs_context', runnable: false,
+    unsatisfiable_context: ['captures'], captures: ['base'],
+    enclosing_symbol: enclosing, reasons: [],
+  });
+  // The walk asks the analysis for each ancestor in turn: the enclosing
+  // function's own profile names the next one up.
+  t.routes.profile = (params) => {
+    if (params.entity === ancestor) {
+      return profile({ symbol: ancestor, classification: 'pure_callable', runnable: true, enclosing_symbol: null });
+    }
+    if (params.entity === enclosing) {
+      return profile({ symbol: enclosing, classification: 'pure_callable', runnable: true, enclosing_symbol: ancestor });
+    }
+    return profile({ classification: 'needs_context', runnable: false,
+      unsatisfiable_context: ['captures'], captures: ['base'], enclosing_symbol: enclosing, reasons: [] });
+  };
+  t.routes.exec = record({
+    via: {
+      symbol: enclosing, path: 'a.js', name: 'middle',
+      chain: [ancestor, enclosing], chain_length: 2,
+      ancestors: [{ symbol: ancestor, path: 'a.js', name: 'outer',
+        source_binding: { path: 'a.js', blob: 'd'.repeat(64), start: 90, end: 140, bytes_verified: true },
+        decision: { allowed: true, refusal: null } }],
+      source_binding: { path: 'a.js', blob: 'c'.repeat(64), start: 40, end: 80, bytes_verified: true },
+      decision: { allowed: true, refusal: null },
+      stage_report: {
+        stage: 'enclosing', stage_count: 2, failed_stage: null,
+        stages: [
+          { index: 0, name: 'middle', value: { kind: 'function', name: 'middle' },
+            closure: { matched_by: 'source_identity', name: 'middle', observed_source: 'function middle() {}' } },
+          { index: 1, name: 'inner', value: { kind: 'function', name: 'inner' },
+            closure: { matched_by: 'source_identity', name: 'inner', observed_source: 'function inner(x) {}' } },
+        ],
+        value: { kind: 'function', name: 'inner' }, thrown: null, awaited: false,
+      },
+    },
+  });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  // The chain is discovered, not typed: the field is pre-filled with the
+  // ancestors above the enclosing function, outermost first.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(t.el('exec-via-chain').value, JSON.stringify([{ symbol: ancestor, args: [] }]),
+    'the ancestor chain must come from the published profiles');
+  const shownBefore = t.el('exec-body').textContent;
+  assert.match(shownBefore, /嵌了 2 层/, 'the panel must say how deep the nesting is');
+  assert.equal(t.el('exec-via-enable').checked, true, 'the only possible path is pre-selected');
+
+  t.el('exec-args').value = '[3]';
+  t.el('exec-via-args').value = '[]';
+  await t.run('runControlled()');
+  const posted = t.requests.filter((r) => r.name === 'exec');
+  assert.equal(posted.length, 1);
+  const body = JSON.parse(posted[0].body);
+  assert.deepEqual(body.via, { symbol: enclosing, args: [] });
+  assert.deepEqual(body.via_chain, [{ symbol: ancestor, args: [] }],
+    'the ancestors are posted outermost first, with their own arguments');
+  const shown = t.el('exec-body').textContent;
+  assert.match(shown, /祖先链（由外到内）outer → middle/, 'every ancestor must be shown, not just the nearest one');
+  assert.match(shown, /阶段 2 调用 inner/, 'each stage is reported separately');
+  assert.match(shown, /下一级源码同一性 source_identity/, 'each link is shown as identity-checked');
 });
 
 check('an unmatched closure instance is shown as an observation, not as the target', async () => {

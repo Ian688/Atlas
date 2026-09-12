@@ -651,6 +651,10 @@ struct ExecRequest {
     /// unstated, exactly like the target's.
     #[serde(default)]
     via: Option<ViaRequest>,
+    /// Ancestors above `via`, outermost first, for a closure nested more than
+    /// one level deep. Each is resolved inside this analysis too.
+    #[serde(default)]
+    via_chain: Option<Vec<ViaRequest>>,
 }
 
 #[derive(serde::Deserialize)]
@@ -694,6 +698,32 @@ async fn exec(
             .is_some_and(|names| names.iter().any(|name| name == "unknown_calls")),
     };
     let plan_only = request.plan;
+    // Ancestors above the enclosing function, outermost first. Same rule as
+    // `via`: the page names symbols, the analysis decides whether they are a
+    // chain, and a receiver stays unstated.
+    let via_chain = match request.via_chain {
+        Some(chain) => {
+            let mut resolved = Vec::new();
+            for stage in chain.into_iter().take(atlas_engine::exec::MAX_VIA_CHAIN) {
+                match crate::runner::resolve_symbol(&app.store, &app.analysis, &stage.symbol) {
+                    Ok(symbol) => resolved.push(atlas_engine::exec::ViaSpec {
+                        symbol,
+                        args: stage.args.into_iter().take(64).collect(),
+                        this_arg: None,
+                    }),
+                    Err(error) => {
+                        return (
+                            StatusCode::BAD_REQUEST,
+                            axum::Json(serde_json::json!({"error": error})),
+                        )
+                            .into_response();
+                    }
+                }
+            }
+            resolved
+        }
+        None => Vec::new(),
+    };
     let via = match request.via {
         Some(via) => match crate::runner::resolve_symbol(&app.store, &app.analysis, &via.symbol) {
             Ok(symbol) => Some(atlas_engine::exec::ViaSpec {
@@ -734,6 +764,7 @@ async fn exec(
         // is a decision for whoever can see the record, not for a page that
         // states inputs for someone else's function.
         materialise: None,
+        via_chain,
     };
     let store = app.store.clone();
     let outcome = tokio::spawn(async move {

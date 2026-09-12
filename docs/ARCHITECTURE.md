@@ -119,8 +119,9 @@ worker stdin ≤160 MiB、stdout ≤32 MiB、stderr ≤64 KiB，V8 old-space 为
 **嵌套函数：闭包实例只能被真实产生，不能被声明（`--via`）**。嵌套函数捕获的外层绑定不是可声明的值——它只在包含它的那个函数运行期间存在。Atlas 因此既不构造作用域、也不接受任何"函数值"输入，而是提供一条唯一的入口：`--via <enclosing-symbol>`。画像给出 `enclosing_symbol`（以及给人读的 `enclosing_name`）与 `captures`（捕获绑定的名字，来自 `Capture(<binding id>)` 与已发布的 `binding_names`）。
 
 - `--via` 必须**恰好等于**目标的真实包含符号；给别的符号一律拒绝（`via_not_the_enclosing_symbol`），因为"某个大概会返回相似函数的符号"不是同一个作用域。
-- 运行分两阶段，记录里按顺序各有一条 `call` 事件（`stage: enclosing` / `stage: target`）。阶段 1 调包含函数（它自己的 `--via-args` / `--via-this`）；阶段 2 只调用返回值的 `Function.toString()` 与目标符号钉住字节**源码同一性**匹配的那个函数，匹配不上就是 `closure_identity_mismatch`（同时保留观测到的源码）。返回的不是函数则是 `closure_not_returned`：包含函数确实跑了，它的返回值原样保留，但目标没有被调用。两者都是**观测**，不是失败的调用。
-- 只支持一层。包含函数自身也是嵌套的时静态拒绝（`closure_depth_not_supported`，并具名下一层），而不是在命名空间里找不到才失败。
+- 运行是"每个祖先一次调用 + 最后调用目标"，记录里按顺序各有一条 `call` 事件（`stage: enclosing` + `stage_index`，最后是 `stage: target`）。**每一环都用同一把尺子量**：该环返回值必须是函数，且 `Function.toString()` 与**下一环符号**的钉住字节做**源码同一性**匹配；最后一环必须匹配目标。任何一环返回的不是函数是 `closure_not_returned`，返回的是别的函数是 `closure_identity_mismatch`，两者都保留该环观测到的返回值与源码并记录 `failed_stage`：链条不会被"只信最后一跳"地简化。记录里 `stage_report.stages[]` 保留每一环，`stage_report` 是产出目标实例的那一环，`ancestors[]` 是它之上的祖先（一层深的闭包为 `[]`，所以旧记录读起来完全一样），`chain` 给出完整符号序列。
+- **多层嵌套用 `--via-chain`**：`--via` 永远表示"目标的包含函数"，`--via-chain` 是**它之上**的祖先（由外到内，JSON 数组 `[{"symbol","args"}]`）。调用顺序是 `via_chain… → via → 目标`。链不是被信任的：每一环都必须满足"其包含函数就是上一环"，最外一环必须是顶层（只有顶层才可能出现在模块命名空间里），任一不满足即**请求本身不成立**（`via_chain_not_connected` / `via_chain_not_rooted`，命令失败而不是发布一条拒绝记录）；`--via-chain` 给了而 `--via` 没给是 `via_chain_without_via`；深度上限 8（每一环都是一次真实调用，无上限就是无界运行）。
+- 只给 `--via` 而包含函数自身也是嵌套的：静态拒绝 `closure_depth_not_supported`，并**具名下一层**告诉你该往 `--via-chain` 里加什么，而不是让运行死在命名空间查找上。
 - 包含函数的字节同样从内容寻址 blob 读取并重新哈希校验（`via.source_binding`），因此两阶段的源码绑定都是构造性的。
 - 拒绝时不会启动进程：`context_required` 的 detail 会点出捕获的绑定名与应当使用的 `--via` 符号。
 

@@ -138,6 +138,13 @@ export function outerFactory(start) {
     return function inner(x) { return base + x; };
   };
 }
+
+export function outerPair(pick) {
+  const base = 20;
+  function midA() { return function leafA(x) { return base + x; }; }
+  function midB() { return function leafB(x) { return base - x; }; }
+  return pick ? midA : midB;
+}
 """
 
 
@@ -757,6 +764,87 @@ class Execution(unittest.TestCase):
         self.assertEqual(middle["verdict"], "returned", middle.get("thrown"))
         self.assertEqual(middle["value"], {"kind": "function", "name": "inner"},
                          "the value is the function `middle` returned, reported as a value")
+
+    def test_a_chain_deeper_than_one_level_runs_when_the_ancestors_are_named(self):
+        # inner < middle < outerFactory: three levels. The value proves the scope
+        # came from the outermost call (base=4), so this is not just "some
+        # function was called".
+        record = self.cli(
+            "exec", self.analysis, "src/closures.js:inner", "--args", "[3]",
+            "--allow-effects", GRANTS,
+            "--via", "src/closures.js:middle",
+            "--via-chain", json.dumps([{"symbol": "src/closures.js:outerFactory", "args": [4]}]),
+        )
+        self.assertEqual(record["verdict"], "returned", record.get("thrown"))
+        self.assertEqual(decode(record["value"]), 7, "outerFactory(4) -> base 4, inner(3) = 7")
+        via = record["via"]
+        self.assertEqual(via["chain_length"], 2)
+        self.assertEqual(len(via["chain"]), 2)
+        self.assertEqual(via["name"], "middle", "the top-level fields still describe the nearest enclosing function")
+        self.assertEqual([ancestor["name"] for ancestor in via["ancestors"]], ["outerFactory"])
+        self.assertEqual([stage["name"] for stage in via["stage_report"]["stages"]], ["middle", "inner"],
+                         "each stage names the symbol it must produce")
+        for stage in via["stage_report"]["stages"]:
+            self.assertEqual(stage["closure"]["matched_by"], "source_identity",
+                             f"stage {stage['index']} was not verified by source")
+        self.assertIsNone(via["stage_report"]["failed_stage"])
+        # Every link is bound to its own re-hashed bytes, not just the last one.
+        for stage in [via] + via["ancestors"]:
+            self.assertTrue(stage["source_binding"]["bytes_verified"])
+        stages = [event.get("stage_index") for event in record["trace"]["events"] if event["kind"] == "call"]
+        self.assertEqual(stages, [0, 1, None], "one call event per ancestor, then the target")
+
+    def test_a_chain_that_returns_the_wrong_function_fails_at_that_stage(self):
+        # outerPair(false) returns midB; the chain asks for midA. Accepting it by
+        # name or position would run a different closure from a nearby scope.
+        target = "src/closures.js:leafA"
+        profile = self.profile(target)
+        self.assertEqual(profile["enclosing_symbol"], self.profile("src/closures.js:midA")["symbol"])
+        mismatch = self.cli(
+            "exec", self.analysis, target, "--args", "[1]", "--allow-effects", GRANTS,
+            "--via", "src/closures.js:midA",
+            "--via-chain", json.dumps([{"symbol": "src/closures.js:outerPair", "args": [False]}]),
+        )
+        self.assertEqual(mismatch["verdict"], "closure_identity_mismatch")
+        self.assertIsNone(mismatch["value"], "the target was never called, so there is no target value")
+        stage_report = mismatch["via"]["stage_report"]
+        self.assertEqual(stage_report["stage_count"], 2)
+        self.assertEqual(stage_report["failed_stage"], 0)
+        self.assertIsNone(stage_report["stages"][0]["closure"]["matched_by"])
+        self.assertIn("midB", stage_report["stages"][0]["closure"]["observed_source"])
+        # The same chain with the pick that really does produce midA runs, so the
+        # refusal is about identity and not about the chain being unrunnable.
+        matching = self.cli(
+            "exec", self.analysis, target, "--args", "[1]", "--allow-effects", GRANTS,
+            "--via", "src/closures.js:midA",
+            "--via-chain", json.dumps([{"symbol": "src/closures.js:outerPair", "args": [True]}]),
+        )
+        self.assertEqual(matching["verdict"], "returned", matching.get("thrown"))
+        self.assertEqual(decode(matching["value"]), 21, "base 20 + 1")
+
+    def test_a_chain_that_is_not_a_containment_path_is_rejected(self):
+        # makeCounter is top-level, but it does not enclose middle, so the chain
+        # is not a path in the containment graph. This is a malformed request,
+        # not a decision about the analysis, so the command fails.
+        result = subprocess.run(
+            [str(BIN), "--store", str(self.store), "exec", self.analysis,
+             "src/closures.js:inner", "--args", "[1]", "--allow-effects", GRANTS,
+             "--via", "src/closures.js:middle",
+             "--via-chain", json.dumps([{"symbol": "src/closures.js:makeCounter", "args": [1]}])],
+            cwd=ROOT, capture_output=True, text=True, timeout=120,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("via_chain_not_connected", result.stderr)
+
+    def test_ancestors_without_the_enclosing_function_are_rejected(self):
+        result = subprocess.run(
+            [str(BIN), "--store", str(self.store), "exec", self.analysis,
+             "src/closures.js:inner", "--args", "[1]", "--allow-effects", GRANTS,
+             "--via-chain", json.dumps([{"symbol": "src/closures.js:outerFactory", "args": [1]}])],
+            cwd=ROOT, capture_output=True, text=True, timeout=120,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("via_chain_without_via", result.stderr)
 
     def test_the_plan_for_a_via_run_names_both_stages(self):
         plan = self.cli("exec", self.analysis, "src/closures.js:increment",

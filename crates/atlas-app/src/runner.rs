@@ -365,64 +365,6 @@ struct ViaPinned {
     source: String,
 }
 
-fn load_via(
-    store: &Store,
-    spec: &RunSpec,
-    snapshot: &Snapshot,
-) -> Result<Option<ViaPinned>, String> {
-    let Some(via) = &spec.via else {
-        return Ok(None);
-    };
-    let node = store
-        .node(&spec.analysis_id, &via.symbol)
-        .map_err(|e| format!("via_symbol_not_found:{e}"))?;
-    if node.kind != "function" {
-        return Err("via_symbol_is_not_a_function".into());
-    }
-    let blob = snapshot
-        .entries
-        .iter()
-        .find(|entry| entry.path == node.path)
-        .and_then(|entry| entry.blob.clone())
-        .ok_or("target_source_missing")?;
-    let fact = store
-        .flow_fact(&spec.analysis_id, &via.symbol)
-        .map_err(|e| format!("flow_fact_not_found:{e}"))?;
-    let enclosing = enclosing_of(node.parent.as_deref());
-    let mut profile = exec::profile(
-        &spec.analysis_id,
-        &via.symbol,
-        &node.path,
-        &node.name,
-        &fact,
-        enclosing.as_deref(),
-    );
-    profile.enclosing_name = enclosing_name(store, &spec.analysis_id, enclosing.as_deref());
-    // The enclosing call is described by the same spec with the enclosing
-    // symbol and arguments, and with its own `via` cleared: one level of
-    // nesting is what this slice supports, and a deeper one is refused by the
-    // enclosing profile rather than silently attempted.
-    let mut via_spec = spec.clone();
-    via_spec.symbol = via.symbol.clone();
-    via_spec.args = via.args.clone();
-    via_spec.this_arg = via.this_arg.clone();
-    via_spec.via = None;
-    let decision = exec::decide(&profile, &via_spec);
-    let source = exec::source_slice(store, snapshot, &node.path, node.start, node.end)
-        .map_err(|e| format!("via_source_unavailable:{e}"))?;
-    Ok(Some(ViaPinned {
-        symbol: via.symbol.clone(),
-        path: node.path,
-        name: node.name,
-        start: node.start,
-        end: node.end,
-        blob,
-        profile,
-        decision,
-        source,
-    }))
-}
-
 /// The declared `engines.node` of the project under test, read from the pinned
 /// snapshot. Atlas records it and refuses to pretend it evaluated it.
 fn declared_node_range(store: &Store, snapshot: &Snapshot) -> Option<String> {
@@ -535,30 +477,65 @@ pub fn plan(store: &Store, spec: &RunSpec) -> Result<Value, String> {
     let spec_digest = spec.digest().map_err(|e| e.to_string())?;
     let pinned = load_pinned(store, spec)?;
     let decision = exec::decide(&pinned.profile, spec);
-    // A `via` plan names the enclosing call and its own decision, so a caller
-    // sees both stages refused or allowed before a process exists.
-    let via_pinned = load_via(store, spec, &pinned.snapshot)?;
+    // A `via` plan names every call in the chain and its own decision, so a
+    // caller sees all of them refused or allowed before a process exists.
+    let via_pinned = load_via_chain(store, spec, &pinned.snapshot)?;
     let via = match &via_pinned {
-        Some(via) => json!({
-            "symbol": via.symbol,
-            "path": via.path,
-            "name": via.name,
-            "source_binding": json!({
-                "path": via.path,
-                "blob": via.blob,
-                "start": via.start,
-                "end": via.end,
-            }),
-            "profile": via.profile,
-            "decision": via.decision,
-        }),
+        Some(stages) => {
+            let describe = |stage: &ViaStagePinned| {
+                json!({
+                    "symbol": stage.pinned.symbol,
+                    "path": stage.pinned.path,
+                    "name": stage.pinned.name,
+                    "args": stage.args,
+                    "source_binding": json!({
+                        "path": stage.pinned.path,
+                        "blob": stage.pinned.blob,
+                        "start": stage.pinned.start,
+                        "end": stage.pinned.end,
+                    }),
+                    "profile": stage.pinned.profile,
+                    "decision": stage.pinned.decision,
+                })
+            };
+            let last = stages.last().expect("a chain always has a last stage");
+            json!({
+                "symbol": last.pinned.symbol,
+                "path": last.pinned.path,
+                "name": last.pinned.name,
+                "args": last.args,
+                "source_binding": json!({
+                    "path": last.pinned.path,
+                    "blob": last.pinned.blob,
+                    "start": last.pinned.start,
+                    "end": last.pinned.end,
+                }),
+                "profile": last.pinned.profile,
+                "decision": last.pinned.decision,
+                "chain": stages.iter().map(|stage| stage.pinned.symbol.clone()).collect::<Vec<_>>(),
+                "ancestors": stages[..stages.len() - 1].iter().map(describe).collect::<Vec<_>>(),
+            })
+        }
         None => Value::Null,
     };
     // The enclosing stage is planned on its own profile, and a chain deeper
     // than one level is refused here rather than by a confusing namespace miss.
+    // The plan refuses for the same reasons the run would, and names the stage:
+    // the first stage that cannot run, or an incomplete chain at its last link.
     let via_reason: Option<exec::Reason> = match &via_pinned {
-        Some(enclosing) if !enclosing.decision.allowed => enclosing.decision.refusal.clone(),
-        Some(enclosing) => via_depth_refusal(store, &spec.analysis_id, enclosing),
+        Some(stages) => stages
+            .iter()
+            .find(|stage| !stage.pinned.decision.allowed)
+            .and_then(|stage| stage.pinned.decision.refusal.clone())
+            .or_else(|| {
+                if spec.via_chain.is_empty() {
+                    stages.last().and_then(|stage| {
+                        via_depth_refusal(store, &spec.analysis_id, &stage.pinned)
+                    })
+                } else {
+                    None
+                }
+            }),
         None => None,
     };
     let via_ok = via_reason.is_none();
@@ -579,10 +556,143 @@ pub fn plan(store: &Store, spec: &RunSpec) -> Result<Value, String> {
     }))
 }
 
-/// A `via` chain one level deep is what this slice supports. An enclosing
-/// function that is itself nested needs a second `via`, and pretending
-/// otherwise would either die at the namespace or, worse, call a same-source
-/// function from a different scope.
+/// One resolved ancestor of a `via` run, with the arguments for its own call.
+struct ViaStagePinned {
+    pinned: ViaPinned,
+    args: Vec<serde_json::Value>,
+    this_arg: Option<serde_json::Value>,
+}
+
+/// Resolve one function of a `via` chain exactly as the single-stage case did.
+fn load_via_one(
+    store: &Store,
+    spec: &RunSpec,
+    snapshot: &Snapshot,
+    via: &exec::ViaSpec,
+) -> Result<ViaPinned, String> {
+    let node = store
+        .node(&spec.analysis_id, &via.symbol)
+        .map_err(|e| format!("via_symbol_not_found:{e}"))?;
+    if node.kind != "function" {
+        return Err("via_symbol_is_not_a_function".into());
+    }
+    let blob = snapshot
+        .entries
+        .iter()
+        .find(|entry| entry.path == node.path)
+        .and_then(|entry| entry.blob.clone())
+        .ok_or("target_source_missing")?;
+    let fact = store
+        .flow_fact(&spec.analysis_id, &via.symbol)
+        .map_err(|e| format!("flow_fact_not_found:{e}"))?;
+    let enclosing = enclosing_of(node.parent.as_deref());
+    let mut profile = exec::profile(
+        &spec.analysis_id,
+        &via.symbol,
+        &node.path,
+        &node.name,
+        &fact,
+        enclosing.as_deref(),
+    );
+    profile.enclosing_name = enclosing_name(store, &spec.analysis_id, enclosing.as_deref());
+    // Each stage is decided on its own profile, with its own arguments and with
+    // its own `via`/`via_chain` cleared: a stage is a plain call, and the chain
+    // above it is this function's business, not that call's.
+    let mut via_spec = spec.clone();
+    via_spec.symbol = via.symbol.clone();
+    via_spec.args = via.args.clone();
+    via_spec.this_arg = via.this_arg.clone();
+    via_spec.via = None;
+    via_spec.via_chain = Vec::new();
+    let decision = exec::decide(&profile, &via_spec);
+    let source = exec::source_slice(store, snapshot, &node.path, node.start, node.end)
+        .map_err(|e| format!("via_source_unavailable:{e}"))?;
+    Ok(ViaPinned {
+        symbol: via.symbol.clone(),
+        path: node.path,
+        name: node.name,
+        start: node.start,
+        end: node.end,
+        blob,
+        profile,
+        decision,
+        source,
+    })
+}
+
+/// The whole chain, in **call order**: the outermost ancestor first and the
+/// target's enclosing function last. `via` keeps its meaning ("the target's
+/// enclosing function"); `via_chain` names the ancestors above it.
+///
+/// Every link is checked against the graph, not against the caller's ordering:
+/// each ancestor's enclosing function must be the previous link, and the
+/// outermost one must be top-level, because that is the only thing the module
+/// namespace can contain.
+fn load_via_chain(
+    store: &Store,
+    spec: &RunSpec,
+    snapshot: &Snapshot,
+) -> Result<Option<Vec<ViaStagePinned>>, String> {
+    let Some(via) = &spec.via else {
+        return Ok(None);
+    };
+    let nearest = load_via_one(store, spec, snapshot, via)?;
+    let mut stages: Vec<ViaStagePinned> = Vec::new();
+    let mut previous: Option<String> = None;
+    for ancestor in &spec.via_chain {
+        let pinned = load_via_one(store, spec, snapshot, ancestor)?;
+        // The chain is a path in the containment graph. Anything else would run
+        // a function that does not enclose the target and then call whatever it
+        // happened to return.
+        if let Some(previous) = &previous {
+            if pinned.profile.enclosing_symbol.as_deref() != Some(previous.as_str()) {
+                return Err(format!(
+                    "via_chain_not_connected:{}:enclosing={}:expected_enclosing={previous}",
+                    pinned.symbol,
+                    pinned
+                        .profile
+                        .enclosing_symbol
+                        .clone()
+                        .unwrap_or_else(|| "无".into())
+                ));
+            }
+        } else if let Some(enclosing) = &pinned.profile.enclosing_symbol {
+            return Err(format!(
+                "via_chain_not_rooted:{}:enclosing={enclosing}:the outermost stage must be a top-level function the module namespace can contain",
+                pinned.symbol
+            ));
+        }
+        previous = Some(pinned.symbol.clone());
+        stages.push(ViaStagePinned {
+            pinned,
+            args: ancestor.args.clone(),
+            this_arg: ancestor.this_arg.clone(),
+        });
+    }
+    if let Some(previous) = &previous
+        && nearest.profile.enclosing_symbol.as_deref() != Some(previous.as_str())
+    {
+        return Err(format!(
+            "via_chain_not_connected:{}:enclosing={}:expected_enclosing={previous}",
+            nearest.symbol,
+            nearest
+                .profile
+                .enclosing_symbol
+                .clone()
+                .unwrap_or_else(|| "无".into())
+        ));
+    }
+    stages.push(ViaStagePinned {
+        pinned: nearest,
+        args: via.args.clone(),
+        this_arg: via.this_arg.clone(),
+    });
+    Ok(Some(stages))
+}
+
+/// The nearest enclosing function is itself nested and no ancestor was named.
+/// This is no longer "unsupported": it is an incomplete chain, and the refusal
+/// names the ancestor to add next.
 fn via_depth_refusal(store: &Store, analysis: &str, via: &ViaPinned) -> Option<exec::Reason> {
     let beyond = via.profile.enclosing_symbol.clone()?;
     let label = match enclosing_name(store, analysis, Some(beyond.as_str())) {
@@ -592,7 +702,7 @@ fn via_depth_refusal(store: &Store, analysis: &str, via: &ViaPinned) -> Option<e
     Some(exec::Reason {
         code: "closure_depth_not_supported".into(),
         detail: format!(
-            "包含函数 {}（{}）自身也是嵌套的（它的包含函数是 {label}）。本切片只支持一层：先调用一个顶层函数取得闭包，再调用该闭包。更深的链需要多级组合，尚未实现。",
+            "包含函数 {}（{}）自身也是嵌套的：它的包含函数是 {label}。请把这一层（以及更外层，按由外到内顺序）加进 --via-chain，让 Atlas 逐级调用并逐级按源码同一性核对。",
             via.name, via.symbol
         ),
         evidence: "via.profile.enclosing_symbol".into(),
@@ -608,7 +718,7 @@ pub async fn execute(
     spec.validate().map_err(|e| e.to_string())?;
     let spec_digest = spec.digest().map_err(|e| e.to_string())?;
     let pinned = load_pinned(store, spec)?;
-    let via = load_via(store, spec, &pinned.snapshot)?;
+    let via_chain = load_via_chain(store, spec, &pinned.snapshot)?;
     let decision = exec::decide(&pinned.profile, spec);
     if !decision.allowed {
         let missing_grants = decision.missing_grants.clone();
@@ -635,51 +745,73 @@ pub async fn execute(
             .map_err(|e| e.to_string())?;
         return Ok(record);
     }
-    // The enclosing stage is decided on its own profile. If it cannot run, no
-    // closure instance can exist, so the run is refused *before* a process is
-    // started rather than after a confusing `target_not_exported`.
-    if let Some(via) = &via
-        && !via.decision.allowed
-    {
-        let inner = via.decision.refusal.clone().unwrap_or(exec::Reason {
-            code: "refused".into(),
-            detail: "包含函数的决策拒绝了本次调用".into(),
-            evidence: "via.decision".into(),
-        });
-        let reason = exec::Reason {
-            code: "via_scope_refused".into(),
-            detail: format!(
-                "包含函数 {} 本身不可运行（{}）：{}",
-                via.symbol, inner.code, inner.detail
-            ),
-            evidence: "via.profile / via.decision".into(),
-        };
-        let mut record = refused_record(spec, &pinned, &spec_digest, &reason);
-        if let Some(object) = record.as_object_mut() {
-            object.insert("via".into(), via_record_value(via, Value::Null));
+    // Every stage is decided on its own profile. If any of them cannot run, no
+    // instance can exist, so the run is refused *before* a process is started
+    // rather than after a confusing `enclosing_not_exported`. The refusal names
+    // the stage that refused, because that is the one to fix.
+    if let Some(stages) = &via_chain {
+        for (index, stage) in stages.iter().enumerate() {
+            let last = index + 1 == stages.len();
+            if !stage.pinned.decision.allowed {
+                let inner = stage
+                    .pinned
+                    .decision
+                    .refusal
+                    .clone()
+                    .unwrap_or(exec::Reason {
+                        code: "refused".into(),
+                        detail: "包含函数的决策拒绝了本次调用".into(),
+                        evidence: "via.decision".into(),
+                    });
+                let reason = exec::Reason {
+                    code: "via_scope_refused".into(),
+                    detail: format!(
+                        "包含函数（链上第 {} 个，{}）本身不可运行（{}）：{}",
+                        index + 1,
+                        stage.pinned.symbol,
+                        inner.code,
+                        inner.detail
+                    ),
+                    evidence: "via.chain[].profile / decision".into(),
+                };
+                let mut record = refused_record(spec, &pinned, &spec_digest, &reason);
+                if let Some(object) = record.as_object_mut() {
+                    object.insert(
+                        "via".into(),
+                        via_record_value(stages, stages.len() - 1, Value::Null),
+                    );
+                }
+                let identity =
+                    serde_json::to_string(&answer_identity(&record)).map_err(|e| e.to_string())?;
+                store
+                    .publish_exec_record(&mut record, &identity)
+                    .map_err(|e| e.to_string())?;
+                return Ok(record);
+            }
+            // An incomplete chain: without ancestors the last stage must be a
+            // function the module namespace can contain, i.e. top-level. The
+            // refusal names what to add instead of letting the run die at the
+            // namespace. With ancestors, `load_via_chain` has already checked
+            // every link, so this cannot fire.
+            if last
+                && spec.via_chain.is_empty()
+                && let Some(reason) = via_depth_refusal(store, &spec.analysis_id, &stage.pinned)
+            {
+                let mut record = refused_record(spec, &pinned, &spec_digest, &reason);
+                if let Some(object) = record.as_object_mut() {
+                    object.insert(
+                        "via".into(),
+                        via_record_value(stages, stages.len() - 1, Value::Null),
+                    );
+                }
+                let identity =
+                    serde_json::to_string(&answer_identity(&record)).map_err(|e| e.to_string())?;
+                store
+                    .publish_exec_record(&mut record, &identity)
+                    .map_err(|e| e.to_string())?;
+                return Ok(record);
+            }
         }
-        let identity =
-            serde_json::to_string(&answer_identity(&record)).map_err(|e| e.to_string())?;
-        store
-            .publish_exec_record(&mut record, &identity)
-            .map_err(|e| e.to_string())?;
-        return Ok(record);
-    }
-    // A chain deeper than one level is refused by name. The alternative is a
-    // run that dies at the namespace and tells the caller nothing about why.
-    if let Some(via) = &via
-        && let Some(reason) = via_depth_refusal(store, &spec.analysis_id, via)
-    {
-        let mut record = refused_record(spec, &pinned, &spec_digest, &reason);
-        if let Some(object) = record.as_object_mut() {
-            object.insert("via".into(), via_record_value(via, Value::Null));
-        }
-        let identity =
-            serde_json::to_string(&answer_identity(&record)).map_err(|e| e.to_string())?;
-        store
-            .publish_exec_record(&mut record, &identity)
-            .map_err(|e| e.to_string())?;
-        return Ok(record);
     }
 
     let probe = tokio::task::spawn_blocking({
@@ -744,12 +876,40 @@ pub async fn execute(
         std::process::id(),
         uuid::Uuid::new_v4().simple()
     );
-    // The namespace is searched for the *enclosing* function on a `via` run:
-    // the closure is never found by name, only by the source of the value the
-    // enclosing call returned.
-    let (resolve_name, resolve_source) = match &via {
-        Some(via) => (via.name.clone(), Some(via.source.as_str())),
+    // The namespace is searched for the *outermost* stage of a `via` run: a
+    // closure is never found by name, only by the source of the value the
+    // previous call returned, and the first call has to come from the module.
+    let (resolve_name, resolve_source) = match via_chain.as_ref().and_then(|stages| stages.first())
+    {
+        Some(stage) => (
+            stage.pinned.name.clone(),
+            Some(stage.pinned.source.as_str()),
+        ),
         None => (pinned.name.clone(), None),
+    };
+    // Each stage expects the *next* symbol's source; the last expects the target.
+    let via_stages: Vec<exec::ViaStage> = match &via_chain {
+        Some(stages) => stages
+            .iter()
+            .enumerate()
+            .map(|(index, stage)| {
+                let expects = stages
+                    .get(index + 1)
+                    .map(|next| next.pinned.source.clone())
+                    .unwrap_or_else(|| prepared.target_source.clone());
+                let name = stages
+                    .get(index + 1)
+                    .map(|next| next.pinned.name.clone())
+                    .unwrap_or_else(|| pinned.name.clone());
+                exec::ViaStage {
+                    name,
+                    args: stage.args.clone(),
+                    this_arg: stage.this_arg.clone(),
+                    expects_source: expects,
+                }
+            })
+            .collect(),
+        None => Vec::new(),
     };
     let payload = exec::harness_payload(
         &prepared,
@@ -757,6 +917,7 @@ pub async fn execute(
         Some(&resolve_name),
         &marker,
         resolve_source,
+        &via_stages,
     )
     .map_err(|e| e.to_string())?;
 
@@ -823,19 +984,22 @@ pub async fn execute(
     let mut trace_async_events: Value = json!([]);
     let mut via_stage_report = Value::Null;
     let mut events: Vec<Value> = Vec::new();
-    // A `via` run is two calls, and the record says so in order: the enclosing
-    // call first, then the target. A reader must never have to infer that the
-    // closure instance came from somewhere.
-    if let Some(via) = &via {
-        events.push(json!({
-            "kind": "call",
-            "stage": "enclosing",
-            "symbol": via.symbol,
-            "path": via.path,
-            "start": via.start,
-            "end": via.end,
-            "args": spec.via.as_ref().map(|v| v.args.clone()).unwrap_or_default(),
-        }));
+    // A `via` run is one call per ancestor and then the target, and the record
+    // says so in order. A reader must never have to infer that the closure
+    // instance came from somewhere, or from which stage.
+    if let Some(stages) = &via_chain {
+        for (index, stage) in stages.iter().enumerate() {
+            events.push(json!({
+                "kind": "call",
+                "stage": "enclosing",
+                "stage_index": index,
+                "symbol": stage.pinned.symbol,
+                "path": stage.pinned.path,
+                "start": stage.pinned.start,
+                "end": stage.pinned.end,
+                "args": stage.args,
+            }));
+        }
     }
     events.push(json!({
         "kind": "call",
@@ -892,11 +1056,14 @@ pub async fn execute(
             if let Some(text) = read_target_source(store, &pinned) {
                 sources.push((pinned.path.clone(), text));
             }
-            if let Some(via) = &via
-                && let Ok(bytes) = store.read_blob(&via.blob)
-                && let Ok(text) = String::from_utf8(bytes)
-            {
-                sources.push((via.path.clone(), text));
+            if let Some(stages) = &via_chain {
+                for stage in stages {
+                    if let Ok(bytes) = store.read_blob(&stage.pinned.blob)
+                        && let Ok(text) = String::from_utf8(bytes)
+                    {
+                        sources.push((stage.pinned.path.clone(), text));
+                    }
+                }
             }
             'frames: for frame in frames.iter().filter_map(|v| v.as_str()) {
                 for (path, source) in &sources {
@@ -965,10 +1132,10 @@ pub async fn execute(
     object.insert("signal".into(), json!(supervised.signal));
     object.insert("source_binding".into(), source_binding);
     object.insert("isolation".into(), isolation);
-    if let Some(via) = &via {
+    if let Some(stages) = &via_chain {
         object.insert(
             "via".into(),
-            via_record_value(via, via_stage_report.clone()),
+            via_record_value(stages, stages.len() - 1, via_stage_report.clone()),
         );
     }
     object.insert(
@@ -1001,25 +1168,59 @@ pub async fn execute(
     Ok(record)
 }
 
-/// The enclosing stage of a run, as published in the record. Every claim here
-/// points at bytes that were re-verified, and `stage_report` is the harness'
-/// own account of what that call actually returned.
-fn via_record_value(via: &ViaPinned, stage_report: Value) -> Value {
+/// The ancestor chain of a run, as published in the record.
+///
+/// `stage_report` is the harness' own account of the stage that produced the
+/// target instance (`index`), and `ancestors` lists the stages above it in call
+/// order so a chain is never summarised down to its last step. Every claim here
+/// points at bytes that were re-verified.
+fn via_record_value(stages: &[ViaStagePinned], index: usize, stage_report: Value) -> Value {
+    let describe = |stage: &ViaStagePinned| {
+        json!({
+            "symbol": stage.pinned.symbol,
+            "path": stage.pinned.path,
+            "name": stage.pinned.name,
+            "args": stage.args,
+            "source_binding": {
+                "path": stage.pinned.path,
+                "blob": stage.pinned.blob,
+                "start": stage.pinned.start,
+                "end": stage.pinned.end,
+                "bytes_verified": true,
+                "verified_how": "包含函数的字节同样从内容寻址 blob 读取并重新哈希校验；调用返回的函数实例只有在其源码与下一级目标的钉住字节匹配时才被采用，因此「拿到了哪个闭包」不是靠名字或位置推测的。",
+            },
+            "profile": stage.pinned.profile,
+            "decision": stage.pinned.decision,
+        })
+    };
+    let Some(last) = stages.get(index) else {
+        return json!({"chain": [], "stage_report": stage_report});
+    };
+    let ancestors: Vec<Value> = stages[..index].iter().map(describe).collect();
     json!({
-        "symbol": via.symbol,
-        "path": via.path,
-        "name": via.name,
+        "symbol": last.pinned.symbol,
+        "path": last.pinned.path,
+        "name": last.pinned.name,
+        "args": last.args,
         "source_binding": {
-            "path": via.path,
-            "blob": via.blob,
-            "start": via.start,
-            "end": via.end,
+            "path": last.pinned.path,
+            "blob": last.pinned.blob,
+            "start": last.pinned.start,
+            "end": last.pinned.end,
             "bytes_verified": true,
-            "verified_how": "包含函数的字节同样从内容寻址 blob 读取并重新哈希校验；调用返回的函数实例只有在其源码与目标符号这段钉住字节匹配时才被调用，因此「拿到了哪个闭包」不是靠名字或位置推测的。",
+            "verified_how": "包含函数的字节同样从内容寻址 blob 读取并重新哈希校验；调用返回的函数实例只有在其源码与下一级目标的钉住字节匹配时才被采用，因此「拿到了哪个闭包」不是靠名字或位置推测的。",
         },
-        "profile": via.profile,
-        "decision": via.decision,
+        "profile": last.pinned.profile,
+        "decision": last.pinned.decision,
         "stage_report": stage_report,
+        // The stages above the nearest enclosing function, outermost first.
+        // Empty when the closure is nested one level deep, which is why an old
+        // record reads the same way it always did.
+        "ancestors": ancestors,
+        "chain_length": stages.len(),
+        // Call order for the whole chain, named so it can be read back without
+        // reassembling `ancestors` and the top-level fields by hand.
+        "chain": stages.iter().map(|stage| stage.pinned.symbol.clone()).collect::<Vec<_>>(),
     })
 }
 

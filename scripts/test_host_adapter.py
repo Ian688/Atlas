@@ -117,6 +117,19 @@ record('closure_verdict', closure.verdict);
 record('closure_value', closure.value);
 record('closure_stage', closure.via.stage_report.closure.matched_by);
 
+// A chain, outermost first: the host states the ancestors and Atlas verifies
+// every link, so the host never supplies a function value.
+const chain = await client.exec({
+  symbol: 'src/lib.js:addToChain', args: [5],
+  allowEffects: ['unknown_calls'],
+  via: { symbol: 'makeAdderFromFactory', args: [] },
+  viaChain: [{ symbol: 'makeAdderFactory', args: [200] }],
+});
+record('chain_verdict', chain.verdict);
+record('chain_value', chain.value);
+record('chain_length', chain.via.chain_length);
+record('chain_stages', chain.via.stage_report.stages.map(s => s.closure.matched_by));
+
 // A bad token must fail loudly rather than silently returning nothing.
 try {
   const bad = new AtlasHostClient({ url, token: 'not-the-token' });
@@ -157,6 +170,13 @@ class HostSeam(unittest.TestCase):
             # cannot obtain by naming it: an instance of an enclosing scope.
             "export function makeAdder(base) {\n"
             "  return function addTo(value) { return base + value; };\n"
+            "}\n"
+            # Three levels deep, so the host seam covers a chain and not just a
+            # single enclosing call.
+            "export function makeAdderFactory(base) {\n"
+            "  return function makeAdderFromFactory() {\n"
+            "    return function addToChain(value) { return base + value; };\n"
+            "  };\n"
             "}\n",
             encoding="utf-8",
         )
@@ -284,6 +304,15 @@ class HostSeam(unittest.TestCase):
                          "the closure must see the scope its enclosing call created")
         self.assertEqual(report["closure_stage"], "source_identity",
                          "the returned function must be accepted by source, not by name")
+
+    def test_a_host_can_name_a_chain_of_enclosing_functions(self):
+        report = self.drive()
+        self.assertEqual(report["chain_verdict"], "returned")
+        self.assertEqual(report["chain_value"], {"kind": "number", "value": 205},
+                         "makeAdderFactory(200) -> makeAdder() -> addTo(5) = 205")
+        self.assertEqual(report["chain_length"], 2)
+        self.assertEqual(report["chain_stages"], ["source_identity", "source_identity"],
+                         "every link must be verified, not just the last one")
 
     # -- the seam itself --------------------------------------------------
     def test_the_contract_does_not_leak_the_store_layout(self):

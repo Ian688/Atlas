@@ -165,6 +165,11 @@ enum Action {
         /// The receiver for the enclosing (`--via`) call, as JSON.
         #[arg(long = "via-this")]
         via_this: Option<String>,
+        /// Ancestors of `--via`, outermost first, as a JSON array of
+        /// `{"symbol": "...", "args": [...]}`. `--via` stays "the target's
+        /// enclosing function"; these are the functions enclosing *it*.
+        #[arg(long = "via-chain", default_value = "[]")]
+        via_chain: String,
         /// What the isolated copy is made of: `snapshot` (every captured file,
         /// the default) or `dependencies` (the target's static import closure
         /// plus package.json files). A slice is a tighter read boundary and is
@@ -1111,6 +1116,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             via,
             via_args,
             via_this,
+            via_chain,
             materialise,
             fixtures,
             fixture_note,
@@ -1159,6 +1165,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 fixture_note,
                 label: None,
                 materialise: Some(materialise),
+                // Resolved like `--via`: each ancestor is a real published
+                // symbol, and the engine checks that the chain is connected.
+                via_chain: serde_json::from_str::<Vec<atlas_engine::exec::ViaSpec>>(&via_chain)?
+                    .into_iter()
+                    .map(|stage| {
+                        Ok(atlas_engine::exec::ViaSpec {
+                            symbol: runner::resolve_symbol(&store, &analysis, &stage.symbol)?,
+                            args: stage.args,
+                            this_arg: stage.this_arg,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, String>>()?,
                 via: match via {
                     // Resolved like the target: `--via` names a real published
                     // symbol, and `decide` then compares it against the

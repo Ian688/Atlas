@@ -36,6 +36,9 @@ pub const MATERIALISE_DEPENDENCIES: &str = "dependencies";
 const SLICE_MAX_FILES: usize = 20_000;
 const SLICE_MAX_EDGES: usize = 400_000;
 const SLICE_MAX_PACKAGE_JSON: usize = 512;
+/// How many ancestors a `via` chain may name. Each one is a real call that has
+/// to happen, so an unbounded chain would be an unbounded run.
+pub const MAX_VIA_CHAIN: usize = 8;
 /// How many written paths a record lists before it only reports the count.
 const SLICE_LIST_LIMIT: usize = 200;
 
@@ -322,6 +325,24 @@ pub struct RunSpec {
     /// and is recorded as such; it is never the silent default.
     #[serde(default)]
     pub materialise: Option<String>,
+    /// Ancestors of `via`, outermost first. `via` stays "the target's enclosing
+    /// function"; this is the chain *above* it, for a closure that is nested
+    /// more than one level deep. Every link is verified by source identity
+    /// against its own pinned bytes, so the chain is never taken on trust.
+    #[serde(default)]
+    pub via_chain: Vec<ViaSpec>,
+}
+
+/// One stage of a `via` run, as the harness receives it: what to call, and the
+/// pinned source of the function that call must return.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ViaStage {
+    pub name: String,
+    #[serde(default)]
+    pub args: Vec<serde_json::Value>,
+    #[serde(default)]
+    pub this_arg: Option<serde_json::Value>,
+    pub expects_source: String,
 }
 
 /// One stage of a `via` run: the enclosing function Atlas calls first.
@@ -382,6 +403,25 @@ impl RunSpec {
             }
         }
         materialise_mode(self.materialise.as_deref())?;
+        if !self.via_chain.is_empty() && self.via.is_none() {
+            // Ancestors without the enclosing function describe no chain: the
+            // last stage would have no defined target to produce.
+            return Err(invalid("via_chain_without_via"));
+        }
+        if self.via_chain.len() > MAX_VIA_CHAIN {
+            return Err(invalid("via_chain_too_long"));
+        }
+        for stage in &self.via_chain {
+            if stage.symbol.is_empty() || stage.symbol.len() > 512 || stage.symbol.contains('\0') {
+                return Err(invalid("invalid_via_symbol"));
+            }
+            if stage.symbol == self.symbol {
+                return Err(invalid("via_symbol_is_the_target"));
+            }
+            if stage.args.len() > 64 {
+                return Err(invalid("too_many_via_arguments"));
+            }
+        }
         if let Some(via) = &self.via {
             if via.symbol.is_empty() || via.symbol.len() > 512 || via.symbol.contains('\0') {
                 return Err(invalid("invalid_via_symbol"));
@@ -1541,7 +1581,10 @@ report.declared_globals = Object.keys(payload.globals || {});
 // A `via` run is two calls. The enclosing stage is created up front so a run in
 // which it could not even be resolved still says which stage failed.
 if (payload.via) {
-  report.via = { stage: 'enclosing', export_name: null, matched_by: null, awaited: false, value: null, thrown: null, closure: null };
+  // One stage per ancestor, outermost first. The stage that produces the target
+  // is the last one; `stage_report` is that stage, and `stages` keeps all of
+  // them so a chain can never be summarised down to its last step.
+  report.via = { stage: 'enclosing', stage_count: payload.via.stages.length, export_name: null, matched_by: null, awaited: false, value: null, thrown: null, closure: null, stages: [], failed_stage: null };
 }
 for (const [name, value] of Object.entries(payload.globals || {})) globalThis[name] = value;
 try {
@@ -1561,58 +1604,89 @@ try {
     report.export_name = matches[0][0];
     report.matched_by = 'source_identity';
     if (report.via) { report.via.export_name = matches[0][0]; report.via.matched_by = 'source_identity'; }
-    // A `via` run calls the enclosing function first and only then the closure
-    // it returned. Each stage has its own receiver and arguments, and each
-    // stage's outcome is reported separately.
-    const stage = payload.via
-      ? { target: payload.via.args, thisArg: payload.via.this_arg }
-      : { target: payload.args, thisArg: payload.this_arg };
-    let first = null;
-    try {
-      first = await callStage(matches[0][1], stage.target, stage.thisArg);
-    } catch (error) {
-      report.verdict = 'threw';
-      report.thrown = describe(error);
-      if (report.via) report.via.thrown = describe(error);
-    }
-    if (first) {
-      report.receiver_declared = payload.via
-        ? payload.via.this_arg !== null && payload.via.this_arg !== undefined
-        : payload.this_arg !== null && payload.this_arg !== undefined;
-      report.awaited = first.awaited;
-      if (!payload.via) {
-        report.value = encode(first.settled, 0, new Set());
+    // A `via` run calls each ancestor in turn and only then the target. Every
+    // stage is checked by the same rule: the value it returned must be a
+    // function whose source is the pinned source of the symbol that stage is
+    // supposed to produce. A chain is therefore not "trust the middle": each
+    // link is verified against bytes.
+    const runTarget = async (fn) => {
+      report.receiver_declared = payload.this_arg !== null && payload.this_arg !== undefined;
+      try {
+        const settled = await callStage(fn, payload.args, payload.this_arg);
+        report.closure_awaited = settled.awaited;
+        report.value = encode(settled.settled, 0, new Set());
         report.verdict = 'returned';
-      } else {
-        report.via.awaited = first.awaited;
-        report.via.value = encode(first.settled, 0, new Set());
-        if (typeof first.settled !== 'function') {
-          // The enclosing function ran and its result is reported verbatim.
-          // Nothing was called, so this is not a failed call of the target.
-          report.detail = 'closure_not_returned';
-        } else {
-          const observed = strip(Function.prototype.toString.call(first.settled));
-          const matched = sourceMatches(first.settled, payload.via.closure_source);
-          report.via.closure = {
-            matched_by: matched ? 'source_identity' : null,
-            name: String(first.settled.name || ''),
-            observed_source: observed.slice(0, 2000)
-          };
-          if (!matched) {
-            report.detail = 'closure_identity_mismatch';
-          } else {
-            try {
-              const second = await callStage(first.settled, payload.args, payload.this_arg);
-              report.closure_awaited = second.awaited;
-              report.value = encode(second.settled, 0, new Set());
-              report.verdict = 'returned';
-            } catch (error) {
-              report.verdict = 'threw';
-              report.thrown = describe(error);
-            }
-          }
-        }
+      } catch (error) {
+        report.verdict = 'threw';
+        report.thrown = describe(error);
       }
+    };
+    let fn = matches[0][1];
+    if (!payload.via) {
+      // A throw from the target is the target throwing. Letting it reach the
+      // outer catch would report it as a module load failure instead.
+      try {
+        report.receiver_declared = payload.this_arg !== null && payload.this_arg !== undefined;
+        const only = await callStage(fn, payload.args, payload.this_arg);
+        report.awaited = only.awaited;
+        report.value = encode(only.settled, 0, new Set());
+        report.verdict = 'returned';
+      } catch (error) {
+        report.verdict = 'threw';
+        report.thrown = describe(error);
+      }
+    } else {
+      let produced = null;
+      for (let index = 0; index < payload.via.stages.length && !report.detail; index++) {
+        const spec = payload.via.stages[index];
+        const stageReport = {
+          stage: 'enclosing', index, name: spec.name || null, args: spec.args,
+          awaited: false, value: null, thrown: null, closure: null
+        };
+        report.via.stages.push(stageReport);
+        try {
+          produced = await callStage(fn, spec.args, spec.this_arg);
+        } catch (error) {
+          stageReport.thrown = describe(error);
+          report.via.failed_stage = index;
+          report.via.thrown = describe(error);
+          report.verdict = 'threw';
+          report.thrown = describe(error);
+          break;
+        }
+        stageReport.awaited = produced.awaited;
+        stageReport.value = encode(produced.settled, 0, new Set());
+        report.via.failed_stage = index;
+        if (typeof produced.settled !== 'function') {
+          // The stage ran and its result is reported verbatim. Nothing further
+          // was called, so this is not a failed call of the target.
+          report.detail = 'closure_not_returned';
+          break;
+        }
+        const observed = strip(Function.prototype.toString.call(produced.settled));
+        const matched = sourceMatches(produced.settled, spec.source);
+        stageReport.closure = {
+          matched_by: matched ? 'source_identity' : null,
+          name: String(produced.settled.name || ''),
+          expected: String(spec.name || ''),
+          observed_source: observed.slice(0, 2000)
+        };
+        if (!matched) {
+          report.detail = 'closure_identity_mismatch';
+          break;
+        }
+        fn = produced.settled;
+        report.via.failed_stage = null;
+      }
+      // The last stage's report is the one that produced the target instance.
+      const last = report.via.stages[report.via.stages.length - 1];
+      if (last) {
+        report.via.awaited = last.awaited;
+        report.via.value = last.value;
+        report.via.thrown = last.thrown;
+        report.via.closure = last.closure;
+      }
+      if (!report.detail && report.verdict !== 'threw') await runTarget(fn);
     }
   }
 } catch (error) {
@@ -1630,9 +1704,13 @@ pub fn harness_payload(
     export_name: Option<&str>,
     report_marker: &str,
     // The source of the function the module namespace is searched for. For a
-    // `via` run that is the *enclosing* function, because that is the one the
-    // namespace can actually contain; the closure is never looked up by name.
+    // `via` run that is the *outermost* ancestor, because that is the one the
+    // namespace can actually contain; a closure is never looked up by name.
     resolve_source: Option<&str>,
+    // One entry per ancestor, outermost first: the arguments for that call and
+    // the pinned source of the symbol it must return. The last entry must
+    // return the target, so the chain is verified link by link.
+    via_stages: &[ViaStage],
 ) -> Result<String> {
     let module_url = format!(
         "file://{}",
@@ -1647,11 +1725,19 @@ pub fn harness_payload(
         "args": spec.args,
         "this_arg": spec.this_arg,
         "globals": spec.globals,
-        "via": spec.via.as_ref().map(|via| serde_json::json!({
-            "args": via.args,
-            "this_arg": via.this_arg,
-            "closure_source": prepared.target_source,
-        })),
+        "via": if via_stages.is_empty() {
+            serde_json::Value::Null
+        } else {
+            serde_json::json!({
+                "stages": via_stages.iter().map(|stage| serde_json::json!({
+                    "name": stage.name,
+                    "args": stage.args,
+                    "this_arg": stage.this_arg,
+                    "source": stage.expects_source,
+                })).collect::<Vec<_>>(),
+                "target_source": prepared.target_source,
+            })
+        },
         "report_marker": report_marker,
         "console_limit": spec.output_limit.min(64 * 1024),
     }))?)
@@ -1747,6 +1833,7 @@ mod tests {
             label: None,
             via: None,
             materialise: None,
+            via_chain: Vec::new(),
         }
     }
 
@@ -1785,6 +1872,7 @@ mod tests {
             label: None,
             via: None,
             materialise: None,
+            via_chain: Vec::new(),
         };
         let refused = decide(&p, &spec);
         assert!(!refused.allowed);
@@ -1822,6 +1910,7 @@ mod tests {
             label: None,
             via: None,
             materialise: None,
+            via_chain: Vec::new(),
         };
         assert_eq!(
             decide(&p, &spec).refusal.unwrap().code,
@@ -1864,6 +1953,7 @@ mod tests {
             label: None,
             via: None,
             materialise: None,
+            via_chain: Vec::new(),
         };
         let refused = decide(&p, &spec);
         assert!(!refused.allowed);
@@ -1908,6 +1998,7 @@ mod tests {
             label: None,
             via: None,
             materialise: None,
+            via_chain: Vec::new(),
         };
         assert!(!decide(&p, &spec).allowed);
         assert_eq!(decide(&p, &spec).missing_context.len(), 2);
@@ -1946,6 +2037,7 @@ mod tests {
             label: None,
             via: None,
             materialise: None,
+            via_chain: Vec::new(),
         };
         // Even a fully permissive spec cannot run an unsupported function.
         assert_eq!(

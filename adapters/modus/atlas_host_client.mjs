@@ -154,8 +154,12 @@ export class AtlasHostClient {
    * first and only invokes the function it returns when that value's source
    * matches the target's pinned bytes. A host cannot supply a closure any other
    * way, and it must not invent one.
+   *
+   * `viaChain` names the functions that enclose *that* one, outermost first, as
+   * `[{ symbol, args }]`. Every link is verified by source identity, so a host
+   * that gets the order wrong gets a refusal rather than a different closure.
    */
-  exec({ symbol, args = [], timeoutMs, allowEffects = [], plan = false, via }) {
+  exec({ symbol, args = [], timeoutMs, allowEffects = [], plan = false, via, viaChain }) {
     return this.request('exec', {
       body: {
         symbol, args,
@@ -163,6 +167,7 @@ export class AtlasHostClient {
         allow_effects: allowEffects,
         plan,
         ...(via ? { via } : {}),
+        ...(viaChain && viaChain.length ? { via_chain: viaChain } : {}),
       },
     });
   }

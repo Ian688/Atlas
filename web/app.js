@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id);
-const state = {token:'',nodes:[],edges:[],nodePage:null,edgePage:null,selected:null,focus:null,request:0,exportUrl:null,execProfile:null,report:null,selection:null,pendingSelection:null,annotations:[],patches:[]};
+const state = {token:'',nodes:[],edges:[],nodePage:null,edgePage:null,selected:null,focus:null,request:0,exportUrl:null,execProfile:null,report:null,selection:null,pendingSelection:null,annotations:[],patches:[],execRender:0,ancestorChain:null};
 const ns='http://www.w3.org/2000/svg';
 function svg(tag, attrs={}, text) {const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));if(text!==undefined)e.textContent=text;return e;}
 function text(tag,value,cls) {const e=document.createElement(tag);e.textContent=value;if(cls)e.className=cls;return e;}
@@ -557,6 +557,24 @@ function renderExecution(profile,record){
       const captures=(profile.unsatisfiable_context||[]).includes('captures');
       viaEnable.checked=captures;
       if(captures)body.append(flowNode('flow-line',`捕获的绑定：${(profile.captures||[]).join(', ')||'（未命名）'}。勾选「经由包含函数」后，Atlas 会先调用 ${enclosing}，并只接受它返回、且源码与目标钉住字节一致的那个函数实例。`));
+      // The enclosing function may itself be nested. The page asks the analysis
+      // for each ancestor's profile in turn and pre-fills the chain, so the
+      // symbols come from the graph and the user only supplies the arguments.
+      // The token makes a late answer from a previous selection write nothing.
+      const token=state.execRender+1;
+      state.execRender=token;
+      loadAncestorChain(profile).then(chainReport=>{
+        if(token!==state.execRender)return;
+        state.ancestorChain=chainReport;
+        const chainField=$('exec-via-chain');
+        if(chainField)chainField.value=chainReport.chain.length>1?JSON.stringify(chainReport.chain.slice(1)):'[]';
+        if(chainReport.chain.length>1){
+          body.append(flowNode('flow-line',`这个闭包嵌了 ${chainReport.chain.length} 层：${chainReport.chain.map(entry=>entry.symbol).join(' → ')}（由分析自身的 enclosing_symbol 逐级查出）→ 目标。每级都要给出实参，且每级返回的函数都会与下一级的钉住字节比对。`));
+        }
+        if(!chainReport.complete&&chainReport.reason==='profile_symbol_mismatch'){
+          body.append(flowNode('flow-unknown','向上追溯包含函数时，画像与所查符号不一致，已停止追溯；请改用 CLI 明确给出 --via-chain。'));
+        }
+      }).catch(()=>{});
     }
   }
   body.append(flowNode('flow-line',`参数：${profile.params.map(p=>`${p.index}:${p.name}`).join(', ')||'无'}`));
@@ -590,10 +608,17 @@ function renderExecRecord(body,record){
   // that must not be hidden behind a single target verdict.
   if(record.via){
     const stage=record.via.stage_report||{};
-    body.append(flowNode('flow-line',`阶段 1 包含函数 ${record.via.name}（${record.via.path}）· 匹配 ${stage.matched_by||'未匹配'} · 返回值 ${stage.value===null||stage.value===undefined?'无':JSON.stringify(decodeEncoded(stage.value))}`));
-    if(stage.thrown)body.append(flowNode('flow-unknown',`包含函数抛出 ${stage.thrown.name}: ${stage.thrown.message}`));
-    if(stage.closure)body.append(flowNode(stage.closure.matched_by?'flow-line':'flow-unknown',`阶段 2 闭包实例 ${stage.closure.name||'（匿名）'} · 源码同一性 ${stage.closure.matched_by||'不匹配'}${stage.closure.matched_by?'':` · 观测到 ${String(stage.closure.observed_source||'').slice(0,160)}`}`));
-    body.append(flowNode('flow-line',`包含函数绑定 blob ${String(record.via.source_binding?.blob||'').slice(0,12)}（读取时重新哈希校验）；目标绑定的仍是本次 analysis 的 snapshot。`));
+    const stages=stage.stages||[stage];
+    const ancestors=record.via.ancestors||[];
+    if(ancestors.length)body.append(flowNode('flow-line',`祖先链（由外到内）${[...ancestors.map(entry=>entry.name),record.via.name].join(' → ')} · 共 ${record.via.chain_length||stages.length} 级，每一级都按源码同一性核对。`));
+    for(const entry of stages){
+      const label=`阶段 ${(entry.index===undefined?0:entry.index)+1} 调用 ${entry.name||'?'} · 返回 ${entry.value===null||entry.value===undefined?'无':JSON.stringify(decodeEncoded(entry.value))}`;
+      body.append(flowNode(entry.closure&&entry.closure.matched_by?'flow-line':'flow-unknown',
+        `${label} · 下一级源码同一性 ${entry.closure?(entry.closure.matched_by||'不匹配'):'未检查'}${entry.closure&&!entry.closure.matched_by?` · 观测到 ${String(entry.closure.observed_source||'').slice(0,160)}`:''}`));
+      if(entry.thrown)body.append(flowNode('flow-unknown',`该级抛出 ${entry.thrown.name}: ${entry.thrown.message}`));
+    }
+    if(stage.failed_stage!==null&&stage.failed_stage!==undefined)body.append(flowNode('flow-unknown',`失败发生在第 ${stage.failed_stage+1} 级；目标没有被调用。`));
+    body.append(flowNode('flow-line',`最近一级绑定 blob ${String(record.via.source_binding?.blob||'').slice(0,12)}（读取时重新哈希校验）；目标绑定的仍是本次 analysis 的 snapshot。`));
   }
   if(record.value!==null&&record.value!==undefined){
     const decoded=decodeEncoded(record.value);
@@ -621,6 +646,21 @@ function renderExecRecord(body,record){
   if(record.isolation?.permission_model)body.append(flowNode('flow-line',`隔离：${record.isolation.permission_model}；授予 ${(record.isolation.effective_flags||[]).filter(f=>!f.startsWith('--allow-fs-read')).join(' ')||'（仅只读副本）'}`));
   if(record.source_binding)body.append(flowNode('flow-line',`绑定来源 analysis ${String(record.source_binding.analysis_id).slice(0,12)} · snapshot ${String(record.source_binding.snapshot_id).slice(0,12)} · blob ${String(record.source_binding.blob).slice(0,12)}（读取时重新哈希校验）`));
 }
+// Walk the *published* profiles upward to find the ancestors of the enclosing
+// function. Each step is a query for a symbol the analysis itself named, so the
+// page never invents a chain: if it cannot walk it, it says how far it got.
+async function loadAncestorChain(profile){
+  const chain=[];let symbol=profile.enclosing_symbol||null;let guard=0;
+  while(symbol&&guard<8){
+    chain.push({symbol,args:[]});
+    guard++;
+    let enclosingProfile=null;
+    try{enclosingProfile=await api('profile',{entity:symbol});}catch{return {chain,complete:false,reason:'enclosing_profile_unavailable'};}
+    if(enclosingProfile.symbol!==symbol)return {chain,complete:false,reason:'profile_symbol_mismatch'};
+    symbol=enclosingProfile.enclosing_symbol||null;
+  }
+  return {chain,complete:!symbol,bounded:guard>=8};
+}
 async function runControlled(){
   const selected=state.selected;if(!selected||selected.kind!=='function'){status('先选择一个函数');return;}
   if(!state.execProfile){status('该函数没有执行画像，页面不会直接执行');return;}
@@ -636,15 +676,25 @@ async function runControlled(){
   const enclosing=state.execProfile.enclosing_symbol||null;
   const viaWanted=Boolean(enclosing&&$('exec-via-enable')?.checked);
   let via=null;
+  let via_chain=null;
   if(viaWanted){
     let viaArgs;
     try{viaArgs=JSON.parse($('exec-via-args').value||'[]');}catch{status('包含函数的实参不是合法 JSON 数组');return;}
     if(!Array.isArray(viaArgs)){status('包含函数的实参必须是 JSON 数组');return;}
     via={symbol:enclosing,args:viaArgs};
+    // The ancestors above the enclosing function, outermost first. Their
+    // symbols were discovered from the analysis; the page only supplies args.
+    let chainArgs;
+    try{chainArgs=JSON.parse($('exec-via-chain')?.value||'[]');}catch{status('祖先链不是合法 JSON 数组');return;}
+    if(!Array.isArray(chainArgs)){status('祖先链必须是 JSON 数组');return;}
+    if(chainArgs.length){
+      if(!chainArgs.every(entry=>entry&&typeof entry.symbol==='string')){status('祖先链的每一项都需要 symbol');return;}
+      via_chain=chainArgs.map(entry=>({symbol:entry.symbol,args:Array.isArray(entry.args)?entry.args:[]}));
+    }
   }
   const request=state.request;$('exec-run').disabled=true;status(via?'先调用包含函数取得闭包实例，再在隔离副本中执行…':'在隔离副本中执行…');
   try{
-    const record=await apiJson('exec',{symbol:selected.id,args,allow_effects,via});
+    const record=await apiJson('exec',{symbol:selected.id,args,allow_effects,via,via_chain});
     if(request!==state.request)return;
     renderExecution(state.execProfile,record);
     status(`受控运行结束：${record.verdict}`);
