@@ -1,0 +1,11 @@
+test_a_deleted_file_is_withdrawn_and_leaves_no_trace (__main__.Incremental.test_a_deleted_file_is_withdrawn_and_leaves_no_trace) ... ok
+test_a_first_run_derives_everything_and_says_so (__main__.Incremental.test_a_first_run_derives_everything_and_says_so) ... ok
+test_a_shared_dependency_invalidates_its_dependents (__main__.Incremental.test_a_shared_dependency_invalidates_its_dependents) ... ok
+test_an_edited_file_is_the_only_one_invalidated (__main__.Incremental.test_an_edited_file_is_the_only_one_invalidated) ... ok
+test_an_unchanged_tree_reuses_the_analysis_a_full_run_would_publish (__main__.Incremental.test_an_unchanged_tree_reuses_the_analysis_a_full_run_would_publish) ... ok
+test_the_analysis_id_survives_every_incremental_path (__main__.Incremental.test_the_analysis_id_survives_every_incremental_path) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 19.135s
+
+OK

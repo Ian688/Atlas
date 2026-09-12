@@ -1,0 +1,7 @@
+ELK global: function
+engine: elk_pinned (no error)
+boxes: 21 edges: 20 ports: 40
+ms: 230.9 crossings: 0 labelCollisions: 0
+atOrigin: 0
+distinct x: 3 bounds: {"width":874,"height":1106}
+RESULT PASS

@@ -64,6 +64,10 @@ CHECKS = [
     # drawn invisibly, and the criterion must be able to fail (the linear scale
     # it replaced is checked against the same bar). No store, no network.
     ("view-readability", [sys.executable, "scripts/bench_view_readability.py", "--self-check"]),
+    # Layout criteria, measured against the pinned engine in plain node. It is
+    # deliberately not measured inside node:vm: the engine returned no
+    # coordinates there at all, so a vm-based number would describe the host.
+    ("view-layout", ["node", "scripts/bench_view_layout.mjs"]),
     ("web-syntax", ["node", "--check", "web/app.js"]),
     # The shared hierarchy: both projections read it, so a parse error here
     # would take down both pages at once.
@@ -153,6 +157,8 @@ def source_fingerprint() -> str:
         "web/index.html",
         "web/app.js",
         "web/hierarchy.js",
+        "web/layout.js",
+        "web/vendor/elk.bundled.js",
         "web/style.css",
         "web/city3d.html",
         "web/city3d.js",

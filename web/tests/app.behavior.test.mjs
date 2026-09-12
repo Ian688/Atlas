@@ -22,6 +22,12 @@ const APP = path.join(HERE, '..', 'app.js');
 // city harness does: a shared name that is missing here is a broken page, not
 // a test detail.
 const HIERARCHY = path.join(HERE, '..', 'hierarchy.js');
+// index.html also loads the shared layout module and the vendored engine. The
+// harness loads layout.js and deliberately leaves `ELK` undefined, so the
+// synchronous local ordering runs here; the pinned engine's own path is
+// measured in scripts/bench_view_layout.mjs, in plain node, where it is
+// reliable (it returned no coordinates at all inside node:vm).
+const LAYOUT = path.join(HERE, '..', 'layout.js');
 
 class El {
   constructor(id) {
@@ -92,10 +98,17 @@ function boot(routes, options = {}) {
     fetch: makeFetch(routes, requests),
     setTimeout, clearTimeout,
   };
+  // A layout engine can be injected, so the asynchronous path is exercised with
+  // a controlled engine instead of the real one: the vendored engine returned
+  // no coordinates at all inside node:vm, so measuring it here would report
+  // whichever answer it happened to give. It is measured in plain node by
+  // scripts/bench_view_layout.mjs.
+  if (options.ELK) sandbox.ELK = options.ELK;
   sandbox.URL.createObjectURL = () => 'blob:test';
   sandbox.URL.revokeObjectURL = () => {};
   const context = vm.createContext(sandbox);
   vm.runInContext(readFileSync(HIERARCHY, 'utf8'), context, { filename: 'web/hierarchy.js' });
+  vm.runInContext(readFileSync(LAYOUT, 'utf8'), context, { filename: 'web/layout.js' });
   vm.runInContext(readFileSync(APP, 'utf8'), context, { filename: 'web/app.js' });
   return {
     el,
@@ -1113,6 +1126,134 @@ check('proposing posts the diff and reports a refusal without pretending it work
   assert.match(t.el('status').textContent, /未通过固定快照校验/, 'a refusal must be reported as one');
 });
 
+
+// ---------------------------------------------------------------------------
+// The 2D call view is laid out. It used to be three columns in load order, with
+// every edge leaving from the middle of a box edge: no layers, no ports, and
+// nothing in the geometry that a reader could follow. These assertions cover
+// the properties that make it a layout, and the two ways it must refuse to
+// pretend: an engine that answers without coordinates, and a layout that
+// arrives after the selection moved on.
+const REACH_FAN = {
+  analysis_id: report.id, direction: 'both', root: FN_A.id, semantics: 'static candidates',
+  nodes: [FN_A, FN_B],
+  edges: [
+    { id: 'c1', kind: 'call_candidate', source: 'symbol:caller1.js:0:1', target: FN_A.id, label: 'from1', basis: 'lexical_declaration_candidate', path: 'a.js', start: 1, end: 2 },
+    { id: 'c2', kind: 'call_candidate', source: 'symbol:caller2.js:0:1', target: FN_A.id, label: 'from2', basis: 'lexical_declaration_candidate', path: 'a.js', start: 2, end: 3 },
+    { id: 'd1', kind: 'call_candidate', source: FN_A.id, target: FN_B.id, label: 'to1', basis: 'lexical_declaration_candidate', path: 'a.js', start: 3, end: 4 },
+    { id: 'd2', kind: 'call_candidate', source: FN_A.id, target: 'symbol:deep.js:0:1', label: 'to2', basis: 'lexical_declaration_candidate', path: 'a.js', start: 4, end: 5 },
+  ],
+  unresolved: [{ id: 'u1', kind: 'call_candidate', source: FN_A.id, target: null, label: 'dyn', basis: 'dynamic_external_or_missing_binding', path: 'a.js', start: 5, end: 6 }],
+  truncated: false,
+};
+
+const FAN_NODES = {
+  items: [
+    FN_A, FN_B,
+    { id: 'symbol:caller1.js:0:1', kind: 'function', name: 'caller1', path: 'caller1.js', parent: 'file:caller1.js' },
+    { id: 'symbol:caller2.js:0:1', kind: 'function', name: 'caller2', path: 'caller2.js', parent: 'file:caller2.js' },
+    { id: 'symbol:deep.js:0:1', kind: 'function', name: 'deep', path: 'deep.js', parent: 'file:deep.js' },
+  ],
+  next_cursor: null, total: 5, analysis_id: report.id,
+};
+
+async function bootFan(options = {}) {
+  const t = boot({ ...routeBase(), nodes: FAN_NODES, reach: REACH_FAN }, options);
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  return t;
+}
+
+check('the call view is layered and every edge leaves from its own port', async () => {
+  const t = await bootFan();
+  const plan = t.evalIn('state.focusLayout');
+  assert.ok(plan, 'a plan must exist after selecting a function');
+  // Layers: the target sits between its callers and its callees on the x axis.
+  const target = plan.boxes.find((b) => b.role === 'target');
+  const upstream = plan.boxes.filter((b) => b.role === 'upstream');
+  const downstream = plan.boxes.filter((b) => b.role === 'downstream');
+  assert.ok(upstream.length >= 2 && downstream.length >= 2, 'both directions must be present');
+  for (const box of upstream) assert.ok(box.x < target.x, `${box.label} must sit upstream of the target`);
+  for (const box of downstream) assert.ok(box.x > target.x, `${box.label} must sit downstream of the target`);
+  // Ports: two edges leaving the target must not share an attachment point.
+  const targetPorts = plan.ports.get(target.id).slots.filter((slot) => slot.side === 'right');
+  assert.ok(targetPorts.length >= 2, 'the target must expose a port per outgoing edge');
+  const ys = new Set(targetPorts.map((slot) => slot.y));
+  assert.equal(ys.size, targetPorts.length, 'each outgoing edge must have its own port');
+  // And the drawn picture uses them: edges are anchored at port coordinates.
+  const paths = collect(t.el('graph')).filter((n) => (n.class || '').split(' ').includes('edge'));
+  assert.ok(paths.length >= 4, `edges must be drawn (${paths.length})`);
+  for (const path of paths) {
+    const match = /^M ([\d.-]+) ([\d.-]+)/.exec(path.d || '');
+    assert.ok(match, 'an edge must start at a coordinate');
+    const port = [...plan.ports.values()].flatMap((entry) => entry.slots)
+      .some((slot) => Math.abs(slot.x - Number(match[1])) < 0.001 && Math.abs(slot.y - Number(match[2])) < 0.001);
+    assert.ok(port, `edge ${path.d} must start at a port, not at a box centre`);
+  }
+  assert.match(t.el('graph-status').textContent, /交叉 \d+/, 'the status must report crossings');
+  assert.match(t.el('graph-status').textContent, /标签碰撞 \d+/, 'and label collisions');
+});
+
+check('the node budget folds instead of dropping, and says what it folded', async () => {
+  const t = await bootFan();
+  // Fold everything beyond the target and one hop by shrinking the budget.
+  const plan = t.run('planFocusLayout(state.focus, state.nodes, { rootId: state.selected.id, maxNodes: 2 })');
+  assert.equal(plan.budget.exceeded, true, 'a budget that bites must say so');
+  assert.ok(plan.folded.length > 0, 'folded members must be attributed, not dropped');
+  const total = plan.folded.reduce((sum, entry) => sum + entry.viaCount, 0);
+  assert.ok(total > 0, 'the fold must carry members');
+  for (const entry of plan.folded) {
+    assert.ok(entry.members.every((id) => typeof id === 'string'), 'members must be listable, not just counted');
+  }
+  // Summary edges exist, are marked as folded chains, and are drawn distinctly.
+  const summary = plan.edges.filter((edge) => edge.kind === 'summary');
+  assert.ok(summary.length > 0, 'a fold must produce a summary edge or a fold marker');
+  assert.ok(summary.every((edge) => edge.declared === 'folded_chain' || edge.declared === 'folded_tail'));
+  assert.ok(summary.every((edge) => edge.viaCount === edge.members.length));
+});
+
+check('an engine that answers without coordinates is refused, not drawn at the origin', async () => {
+  class CoordlessElk {
+    layout(graph) {
+      // Exactly the shape the real engine produced inside node:vm: children
+      // with sizes but no positions.
+      return Promise.resolve({ id: graph.id, children: graph.children.map((c) => ({ id: c.id, width: c.width, height: c.height })) });
+    }
+  }
+  const t = await bootFan({ ELK: CoordlessElk });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const plan = t.evalIn('state.focusLayout');
+  assert.ok(plan, 'the page must still produce a picture');
+  assert.equal(plan.engine, 'fallback_local', 'a coordinate-less result must fall back');
+  assert.match(String(plan.engineError), /elk_returned_no_coordinates/);
+  const atOrigin = plan.boxes.filter((box) => box.x === 0 && box.y === 0).length;
+  assert.equal(atOrigin, 0, 'no box may be left at the origin: that picture looks deliberate and means nothing');
+  assert.match(t.el('graph-status').textContent, /本地回退/);
+  assert.match(t.el('graph-status').textContent, /elk_returned_no_coordinates/);
+});
+
+check('a layout that arrives after the selection moved on is discarded', async () => {
+  const release = [];
+  class SlowElk {
+    layout(graph) {
+      return new Promise((resolve) => release.push(() => resolve({ id: graph.id, children: graph.children.map((c, i) => ({ id: c.id, x: 10 + i * 20, y: 10, width: c.width, height: c.height })) })));
+    }
+  }
+  const t = await bootFan({ ELK: SlowElk });
+  const firstGeneration = t.evalIn('state.layoutGen');
+  assert.ok(release.length >= 1, 'the first selection must have started a layout');
+  const started = release.length;
+  // The selection moves on before that layout comes back.
+  await t.run(`select(${JSON.stringify(FN_B)})`);
+  assert.notEqual(t.evalIn('state.layoutGen'), firstGeneration, 'the generation must have advanced');
+  // Release every layout started for the old selection; none may be adopted.
+  for (let i = 0; i < started; i++) release[i]();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const stale = t.evalIn('state.focusLayout');
+  assert.ok(!stale || stale.stale !== true, 'a stale result must not be adopted');
+  if (stale) assert.notEqual(stale.model.targetId, FN_A.id, 'the target must be the new selection');
+});
 let failed = 0;
 for (const [name, fn] of checks) {
   try {

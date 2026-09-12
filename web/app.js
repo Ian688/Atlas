@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id);
-const state = {token:'',nodes:[],edges:[],nodePage:null,edgePage:null,selected:null,focus:null,request:0,exportUrl:null,execProfile:null,report:null,selection:null,pendingSelection:null,annotations:[],patches:[],execRender:0,ancestorChain:null,contract:null,level:'file',hierarchy:null,levelView:null,index:null};
+const state = {token:'',nodes:[],edges:[],nodePage:null,edgePage:null,selected:null,focus:null,request:0,exportUrl:null,execProfile:null,report:null,selection:null,pendingSelection:null,annotations:[],patches:[],execRender:0,ancestorChain:null,contract:null,level:'file',hierarchy:null,levelView:null,index:null,focusLayout:null,focusLayoutKey:null,layoutGen:0};
 const ns='http://www.w3.org/2000/svg';
 function svg(tag, attrs={}, text) {const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));if(text!==undefined)e.textContent=text;return e;}
 function text(tag,value,cls) {const e=document.createElement(tag);e.textContent=value;if(cls)e.className=cls;return e;}
@@ -326,37 +326,104 @@ function graphEdge(graph,a,b,label,cls){
   graph.append(path);
   graph.append(svg('text',{x:(ax+bx)/2,y:(a.y+b.y)/2-7,class:'edge-label','text-anchor':'middle'},String(label).slice(0,14)));
 }
+// The focus graph is laid out, not gridded.
+//
+// What changed and why: this used to place callers in one column, the target in
+// another and callees in a third, in load order, and to draw each edge from the
+// middle of a box edge. That is not a layout. A call graph drawn that way has no
+// layers the eye can follow and no port to tell two connections apart, so the
+// picture could be wrong in ways nobody would notice.
+//
+// Now: the bounded focus model is built from the facts (layers by distance from
+// the target, unresolved targets kept as boundary stubs), the pinned layout
+// engine places the boxes, every edge leaves from its own port, and a fold
+// caused by the node budget is drawn as a summary edge or a fold marker that
+// says how many members it stands for. The status line reports the engine, the
+// crossings, the label collisions and what was folded, so "readable" is a
+// number here too.
+const FOCUS_KEY_SEPARATOR='|';
+function focusKey(root){
+  const reach=state.focus||{edges:[]};
+  return [root.id,(reach.edges||[]).length,(reach.unresolved||[]).length,state.layoutGen].join(FOCUS_KEY_SEPARATOR);
+}
+function focusEngine(){
+  // `ELK` is the vendored, pinned engine loaded by index.html. Its absence is
+  // not an error: the local layered ordering runs instead and the result says
+  // so, because a fallback that looks like a layout is worse than an admitted one.
+  try{return typeof ELK!=='undefined'&&ELK?new ELK():null;}catch(error){return null;}
+}
+function focusPlanOptions(root,generation,elk){
+  return {rootId:root.id,rootLabel:root.name,maxNodes:LAYOUT_MAX_NODES,generation,elk};
+}
+function drawFocusPlan(graph,plan,byId){
+  const slotFor=(boxId,edgeId)=>{
+    const entry=plan.ports.get(boxId);
+    if(!entry)return null;
+    return entry.slots.find(s=>s.edge===edgeId)||null;
+  };
+  for(const box of plan.boxes){
+    const node=box.fileId?byId.get(box.fileId):null;
+    const cls=[box.role==='target'?'selected':'',box.unresolved?'unresolved':'',box.folded?'folded':''].filter(Boolean).join(' ');
+    graphNode(graph,{x:box.x+box.w/2,y:box.y+box.h/2,label:box.label,sub:box.sub,width:box.w,height:box.h,cls,
+      onClick:node?()=>select(node):null});
+  }
+  for(const edge of plan.edges){
+    const from=slotFor(edge.from,edge.id),to=slotFor(edge.to,edge.id);
+    if(!from||!to)continue;
+    const midX=(from.x+to.x)/2;
+    const path=svg('path',{d:`M ${from.x} ${from.y} C ${midX} ${from.y}, ${midX} ${to.y}, ${to.x} ${to.y}`,
+      class:`edge${edge.kind==='direct'?'':' '+edge.kind}`,'marker-end':'url(#arrow)'});
+    path.append(svg('title',{},edge.kind==='summary'
+      ?`摘要边：折叠了 ${edge.viaCount} 个成员，不是直接调用`
+      :`${edge.label}（${edge.kind==='unresolved'?'未解析目标':'静态调用候选'}）`));
+    graph.append(path);
+    const label=edge.kind==='summary'?`经 ${edge.viaCount} 个${edge.declared==='folded_tail'?'成员':'函数'}`:edge.label;
+    graph.append(svg('text',{x:(from.x+to.x)/2,y:(from.y+to.y)/2-7,class:`edge-label ${edge.kind}`, 'text-anchor':'middle'},String(label).slice(0,18)));
+  }
+  const chainEdges=plan.edges.filter(e=>e.kind==='summary').length;
+  const foldedTotal=plan.folded.reduce((total,entry)=>total+entry.viaCount,0);
+  graph.append(svg('text',{x:20,y:20,class:'frame-label'},`调用视图 · 分层 ${plan.engine==='elk_pinned'?'（布局引擎）':'（本地回退）'}`));
+  graph.append(svg('text',{x:20,y:36,class:'node-sub'},plan.engineLabel));
+  if(foldedTotal)graph.append(svg('text',{x:20,y:52,class:'node-sub'},`折叠 ${foldedTotal} 个成员 → ${chainEdges} 条摘要边（虚线，不是直接调用）`));
+  return {chainEdges,foldedTotal};
+}
+function drawFocusPending(graph,root){
+  graph.append(svg('text',{x:20,y:20,class:'frame-label'},'调用视图 · 正在计算布局'));
+  graphNode(graph,{x:150,y:110,label:root.name,sub:`${root.path} · 布局计算中`,cls:'selected',width:200,height:38});
+}
 function renderFocusGraph(graph,byId,root){
   const reach=state.focus||{edges:[],unresolved:[]};
-  const known=new Map([...(reach.edges||[]),...state.edges].filter(e=>e.target).map(e=>[e.id,e]));
-  const out=[...known.values()].filter(e=>e.source===root.id);
-  const inc=[...known.values()].filter(e=>e.target===root.id);
-  const unresolved=reach.unresolved||[];
-  graph.append(svg('text',{x:60,y:22,class:'frame-label'},`调用者 ${inc.length}（已解析）`));
-  graph.append(svg('text',{x:300,y:22,class:'frame-label'},'当前选区'));
-  graph.append(svg('text',{x:560,y:22,class:'frame-label'},`被调用 ${out.length} · 未解析 ${unresolved.length}`));
-  const rootBox=graphNode(graph,{x:300,y:104,label:root.name,sub:root.path,cls:'selected',width:200,height:38});
-  let left=0;
-  for(const e of inc){
-    const n=byId.get(e.source),y=62+left*46;left++;
-    const box=graphNode(graph,{x:60,y,label:n?n.name:e.source,sub:n?n.path:'（未载入本分析）',width:210,onClick:n?()=>select(n):null});
-    graphEdge(graph,box,rootBox,e.label||'call');
+  const key=focusKey(root);
+  if(state.focusLayout&&state.focusLayoutKey===key){
+    const drawn=drawFocusPlan(graph,state.focusLayout,byId);
+    const plan=state.focusLayout;
+    $('graph-status').textContent=`调用视图 ${plan.metrics.nodes} 块 / ${plan.metrics.edges} 边 · 未解析 ${plan.omitted.unresolved} · 引擎 ${plan.engine==='elk_pinned'?'布局引擎':'本地回退'}${plan.engineError?'（'+plan.engineError+'）':''} · 交叉 ${plan.metrics.crossings} · 标签碰撞 ${plan.metrics.labelCollisions} · 折叠 ${drawn.foldedTotal}${plan.budget.exceeded?' · 已按预算折叠':' · 未折叠'}`;
+    $('graph-status').title='分层布局与端口由本地算法产生；边只表示静态候选，摘要边表示折叠，不是直接调用。';
+    return Math.max(plan.bounds.height,240);
   }
-  let right=0;
-  for(const e of out){
-    const n=byId.get(e.target),y=62+right*46;right++;
-    const box=graphNode(graph,{x:560,y,label:n?n.name:e.target,sub:n?n.path:'',width:210,onClick:n?()=>select(n):null});
-    graphEdge(graph,rootBox,box,e.label||'call');
+  const generation=++state.layoutGen;
+  state.focusLayout=null;state.focusLayoutKey=null;
+  const elk=focusEngine();
+  if(!elk){
+    // Without the engine the local ordering is synchronous, so the page stays
+    // usable and says which path it took.
+    state.focusLayout=planFocusLayout(reach,state.nodes,focusPlanOptions(root,null,elk));
+    state.focusLayoutKey=focusKey(root);
+    return renderFocusGraph(graph,byId,root);
   }
-  for(const u of unresolved){
-    const y=62+right*46;right++;
-    const box=graphNode(graph,{x:560,y,label:`? ${u.label}`,sub:'未解析目标：动态/外部/缺失绑定',cls:'unresolved',width:210});
-    graphEdge(graph,rootBox,box,u.label||'call','unresolved');
-  }
-  if(!right)graph.append(svg('text',{x:560,y:62,class:'node-sub'},'没有已知的被调用目标'));
-  $('graph-status').textContent=`焦点 ${root.name} · 被调用 ${out.length} · 未解析 ${unresolved.length} · 调用者 ${inc.length}`;
-  $('graph-status').title=reach.semantics||'以选中函数为中心的静态调用候选，不是执行顺序。';
-  return 62+Math.max(left,right,1)*46+30;
+  drawFocusPending(graph,root);
+  $('graph-status').textContent='调用视图 · 正在计算布局（完成前不显示上一次选区的结果）';
+  const mine=generation;
+  planFocusLayoutAsync(reach,state.nodes,focusPlanOptions(root,()=>state.layoutGen,elk)).then(plan=>{
+    // A layout that arrives after the selection moved on is dropped, and says so.
+    if(mine!==state.layoutGen||plan.stale)return;
+    state.focusLayout=plan;state.focusLayoutKey=focusKey(root);
+    renderGraph();
+  }).catch(error=>{
+    if(mine!==state.layoutGen)return;
+    status(`布局失败：${String((error&&error.message)||error)}`);
+  });
+  return 240;
 }
 // How many blocks the 2D canvas draws at the file level. The city can afford
 // hundreds of columns; a workbench drawing one SVG group per block cannot, so

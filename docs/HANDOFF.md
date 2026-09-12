@@ -61,7 +61,7 @@ AI Coding 第一条完整链应做到：选函数标注新增约束 → 导出�
 
 这些是接力任务，不是永久放弃。允许替换框架和目录，要求保留身份、授权、本地数据、明确未知、终止和真实验收。不要为了沿用旧代码而保留错误，也不要为展示进度而把未实现功能画成可用按钮。
 
-## 交接状态（2026-09-12，第 18 轮结束时）
+## 交接状态（2026-09-12，第 19 轮结束时）
 
 本节是**当前实际状态**，不是目标描述。全部数字都有 `evidence/development/` 下的窗口目录（`REPORT.md` + `verification.json` + 各检查日志）与 Git 提交对应。
 
@@ -79,8 +79,9 @@ AI Coding 第一条完整链应做到：选函数标注新增约束 → 导出�
 | W07/W06 并发 | 写锁等待可取消 + 具名超时；3 并发同 id（真实 rxjs）；`job work --parallel 1..=4` 每槽位独立租约 | `2026-09-12-ge3-concurrency`、`2026-09-12-w06-bounded-parallel-jobs` |
 | W09 共享层级 | 2D/3D 共用一个几何无关的层级定义（`web/hierarchy.js`）；2D 获得层级切换 + 均匀网格空间索引；层级省略与预算截断分开报告 | `2026-09-12-w09-shared-hierarchy` |
 | W09 尺度合同 | 柱高从等比改为分段单调尺度（2D/3D 共用）；压缩标记环；「尺度」行含标尺与对照；可读性基准进入门禁（判据可被证伪） | `2026-09-12-w09-column-scale` |
+| W09 2D 分层布局 | 本地钉版 elkjs 0.12.0（`web/vendor/`，未修改、EPL-2.0、指纹覆盖）+ 端口 + 折叠摘要边；无坐标结果具名拒绝、迟到布局按 generation 丢弃、引擎/交叉/碰撞/折叠进入状态行与门禁 | `2026-09-12-w09-layered-layout` |
 
-门禁状态：`python3 scripts/verify.py` = **24 项检查 + 1 项受控负对照 + 指纹配对**（含"二进制自称的指纹 == 从源码算出的指纹"），最新为全绿（见 `evidence/development/2026-09-12-w09-shared-hierarchy/verification.json`）。第 17 轮第一次运行**是红的**：`fingerprint pairing` 发现 `build.rs` 的指纹清单漏了 `web/hierarchy.js`，原始失败证据保留在该窗口 `runs/run-1-fingerprint-mismatch/`。
+门禁状态：`python3 scripts/verify.py` = **25 项检查 + 1 项受控负对照 + 指纹配对**（含"二进制自称的指纹 == 从源码算出的指纹"），最新为全绿（见 `evidence/development/2026-09-12-w09-shared-hierarchy/verification.json`）。第 17 轮第一次运行**是红的**：`fingerprint pairing` 发现 `build.rs` 的指纹清单漏了 `web/hierarchy.js`，原始失败证据保留在该窗口 `runs/run-1-fingerprint-mismatch/`。
 
 ### 下一轮起点（按价值排序）
 
@@ -103,7 +104,8 @@ AI Coding 第一条完整链应做到：选函数标注新增约束 → 导出�
 - 层级还不能像选区那样经 URL fragment 在 2D/3D 之间传递；2D 的空间索引只做"这一点上是哪个块"，不做布局避让。
 - **按用户决定，广度已暂停**：W07 大仓库/monorepo 资格与 W10 宿主侧 E2E 不再推进，继续标注为 PARTIAL / 环境性阻塞；当前集中做"把 2D 做成真能用的工作台"。
 - 3D 仍缺：玻璃外壳（`alpha:false`）、跨目录调用的**边界端口**、正交/平面 2.5D 视角、相机与折叠的跨视图保存、静态阅读按需重绘（现为常驻 `requestAnimationFrame`）、搜索定位到层、类层组标题、`visibility_reason`、文件树/全局小图/时间轴。
-- 可读性目前**只有柱高有判据**：标签碰撞、边交叉、布局稳定性、帧时间都还没有量测；2D 仍没有分层布局与端口。
+- 可读性现在有两条判据（柱高、布局交叉与标签碰撞），但**帧时间与布局稳定性只有脚本级检查**，没有浏览器内量测；2D 的**概览**仍是网格，只有调用视图是布局出来的。
+- 布局在**主线程**同步等待异步引擎结果，`LAYOUT_MAX_NODES = 120`；规格要求的 layout worker、deadline、取消与 generation 缓存**未实现**。3D 的缺口（玻璃、边界端口、正交视角、相机保存、按需重绘、搜索定位、visibility_reason）一条都没动。
 - W00–W10 的 `implementation` 多为 PARTIAL：自动化检查 PASS，但**资格（qualification）一律 NOT_QUALIFIED，且独立评审未做**。
 
 ### 复验入口（一条命令）

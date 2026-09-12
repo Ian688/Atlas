@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-column-scale",
+    "window": "2026-09-12/w09-layered-layout",
     "status": "DELIVERED",
-    "note": "柱高从等比改为分段单调的尺度合同（前 8 层线性、其后对数封顶、N=0 矮柱、半径饱和），两个投影共用一个尺度函数；可读性由 scripts/bench_view_readability.py 量测并进入门禁（判据必须能被证伪：被替换的等比尺度须在同一条判据上失败）。真实 rxjs：不足最高柱 1% 的列 850/923 → 0/923，中位/最高 0.003 → 0.103。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-column-scale",
-    "verification": "evidence/development/2026-09-12-w09-column-scale/verification.json"
+    "note": "2D 调用视图改为真正的分层布局：本地钉版 elkjs 0.12.0（未修改、EPL-2.0、进入指纹）+ 端口 + 折叠摘要边；引擎无坐标结果具名拒绝、迟到布局按 generation 丢弃；布局判据进入门禁（确定性、0 标签碰撞、折叠必须产生摘要边）。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-layered-layout",
+    "verification": "evidence/development/2026-09-12-w09-layered-layout/verification.json"
   },
   "windows": [
     {
@@ -447,10 +447,20 @@
       "note": "尺度合同：atlasScaleHeight/Tier/Radius/Compression/Report/Ruler 写进 web/hierarchy.js（2D/3D 共用），city3d 柱高走该尺度并画压缩标记环，层数受压缩高度限制；页面新增「尺度」行给出标尺、中位/最高、不足 1% 的列数（并给出线性尺度下的对照）。可读性基准 scripts/bench_view_readability.py（node 驱动读取同一份尺度实现，不重抄公式）以 --self-check 进入门禁。第一次门禁运行 24/24 绿但 status=UNSTABLE（运行中改了源文件），原始记录保留在 runs/run-1-unstable-sources-changed/，冻结后重跑为 PASS。仍未做：玻璃、边界端口、正交/平面视角、相机与折叠保存、按需重绘、搜索定位到层、类层组、visibility_reason、文件树/小图/时间轴；2D 真实布局是下一步。",
       "report": "evidence/development/2026-09-12-w09-column-scale/REPORT.md",
       "verification": "evidence/development/2026-09-12-w09-column-scale/verification.json"
+    },
+    {
+      "id": "2026-09-12/w09-layered-layout",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09"
+      ],
+      "note": "规格明确要求布局用 ELK 方向而不是手搓坐标，并要求先在 fixture 上评估。评估结果：elkjs 0.12.0、无依赖、未修改、1.61MB、EPL-2.0；真实规模焦点图 30–115ms（纯 node），浏览器内 21 块约 230ms 且 engine=elk_pinned。适配器 Atlas 侧：按距离分层、未解析保留为边界桩、超预算折叠为摘要边（带成员）或折叠标记；端口逐边独立；交叉/标签碰撞/确定性可测。三个由基准抓出的真 bug：分布到未绘制节点的摘要边被守卫丢弃、折叠尾巴每个成员生成一个标记、缺失坐标被当成 0（后者改为具名拒绝 elk_returned_no_coordinates）。elkjs 无同步 API，故布局异步；迟到结果按 generation 丢弃。未做：layout worker/deadline/取消、3D 全部缺口、2D 概览仍为网格。",
+      "report": "evidence/development/2026-09-12-w09-layered-layout/REPORT.md",
+      "verification": "evidence/development/2026-09-12-w09-layered-layout/verification.json"
     }
   ],
   "next_work_item": "2D 画布的正式层级与空间索引，或大仓库/monorepo 的规模资格",
-  "next_action": "按用户决定转深度、暂停广度：(1) 2D 真正的分层布局（端口 + 摘要边语义，布局用本地钉版的 ELK 方向而不是手搓坐标）；(2) 3D 玻璃 / 边界端口 / 正交平面视角；(3) 相机与折叠跨视图保存、按需重绘、搜索定位到层、visibility_reason；(4) 标签碰撞与边交叉的可读性判据（目前只有柱高有判据）。已暂停并如实标注：W07 大仓库资格、W10 宿主侧 E2E（环境性阻塞）。",
+  "next_action": "继续深度路线：2D 概览也用布局（或明确它是列表）；布局移到 worker 并加 deadline/取消/缓存；然后 3D 的玻璃/边界端口/正交视角/相机保存/按需重绘/搜索定位/visibility_reason。广度仍暂停（W07 资格、W10 宿主侧）。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",

@@ -1368,6 +1368,26 @@ pub async fn serve(
                 )
             }),
         )
+        // Vendored layout engine, unmodified and pinned (see web/vendor/README.md).
+        // It computes coordinates and nothing else: it never sees the analysis.
+        .route(
+            "/vendor/elk.bundled.js",
+            get(|| async {
+                asset(
+                    include_str!("../../../web/vendor/elk.bundled.js"),
+                    "text/javascript; charset=utf-8",
+                )
+            }),
+        )
+        .route(
+            "/layout.js",
+            get(|| async {
+                asset(
+                    include_str!("../../../web/layout.js"),
+                    "text/javascript; charset=utf-8",
+                )
+            }),
+        )
         .route(
             "/style.css",
             get(|| async {

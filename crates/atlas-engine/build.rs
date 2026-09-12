@@ -61,6 +61,8 @@ fn main() {
         // binary, and leaving it out would let the UI change without the
         // fingerprint moving.
         "web/hierarchy.js",
+        "web/layout.js",
+        "web/vendor/elk.bundled.js",
         "web/style.css",
         "web/city3d.html",
         "web/city3d.js",
