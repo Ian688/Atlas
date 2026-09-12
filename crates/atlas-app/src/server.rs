@@ -23,6 +23,13 @@ struct App {
     token: String,
     authority: String,
     slots: Arc<Semaphore>,
+    /// The authenticated principal for everything that arrives over HTTP.
+    ///
+    /// The only identity this service can actually verify is "holds the session
+    /// token", so that is the owner every request is attributed to. A page that
+    /// declares a different owner is not believed -- letting one page write rows
+    /// under another's name would make the owner column meaningless.
+    owner: String,
 }
 #[derive(Deserialize)]
 struct Request {
@@ -298,8 +305,6 @@ struct ProposeBody {
     entity: String,
     diff: String,
     summary: Option<String>,
-    #[serde(default = "default_human")]
-    proposed_by: String,
 }
 
 /// Register a proposal over HTTP. This is the review surface's entry point: a
@@ -326,13 +331,14 @@ async fn propose_patch(
     };
     let store = app.store.clone();
     let analysis = app.analysis.clone();
+    let owner = app.owner.clone();
     let outcome = tokio::task::spawn_blocking(move || {
         crate::patchwork::propose_from_diff(
             &store,
             &analysis,
             &entity,
             &body.diff,
-            &body.proposed_by,
+            &owner,
             body.summary.as_deref(),
         )
     })
@@ -365,17 +371,11 @@ struct AnnotationRequest {
     #[serde(default = "default_intent")]
     kind: String,
     body: String,
-    #[serde(default = "default_human")]
-    proposed_by: String,
 }
 
 fn default_intent() -> String {
     "intent".into()
 }
-fn default_human() -> String {
-    "human".into()
-}
-
 /// Register an Intent. This is the only write the page can make, and it writes
 /// a proposal -- never source, never a fact.
 async fn annotate(
@@ -397,12 +397,12 @@ async fn annotate(
         }
     };
     let selection = bridge::selection(&app.analysis, &symbol, "entity");
-    match app.store.create_annotation(
-        &selection,
-        &request.kind,
-        &request.body,
-        &request.proposed_by,
-    ) {
+    // `proposed_by` is the session, not a string the caller chose: a page that
+    // could claim authorship could attribute its own proposal to a person.
+    match app
+        .store
+        .create_annotation(&selection, &request.kind, &request.body, &app.owner)
+    {
         Ok((annotation, created)) => axum::Json(serde_json::json!({
             "outcome": if created {"created"} else {"already_proposed"},
             "annotation": annotation,
@@ -418,7 +418,6 @@ async fn annotate(
 
 #[derive(Deserialize)]
 struct AgentRequestBody {
-    owner: String,
     request_key: String,
     #[serde(default = "default_inspect")]
     kind: String,
@@ -456,7 +455,10 @@ async fn agent_request(
         None => None,
     };
     let spec = bridge::AgentRequestSpec {
-        owner: &body.owner,
+        // The session is the owner. `owner` is deliberately absent from this
+        // request type, so a page cannot address another owner's request
+        // identity -- there is no field to read.
+        owner: &app.owner,
         request_key: &body.request_key,
         kind: &body.kind,
         analysis_id: &app.analysis,
@@ -971,9 +973,10 @@ pub async fn serve(
     let app = App {
         store,
         analysis,
-        token,
+        token: token.clone(),
         authority: address.to_string(),
         slots: Arc::new(Semaphore::new(8)),
+        owner: format!("session-{}", &token[..12]),
     };
     let router = Router::new()
         .route(

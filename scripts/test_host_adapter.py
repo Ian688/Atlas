@@ -208,7 +208,10 @@ class HostSeam(unittest.TestCase):
         self.assertEqual(report["context_analysis"], self.analysis)
         self.assertTrue(report["selection_version"], "a selection is pinned to the served version")
         self.assertFalse(report["annotation_exists"], "an Intent is not existing code")
-        self.assertEqual(report["annotation_author"], "host")
+        # Authorship over HTTP is the service's to record, not the caller's to
+        # claim: the only identity it can verify is the session token.
+        self.assertTrue(report["annotation_author"].startswith("session-"),
+                        report["annotation_author"])
         self.assertGreaterEqual(report["annotation_count"], 1)
 
     def test_a_host_can_register_and_read_a_patch_proposal(self):

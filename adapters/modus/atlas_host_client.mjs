@@ -102,9 +102,16 @@ export class AtlasHostClient {
   // -- act ----------------------------------------------------------------
   /** Pin a selection context. Content-addressed, so the same request is the same id. */
   context({ entity }) { return this.request('context', { body: { entity } }); }
-  /** Register an Intent. Never writes source. */
-  annotate({ entity, kind = 'intent', body, proposedBy = 'host' }) {
-    return this.request('annotation', { body: { entity, kind, body, proposed_by: proposedBy } });
+  /**
+   * Register an Intent. Never writes source.
+   *
+   * Authorship is the service's to record, not the caller's to claim: the only
+   * identity it can verify is "holds the session token", so `proposed_by` on
+   * the returned annotation is that session. A host that needs its own name in
+   * the record should run the CLI, where an operator states who they are.
+   */
+  annotate({ entity, kind = 'intent', body }) {
+    return this.request('annotation', { body: { entity, kind, body } });
   }
   /** Enqueue a bounded bridge request; the service rejects unbounded kinds. */
   agentRequest({ owner, requestKey, kind = 'inspect', entity, payload }) {
@@ -119,9 +126,9 @@ export class AtlasHostClient {
    * nothing. Verifying (which re-indexes) and applying (which writes a
    * checkout) are CLI operations -- a host must not do them behind a page.
    */
-  proposePatch({ entity, diff, summary, proposedBy = 'host' }) {
+  proposePatch({ entity, diff, summary }) {
     return this.request('patch/propose', {
-      body: { entity, diff, ...(summary ? { summary } : {}), proposed_by: proposedBy },
+      body: { entity, diff, ...(summary ? { summary } : {}) },
     });
   }
   /**

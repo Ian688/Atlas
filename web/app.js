@@ -105,7 +105,7 @@ async function proposePatch(){
   if(!diff.trim()){status('先粘贴一份统一 diff');return;}
   $('patch-propose').disabled=true;
   try{
-    const result=await apiJson('patch/propose',{entity:selected.id,diff,proposed_by:'human'});
+    const result=await apiJson('patch/propose',{entity:selected.id,diff});
     $('patch-input').value='';
     await loadPatches(selected);
     status(result.outcome==='proposed'?'提案已登记（未应用，也未验证）':'这份提案已经登记过');
@@ -129,7 +129,9 @@ async function proposeAnnotation(){
   const body=$('annotation-input').value.trim();
   if(!body){status('先写下要登记的意图');return;}
   try{
-    const result=await apiJson('annotation',{entity:selected.id,kind:'constraint',body,proposed_by:'human'});
+    // No `proposed_by`: authorship over HTTP is the service's to record, and
+    // the page cannot claim to be someone else.
+    const result=await apiJson('annotation',{entity:selected.id,kind:'constraint',body});
     $('annotation-input').value='';
     await loadAnnotations(selected);
     status(result.outcome==='created'?'Intent 已登记为提案（不是代码）':'这条 Intent 已经登记过');
@@ -152,7 +154,7 @@ function installBridge(){
     // and applying are not exposed here at all.
     async proposePatch(diff){if(!state.selected)return {ok:false,error:'no_selection'};$('patch-input').value=diff||'';const result=await proposePatch();return result?{ok:true,proposal:result.proposal}:{ok:false,error:'proposal_rejected'};},
     async select(entityId){const node=state.nodes.find(n=>n.id===entityId);if(!node)return {ok:false,error:'entity_not_loaded'};await select(node);return {ok:true,entity_id:node.id};},
-    async propose(kind,body){if(!state.selected)return {ok:false,error:'no_selection'};const result=await apiJson('annotation',{entity:state.selected.id,kind:kind||'constraint',body,proposed_by:'agent'});await loadAnnotations(state.selected);return {ok:true,annotation:result.annotation,exists:false};},
+    async propose(kind,body){if(!state.selected)return {ok:false,error:'no_selection'};const result=await apiJson('annotation',{entity:state.selected.id,kind:kind||'constraint',body});await loadAnnotations(state.selected);return {ok:true,annotation:result.annotation,exists:false};},
     openProjection(view){const target=view==='3d'?($('open-3d')?.getAttribute('href')||'/city3d'):'/';if(typeof location!=='undefined')location.href=target;return target;},
     runControlled(){return runControlled();},
   };

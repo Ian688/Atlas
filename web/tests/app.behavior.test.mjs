@@ -555,6 +555,8 @@ check('an Intent is registered as a proposal, never as existing code', async () 
   const posted = t.requests.filter((r) => r.name === 'annotation');
   assert.equal(posted.length, 1, 'exactly one Intent must be posted');
   assert.equal(JSON.parse(posted[0].body).entity, FN_A.id, 'the Intent is pinned to the selection');
+  assert.equal(JSON.parse(posted[0].body).proposed_by, undefined,
+    'the page must not claim authorship: the service records the session');
   const shown = t.el('annotation-body').textContent;
   assert.match(shown, /must not raise/, 'the Intent must be visible');
   assert.match(shown, /提案（尚未存在）/, 'a proposal must not read as existing code');

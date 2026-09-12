@@ -238,6 +238,16 @@
       ],
       "note": "受控运行的 SIGINT 取消接通并有测试（按进程组 kill、发布 cancelled 记录）；scenario 取消后停止并区分 attempted/declared。",
       "report": "evidence/development/2026-09-12-w08/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/w09-session-identity",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09-http-owner-is-the-session",
+        "W09-http-authorship-is-the-session"
+      ],
+      "note": "HTTP 上的 owner 与作者改由服务端按会话写入；请求体里的 owner/proposed_by 不被采信。CLI 保留显式声明（本机自我声明，非认证）。",
+      "report": "evidence/development/2026-09-12-w09-session-identity/REPORT.md"
     }
   ],
   "next_work_item": "宿主侧 E2E 与旧入口切换（需要 Modus 检出）；或回到 W08/W09 的深化项",
@@ -504,7 +514,8 @@
         "排队取消：queued 可取消；running 不可被旁观者取消（属于租约持有者）。reap 是放弃这次运行，claim_next 是换人接着跑，两种意图分开",
         "加列迁移：priority/options 以纯增量方式补齐旧库，且依赖新列的索引在迁移之后创建（此前索引先于加列执行会让旧库直接开不了）",
         "请求身份收进 JobRequest：5 个同类型字符串不再靠参数位置区分 owner 与 project",
-        "队列按 kind 分派：jobs.kind（index|patch_verify，增量加列默认 index）；job work 依据行自身 kind 选择执行路径，两种作业共用身份三元组/优先级/租约/心跳/收割；一行无法自述怎么跑时判失败而不是用本 worker 默认参数顶替"
+        "队列按 kind 分派：jobs.kind（index|patch_verify，增量加列默认 index）；job work 依据行自身 kind 选择执行路径，两种作业共用身份三元组/优先级/租约/心跳/收割；一行无法自述怎么跑时判失败而不是用本 worker 默认参数顶替",
+        "HTTP 上 owner 由服务端按会话钉定（请求类型里没有 owner 字段），页面无法以他人名义入队；CLI 的 --owner 仍是本机操作者的自我声明"
       ],
       "evidence": [
         "crates/atlas-engine/src/scan.rs deadline + tests",
@@ -517,10 +528,11 @@
         "evidence/daily/2026-09-12/w06-jobs/verification.json",
         "evidence/daily/2026-09-12/w06-queue/verification.json",
         "evidence/development/2026-09-10-continuation/verified/verification.json",
-        "scripts/test_patch.py::Queued（排队验证、幂等、多 kind 共存、坏作业行判失败）"
+        "scripts/test_patch.py::Queued（排队验证、幂等、多 kind 共存、坏作业行判失败）",
+        "scripts/test_bridge.py::Http（会话即 owner 与作者，声明不被采信）"
       ],
       "blockers": [
-        "owner 是未经认证的调用者声明；W06 合同要求的“服务端验证权限与版本”未实现，作业 API 尚未暴露到 HTTP（HTTP 层仍只有本地会话令牌）",
+        "CLI 的 owner 仍是未经认证的操作者声明（本机信任模型）；HTTP 上已改为服务端按会话钉定，因此作业 API 的 HTTP 暴露不再是身份伪造面，但远程/多租户认证仍未实现",
         "无守护进程与并行 worker 池：job work 需人工触发，单 worker 串行，无重试退避、公平性或配额",
         "迁移策略只覆盖纯增量变更；改列类型、拆表等非增量变更仍无迁移与回滚方案。断电耐久未资格验证",
         "协作取消不承诺中断进行中的单次OS I/O或磁盘commit；POSIX信号测试不替代Windows资格"
@@ -678,7 +690,8 @@
         "Intent/Static/Observed 三类证据分开存放：proposal 带 intent=true/code_exists=false，verification 里 graph_diff 与 test 各自标注",
         "提案审阅面：GET /api/patches、GET /api/patch?id=、POST /api/patch/propose 与函数面板提案面板；页面可登记（Intent）并读校验结果/图差异/测试退出码，验证与应用仍只在 CLI",
         "HTTP 与 CLI 共用 patchwork::propose_from_diff：同一校验路径，页面无法登记一个 CLI 会拒绝的 diff；跨分析的提案查询被拒绝",
-        "补丁验证可排队：patch verify --enqueue --owner X 生成 kind=patch_verify 作业，job work 用同一个 verify_proposal 执行（前台与排队不是两条路径）；终态 artifact 是补丁树派生的 analysis；同一 (owner,project,request_key) 幂等，完成后重排报告 already_completed"
+        "补丁验证可排队：patch verify --enqueue --owner X 生成 kind=patch_verify 作业，job work 用同一个 verify_proposal 执行（前台与排队不是两条路径）；终态 artifact 是补丁树派生的 analysis；同一 (owner,project,request_key) 幂等，完成后重排报告 already_completed",
+        "HTTP 身份：注解与提案的作者由服务端按会话写入（请求类型无 proposed_by），页面无法把提案归到别人名下"
       ],
       "evidence": [
         "crates/atlas-engine/src/patch.rs（11 个 diff 单测 + 提案存储与状态迁移）",
@@ -689,7 +702,9 @@
         "scripts/test_patch.py（35 个用例：CLI 32 + HTTP 3）",
         "web/tests/app.behavior.test.mjs（24 项，新增 4 项提案面板行为）",
         "adapters/modus/atlas_host_client.mjs（patches/patch/proposePatch）",
-        "scripts/test_patch.py（25 个用例：CLI 16 + 排队 5 + HTTP 3 + 共享基类去重）"
+        "scripts/test_patch.py（25 个用例：CLI 16 + 排队 5 + HTTP 3 + 共享基类去重）",
+        "scripts/test_bridge.py（22 个用例，新增 2 项身份用例）",
+        "scripts/test_host_adapter.py（8 个用例，作者断言改为会话）"
       ],
       "blockers": [
         "AI Coding 链没有图形化的一键撤销：apply/revert 只有 CLI；提案形式只支持统一 diff（新建/删除/重命名文件不支持）",

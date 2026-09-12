@@ -257,6 +257,31 @@ class Http(Harness):
         self.assertFalse(posted["annotation"]["exists"])
         self.assertEqual(len(self.get("api/annotations?entity=double")["annotations"]), 1)
 
+    def test_a_page_cannot_claim_another_owner_or_author(self):
+        # The only identity this service can verify is "holds the session
+        # token", so every row written over HTTP is attributed to the session.
+        # A page that sends its own owner/authorship is not believed, or the
+        # owner column would mean nothing.
+        enqueued = json.load(self.post("api/agent/request", {
+            "owner": "somebody-else", "proposed_by": "a-person",
+            "request_key": "impersonate", "kind": "inspect", "entity": "double",
+        }))
+        owner = enqueued["request"]["owner"]
+        self.assertNotEqual(owner, "somebody-else")
+        self.assertTrue(owner.startswith("session-"), owner)
+        # The same session is one owner across requests.
+        again = json.load(self.post("api/agent/request", {
+            "owner": "another-name", "request_key": "impersonate-2",
+            "kind": "inspect", "entity": "double",
+        }))
+        self.assertEqual(again["request"]["owner"], owner)
+
+        annotation = json.load(self.post("api/annotation", {
+            "entity": "double", "kind": "intent", "body": "who wrote this?",
+            "proposed_by": "a-person",
+        }))
+        self.assertEqual(annotation["annotation"]["proposed_by"], owner)
+
     def test_the_bridge_queue_over_http(self):
         enqueued = json.load(self.post("api/agent/request", {
             "owner": "page-agent", "request_key": "h1", "kind": "inspect", "entity": "double",
@@ -278,6 +303,19 @@ class Http(Harness):
         payload = json.load(error.exception)
         error.exception.close()
         self.assertEqual(payload["request"]["terminal_reason"], "action_not_in_bounded_set")
+
+    def test_a_proposal_from_the_page_is_attributed_to_the_session(self):
+        posted = json.load(self.post("api/patch/propose", {
+            "entity": "double", "proposed_by": "a-person", "summary": "attribution",
+            "diff": ("--- a/src/lib.js\n+++ b/src/lib.js\n@@ -1,2 +1,2 @@\n"
+                     " export function double(value) { return value * 2; }\n"
+                     "-export function label(value) { return 'v' + value; }\n"
+                     "+export function label(value) { return 'v:' + value; }\n"),
+        }))
+        self.assertTrue(posted["proposal"]["proposed_by"].startswith("session-"),
+                        posted["proposal"]["proposed_by"])
+        self.assertEqual(posted["proposal"]["proposal"]["proposed_by"],
+                         posted["proposal"]["proposed_by"])
 
     def test_the_page_cannot_pin_work_to_another_analysis(self):
         # `analysis_id` is not part of the request type, so a page cannot name a
