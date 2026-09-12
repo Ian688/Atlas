@@ -1,0 +1,13 @@
+{"case": "pipeline_deadline_under_publication_lock", "exit_code": 1, "elapsed_seconds": 2.042, "publication_unchanged": true, "retry_exit_code": 0}
+{"case": "SIGINT_after_worker_under_publication_lock", "exit_code": 1, "signal_to_exit_seconds": 0.009, "worker_reaped": true, "publication_unchanged": true, "retry_exit_code": 0}
+{"case": "SIGTERM_after_worker_under_publication_lock", "exit_code": 1, "signal_to_exit_seconds": 0.007, "worker_reaped": true, "publication_unchanged": true, "retry_exit_code": 0}
+test_pipeline_deadline_includes_publication_lock_wait (__main__.Cancellation.test_pipeline_deadline_includes_publication_lock_wait) ... ok
+test_sigint_after_worker_cannot_publish_when_lock_releases (__main__.Cancellation.test_sigint_after_worker_cannot_publish_when_lock_releases) ... ok
+test_sigint_while_worker_waits_reaps_child_and_allows_retry (__main__.Cancellation.test_sigint_while_worker_waits_reaps_child_and_allows_retry) ... ok
+test_sigterm_after_worker_cannot_publish_when_lock_releases (__main__.Cancellation.test_sigterm_after_worker_cannot_publish_when_lock_releases) ... ok
+test_sigterm_while_worker_waits_reaps_child_and_allows_retry (__main__.Cancellation.test_sigterm_while_worker_waits_reaps_child_and_allows_retry) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 9.675s
+
+OK
