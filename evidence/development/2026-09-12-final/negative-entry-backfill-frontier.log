@@ -1,0 +1,30 @@
+test_a_call_that_cannot_return_has_no_normal_successor (__main__.SemanticContracts.test_a_call_that_cannot_return_has_no_normal_successor) ... ok
+test_budget_publication_is_partial_bounded_and_immutable (__main__.SemanticContracts.test_budget_publication_is_partial_bounded_and_immutable) ... 
+  test_budget_publication_is_partial_bounded_and_immutable (__main__.SemanticContracts.test_budget_publication_is_partial_bounded_and_immutable) (budget=15) ... FAIL
+test_context_cap_preserves_every_callers_possible_result (__main__.SemanticContracts.test_context_cap_preserves_every_callers_possible_result) ... ok
+test_number_to_string_matches_node_at_rounding_and_exponent_boundaries (__main__.SemanticContracts.test_number_to_string_matches_node_at_rounding_and_exponent_boundaries) ... ok
+test_parameter_permutation_and_refined_scalar_contexts (__main__.SemanticContracts.test_parameter_permutation_and_refined_scalar_contexts) ... ok
+test_reassigned_captured_function_does_not_claim_the_old_target (__main__.SemanticContracts.test_reassigned_captured_function_does_not_claim_the_old_target) ... ok
+
+======================================================================
+FAIL: test_budget_publication_is_partial_bounded_and_immutable (__main__.SemanticContracts.test_budget_publication_is_partial_bounded_and_immutable) (budget=15)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_semantic_contracts.py", line 138, in test_budget_publication_is_partial_bounded_and_immutable
+    self.assertEqual(fact['frontier'], [])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: [0] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+0
+
+- [0]
+?  -
+
++ []
+
+----------------------------------------------------------------------
+Ran 6 tests in 6.366s
+
+FAILED (failures=1)
