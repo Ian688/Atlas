@@ -492,27 +492,53 @@ class Execution(unittest.TestCase):
         self.assertTrue(record["isolation"]["declared_context"]["this_arg"])
         self.assertTrue(record["trace"]["events"][-1]["receiver_declared"])
 
-    def test_an_unnamed_global_read_needs_acknowledgement_not_a_fake_declaration(self):
-        # `CONFIG` is read as a bare identifier, and the published facts carry
-        # no name for it. Atlas therefore does not demand a declaration it
-        # cannot name; it asks for the acknowledgement and lets the run produce
-        # a real answer -- which is a ReferenceError until the caller states the
-        # value. Both halves are asserted, because "we ran it" is only useful if
-        # what happened is reported.
+    def test_a_true_global_is_named_so_the_caller_knows_what_to_declare(self):
+        # `CONFIG` is read as a bare identifier. The `read_external` op names it,
+        # so the refusal can say exactly which value is missing instead of
+        # asking the caller to guess.
         profile = self.profile("readConfig")
-        self.assertIn("unknown_calls", profile["required_grants"])
-        self.assertEqual(profile["required_globals"], [],
-                         "an unnamed external must not invent a name")
-        undeclared = self.exec("readConfig", grants=GRANTS)
-        self.assertEqual(undeclared["verdict"], "threw")
-        self.assertEqual(undeclared["thrown"]["name"], "ReferenceError",
-                         "the honest answer is the real error, not a fabricated value")
+        self.assertEqual(profile["required_globals"], ["CONFIG"])
+        self.assertIn("globals", profile["required_context"])
+        refused = self.exec("readConfig", grants=GRANTS)
+        self.assertEqual(refused["verdict"], "refused")
+        self.assertEqual(refused["refusal"]["missing_context"], ["global:CONFIG"])
         declared = self.exec("readConfig", grants=GRANTS,
                              extra=["--global", 'CONFIG={"value":"declared"}'])
         self.assertEqual(declared["verdict"], "returned", declared.get("thrown"))
         self.assertEqual(decode(declared["value"]), "declared")
         self.assertEqual(declared["isolation"]["declared_context"]["globals"], ["CONFIG"])
         self.assertEqual(declared["trace"]["events"][-1]["declared_globals"], ["CONFIG"])
+
+    def test_a_runtime_builtin_is_never_asked_for_as_an_input(self):
+        # `divide` throws `new Error(...)`. The engine used to report `Error` as
+        # a global to declare, and declaring it as JSON replaced the real
+        # constructor -- the run then failed with a TypeError that had nothing to
+        # do with the function. Built-ins belong to the runtime, not the caller.
+        profile = self.profile("divide")
+        self.assertEqual(profile["required_globals"], [])
+        self.assertNotIn("globals", profile["required_context"])
+        record = self.exec("divide", [1, 0], grants=GRANTS)
+        self.assertEqual(record["verdict"], "threw")
+        self.assertEqual(record["thrown"]["name"], "Error",
+                         "the real constructor must still be the real one")
+
+    def test_an_imported_binding_is_not_a_global_to_declare(self):
+        # `fs`, `helper` and friends are module state: the copied module already
+        # has them. Asking the caller to declare one would be asking for a value
+        # that is already there, and would hide the real global behind it.
+        for entity in ["writeOutside", "readOutside", "spawnEcho", "fetchLocal",
+                       "shout", "useModuleConst"]:
+            profile = self.profile(entity)
+            self.assertEqual(profile["required_globals"], [],
+                             f"{entity}: an import must not be reported as a global")
+        # These read only their own import (or their own module state), so the
+        # global-access effect must not fire either. (`spawnEcho`/`fetchLocal`
+        # use a dynamic import whose local binding Atlas cannot resolve, and
+        # `shout` reads the runtime's `console` -- both are genuinely unresolved
+        # or global reads, so they are deliberately not in this list.)
+        for entity in ["writeOutside", "readOutside", "useModuleConst"]:
+            self.assertFalse(self.profile(entity)["effects"]["may_access_global"],
+                             f"{entity}: reading its own import is not a global access")
 
     def test_an_unknown_effect_grant_name_is_rejected(self):
         # The old `globals` grant must fail loudly rather than be ignored, or a

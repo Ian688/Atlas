@@ -75,6 +75,7 @@ fn function(name: &str, params: &[&str], body: Vec<Stmt>) -> FlowFunction {
         start: 0,
         end: 99,
         params: param_ids,
+        imports: Vec::new(),
         scopes: vec![FlowScope {
             id: "s:f.ts:0:function".into(),
             kind: "function".into(),
@@ -950,7 +951,7 @@ fn run_interproc(
     let flow = FlowFacts {
         schema: FLOW_SCHEMA.into(),
         snapshot_id: "t".into(),
-        producer: "typescript/5.9.3;worker/0.2.0".into(),
+        producer: atlas_contract::WORKER_PRODUCER.into(),
         profile: FLOW_PROFILE.into(),
         functions,
         diagnostics: vec![],
@@ -1524,7 +1525,7 @@ fn r5_expired_deadline_aborts_derivation() {
     let flow = FlowFacts {
         schema: FLOW_SCHEMA.into(),
         snapshot_id: "t".into(),
-        producer: "typescript/5.9.3;worker/0.2.0".into(),
+        producer: atlas_contract::WORKER_PRODUCER.into(),
         profile: FLOW_PROFILE.into(),
         functions: vec![f],
         diagnostics: vec![],
@@ -1575,7 +1576,7 @@ fn interproc_value(
     let flow = FlowFacts {
         schema: FLOW_SCHEMA.into(),
         snapshot_id: "t".into(),
-        producer: "typescript/5.9.3;worker/0.2.0".into(),
+        producer: atlas_contract::WORKER_PRODUCER.into(),
         profile: FLOW_PROFILE.into(),
         functions,
         diagnostics: vec![],
@@ -2344,7 +2345,7 @@ fn k1_context_sensitive_branch_folding() {
     let flow = FlowFacts {
         schema: FLOW_SCHEMA.into(),
         snapshot_id: "t".into(),
-        producer: "typescript/5.9.3;worker/0.2.0".into(),
+        producer: atlas_contract::WORKER_PRODUCER.into(),
         profile: FLOW_PROFILE.into(),
         functions: vec![pick, caller_a, caller_b],
         diagnostics: vec![],

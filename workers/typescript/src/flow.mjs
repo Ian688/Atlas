@@ -47,7 +47,7 @@ export function buildFlow(context) {
   const flow = {
     schema: 'atlas.flow-ir.v1',
     snapshot_id: context.snapshotId,
-    producer: `typescript/${ts.version};worker/0.2.0`,
+    producer: `typescript/${ts.version};worker/0.2.1`,
     profile: 'js-structured-control.v1',
     functions: [],
     diagnostics: [],
@@ -135,6 +135,18 @@ class FileBuilder {
   buildFile() {
     // Pass 0: register module-level declaration names so hoisted, recursive and
     // mutual references between functions resolve to real bindings.
+    // Runtime import local names. A type-only import is erased and introduces
+    // no binding, so listing it would make the engine treat an undefined read as
+    // provided module state.
+    const moduleImports = [];
+    for (const stmt of this.sf.statements) {
+      if (!ts.isImportDeclaration(stmt) || !stmt.importClause || stmt.importClause.isTypeOnly) continue;
+      const clause = stmt.importClause;
+      if (clause.name) moduleImports.push(clause.name.text);
+      const bindings = clause.namedBindings;
+      if (bindings && ts.isNamespaceImport(bindings)) moduleImports.push(bindings.name.text);
+      if (bindings && ts.isNamedImports(bindings)) for (const element of bindings.elements) moduleImports.push(element.name.text);
+    }
     const moduleNames = [];
     const walkModule = (node) => {
       // Module scope only: never descend into a function or class body, whose
@@ -159,10 +171,10 @@ class FileBuilder {
     for (const stmt of this.sf.statements) walkModule(stmt);
     const records = this.context.recordsByFile.get(this.sf) || [];
     // Pass 1: build every function body (preorder; outer before inner).
-    for (const record of records) this.buildFunction(record, moduleNames);
+    for (const record of records) this.buildFunction(record, moduleNames, moduleImports);
   }
 
-  buildFunction(record, moduleNames) {
+  buildFunction(record, moduleNames, moduleImports = []) {
     const node = record.node;
     const [fnStart, fnEnd] = this.u8(node);
     const fn = {
@@ -172,6 +184,7 @@ class FileBuilder {
       start: fnStart,
       end: fnEnd,
       params: [],
+      imports: [...new Set(moduleImports)].sort(),
       scopes: [],
       bindings: [],
       body: [],

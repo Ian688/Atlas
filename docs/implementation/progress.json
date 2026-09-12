@@ -268,6 +268,18 @@
       ],
       "note": "语言 worker 堆上限成为参数（默认 1024，128–8192）并在耗尽时给出具名错误；实测单文件 14k 函数在 128MiB 下 1.5s 耗尽。",
       "report": "evidence/development/2026-09-12-w07-worker-heap/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/w08-imports-vs-globals",
+      "status": "DELIVERED",
+      "work_items": [
+        "W08-flow-function-imports",
+        "W08-import-is-not-a-global",
+        "W08-runtime-globals-not-inputs",
+        "W08-single-worker-producer-constant"
+      ],
+      "note": "把 import、运行时全局、真正自由标识符分开：导入不再被要求声明，内建不再被要求声明，真全局具名要求；worker/engine 用单一 producer 常量对齐并具名拒绝不兼容版本。",
+      "report": "evidence/development/2026-09-12-w08-imports/REPORT.md"
     }
   ],
   "next_work_item": "宿主侧 E2E 与旧入口切换（需要 Modus 检出）；或回到 W08/W09 的深化项",
@@ -645,7 +657,10 @@
         "拒绝可行动：refusal 带 missing_grants 与 missing_context 列表，一次列全，不让调用者改一个再试一次",
         "结果记录写明声明了什么：isolation.declared_context 与 trace 事件里的 declared_globals / receiver_declared",
         "Effect journal（atlas.effect-journal.v1）：记录被拒绝的尝试（permission/resource/error_code）与授予集合；harness 从 ERR_ACCESS_DENIED 上带出 permission 与 resource；节点明确写明「被允许的操作没有逐条日志，空 journal 不等于没有副作用」",
-        "SIGINT 取消受控运行：按进程组 SIGKILL 回收并发布 verdict=cancelled 的记录（取消的运行同样被记录，不丢弃）；scenario 收到取消即停止，declared_cases 与 attempted_cases 分开，避免把未尝试的用例读成已尝试"
+        "SIGINT 取消受控运行：按进程组 SIGKILL 回收并发布 verdict=cancelled 的记录（取消的运行同样被记录，不丢弃）；scenario 收到取消即停止，declared_cases 与 attempted_cases 分开，避免把未尝试的用例读成已尝试",
+        "外部读分三类：运行时 import（模块状态，不声明）、运行时内建/宿主全局（RUNTIME_GLOBALS，不声明，声明反而会覆盖真构造器）、真正自由标识符（具名要求声明并在拒绝里写 global:NAME）",
+        "FlowFunction.imports（运行时可导入名，import type 排除）+ FunctionFlowFact.imports；engine 的 ReadExternal 仅在该名不是 import 时置 may_access_global",
+        "单一 WORKER_PRODUCER 常量：不兼容的 worker 输出被具名拒绝（worker_producer_not_supported / flow_producer_mismatch），而不是被读成相反结论；ENGINE_VERSION/ALGORITHM_VERSION 同步提升（0.2.2 / 0.2.2）"
       ],
       "evidence": [
         "crates/atlas-engine/src/exec.rs（8 个单测：分类顺序/arity/参数顺序/partial 降级/dynamic 拒绝/缺授权/路径校验/栈帧映射）",
@@ -660,10 +675,13 @@
         "evidence/development/2026-09-12-w08/REPORT.md（上下文模型一节）",
         "scripts/test_execution.py（35 个用例，新增 3 项 effect journal 用例）",
         "web/tests/app.behavior.test.mjs（25 项，新增 1 项 journal 呈现）",
-        "scripts/test_execution.py（37 个用例，新增 2 项取消用例）"
+        "scripts/test_execution.py（37 个用例，新增 2 项取消用例）",
+        "workers/typescript/tests/flow.test.mjs（26 项，新增 imports 用例含 import type 排除）",
+        "crates/atlas-engine/src/exec.rs（import/全局/内建三分单测）",
+        "scripts/test_execution.py（39 个用例，新增 3 项分类用例）"
       ],
       "blockers": [
-        "needs_context 仍不完整：嵌套函数的闭包实例无法用数据声明，因此这类函数不可运行；worker 仍把 ES import 绑定当作 External 名称（导入绑定与真正的全局在已发布事实里无法区分），因此读取导入模块的函数会被要求承认未知——保守但不够精确",
+        "needs_context 仍不完整：嵌套函数的闭包实例无法用数据声明，因此这类函数不可运行。worker import 绑定与真正全局已区分（本片修复），但**动态 import / require** 的局部绑定仍无法解析，只能保守地当作未解析名",
         "没有行级覆盖、运行期调用图与因果链：只有入口调用的返回/抛出与运行时报告的源码位置；未知路径保持未知",
         "Effect journal 只覆盖被拒绝的尝试：Node 不为被允许的操作提供逐条日志，也没有系统调用级审计；因此 journal 无法回答「这次运行真的写了哪些文件」，只能回答「哪些尝试被挡住了」",
         "fixtures 只是声明标签：不注入 mock、不做依赖切片、不校验 mock 与真实依赖的区别，仅保证运行结果不会被读作真实环境观测",

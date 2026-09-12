@@ -108,6 +108,7 @@ fn function(name: &str, param_count: usize, body: Vec<Stmt>) -> FlowFunction {
         path: "test.js".into(),
         start: 0,
         end: 1,
+        imports: Vec::new(),
         scopes: vec![FlowScope {
             id: format!("{name}:scope"),
             kind: "function".into(),

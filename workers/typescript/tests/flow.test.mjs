@@ -195,3 +195,25 @@ test('a nested function keeps its own declarations out of the enclosing function
   assert.equal(method.bindings.some(b => b.name === 'value'), false,
     'an enclosing function must not declare a nested function\'s local');
 });
+
+
+test('runtime imports are named on every function, and type-only imports are not', () => {
+  // The engine subtracts these from the external reads it asks a caller to
+  // declare. Listing a type-only import would make an erased binding look like
+  // module state the module actually provides.
+  const parsed = facts({
+    'a.ts': [
+      "import fs from 'node:fs';",
+      "import * as path from 'node:path';",
+      "import { helper, other as renamed } from './helper.js';",
+      "import type { Shape } from './types.js';",
+      'export function f(x: Shape) { return helper(x) + path.sep.length + renamed(1) + fs.constants.F_OK; }',
+    ].join('\n'),
+    'helper.js': 'export function helper(x) { return x; }\nexport function other(x) { return x; }',
+    'types.js': 'export type Shape = { a: number };',
+  });
+  const fn = flowOf(parsed, 'f');
+  assert.deepEqual(fn.imports, ['fs', 'helper', 'path', 'renamed']);
+  assert.equal(fn.imports.includes('Shape'), false,
+    'a type-only import has no runtime binding and must not be listed');
+});

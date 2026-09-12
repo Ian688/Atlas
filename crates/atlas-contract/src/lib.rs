@@ -10,7 +10,15 @@ pub use flow::{
 pub const SNAPSHOT_SCHEMA: &str = "atlas.snapshot.v1";
 pub const FACTS_SCHEMA: &str = "atlas.language-facts.v1";
 pub const ANALYSIS_SCHEMA: &str = "atlas.analysis.v1";
-pub const ENGINE_VERSION: &str = "foundation-flow-0.2.1";
+pub const ENGINE_VERSION: &str = "foundation-flow-0.2.2";
+/// The one worker producer string this engine accepts.
+///
+/// One constant rather than a list of tolerated versions: the flow IR gained a
+/// field whose absence changes meaning (an older worker cannot say which
+/// externals are imports, so its output would be read as "this function reads a
+/// global" when it reads its own module). A version that cannot express the
+/// current semantics is refused by name instead of being interpreted wrongly.
+pub const WORKER_PRODUCER: &str = "typescript/5.9.3;worker/0.2.1";
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ScanLimits {

@@ -37,6 +37,12 @@ pub struct FlowFunction {
     pub end: usize,
     /// Parameter binding ids in declaration order.
     pub params: Vec<String>,
+    /// Local names this module imports (runtime imports only; a type-only
+    /// import has no runtime binding and is not listed). Reading one of these
+    /// is reading module state the module itself provides -- not a global the
+    /// caller would have to supply.
+    #[serde(default)]
+    pub imports: Vec<String>,
     pub scopes: Vec<FlowScope>,
     #[serde(default)]
     pub bindings: Vec<FlowBinding>,

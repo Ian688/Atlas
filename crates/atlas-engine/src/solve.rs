@@ -14,7 +14,7 @@ use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const ALGORITHM_ID: &str = "atlas-local-absint";
-pub const ALGORITHM_VERSION: &str = "0.2.1";
+pub const ALGORITHM_VERSION: &str = "0.2.2";
 pub const CAP_CONSTANTS: usize = 8;
 pub const CAP_TARGETS: usize = 64;
 pub const CAP_ORIGINS: usize = 8;
@@ -384,6 +384,10 @@ struct Solver<'a> {
     current_defs: BTreeMap<String, BTreeSet<u32>>,
     /// binding id -> symbol of the function that binding denotes (module peers).
     function_directory: &'a BTreeMap<String, String>,
+    /// Runtime import local names for this function. A `ReadExternal` whose name
+    /// is here is reading module state the module itself provides; only the
+    /// remaining names are global accesses the caller would have to supply.
+    imports: BTreeSet<String>,
     /// Pipeline deadline; a breach stops this function's work early and is
     /// reported through `budget_exhausted` (R5).
     control: &'a ExecutionControl,
@@ -808,6 +812,7 @@ pub fn solve_controlled(
         def_use: BTreeMap::new(),
         pruned_edges: Vec::new(),
         function_directory,
+        imports: function.imports.iter().cloned().collect(),
         cross_block_operands: &cross_block_operands,
         control,
         transfer_limit: transfer_limit.min(max_transfers_budget()),
@@ -1138,7 +1143,13 @@ impl<'a> Solver<'a> {
                 }
             }
             OpKind::ReadExternal(name) => {
-                state.effects.may_access_global = true;
+                // An import binding is not a global: the module provides it, and
+                // the copy the runner executes contains it. Reporting it as a
+                // global access made the profile ask the caller to declare a
+                // value that was already there.
+                if !self.imports.contains(name) {
+                    state.effects.may_access_global = true;
+                }
                 Some(
                     Value::top("external_value_unknown")
                         .with_origins(vec![Origin::External(name.clone())]),
@@ -1607,7 +1618,10 @@ impl<'a> Solver<'a> {
                 state.effects.may_write_heap = true;
                 state.effects.may_access_global = true;
                 self.note_unknown(&format!("unmodeled_construct:{reason}"));
-                Some(Value::top(reason).with_origins(vec![Origin::External("unmodeled".into())]))
+                // `<unmodeled>` is a marker, not a name: angle brackets cannot
+                // occur in a JavaScript identifier, so this can never collide
+                // with a real external the caller would have to declare.
+                Some(Value::top(reason).with_origins(vec![Origin::External("<unmodeled>".into())]))
             }
         };
         if op.may_throw {

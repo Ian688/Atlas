@@ -596,6 +596,7 @@ mod budget_tests {
                 start: 0,
                 end: 1,
                 params: vec![],
+                imports: Vec::new(),
                 scopes: vec![],
                 bindings: vec![],
                 body: vec![body],
@@ -656,6 +657,7 @@ mod budget_tests {
                 start: 0,
                 end: 1,
                 params: vec![],
+                imports: Vec::new(),
                 scopes: vec![],
                 bindings: vec![],
                 body: vec![atlas_contract::Stmt {
@@ -738,6 +740,7 @@ mod budget_tests {
                     start: 0,
                     end: 1,
                     params: vec!["f0:p0".into()],
+                    imports: Vec::new(),
                     scopes: vec![],
                     bindings: vec![],
                     body: vec![atlas_contract::Stmt {
@@ -763,6 +766,7 @@ mod budget_tests {
                     start: 0,
                     end: 1,
                     params: vec![],
+                    imports: Vec::new(),
                     scopes: vec![],
                     bindings: vec![],
                     body: vec![call_f0],
@@ -810,6 +814,7 @@ mod budget_tests {
                     start: 0,
                     end: 1,
                     params: vec![],
+                    imports: Vec::new(),
                     scopes: vec![],
                     bindings: vec![],
                     body: vec![atlas_contract::Stmt {

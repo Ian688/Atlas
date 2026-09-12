@@ -139,7 +139,7 @@ fn late_cancellation_cannot_relabel_a_committed_analysis() {
         LanguageFacts {
             schema: FACTS_SCHEMA.into(),
             snapshot_id: snapshot.id.clone(),
-            producer: "typescript/5.9.3;worker/0.2.0".into(),
+            producer: atlas_contract::WORKER_PRODUCER.into(),
             parsed_files: vec![],
             symbols: vec![],
             calls: vec![],

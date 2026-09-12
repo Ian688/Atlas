@@ -217,8 +217,12 @@ pub fn validate_flow_with_symbols(
     {
         return Err(invalid("flow_contract_mismatch"));
     }
-    if flow.producer != "typescript/5.9.3;worker/0.2.0" {
-        return Err(invalid("flow_producer_mismatch"));
+    if flow.producer != atlas_contract::WORKER_PRODUCER {
+        return Err(invalid(&format!(
+            "flow_producer_mismatch:got={}:expected={}",
+            flow.producer,
+            atlas_contract::WORKER_PRODUCER
+        )));
     }
     if flow.functions.len() > MAX_FUNCTIONS {
         return Err(invalid("flow_function_budget_exceeded"));

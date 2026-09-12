@@ -39,6 +39,10 @@ pub struct FunctionFlowFact {
     /// binding id -> short name, for consumers.
     pub binding_names: BTreeMap<String, String>,
     pub binding_kinds: BTreeMap<String, String>,
+    /// Runtime import local names. Reading one of these is module state, not a
+    /// global the caller would have to declare.
+    #[serde(default)]
+    pub imports: Vec<String>,
     pub interprocedural: InterprocJson,
 }
 
@@ -438,6 +442,7 @@ pub fn assemble_flow_fact(
         budgets: output.budgets.clone(),
         binding_names,
         binding_kinds,
+        imports: function.imports.clone(),
         interprocedural: {
             let callsites = inter_callsites
                 .iter()

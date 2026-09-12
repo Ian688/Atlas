@@ -112,6 +112,8 @@ worker stdin ≤160 MiB、stdout ≤32 MiB、stderr ≤64 KiB，V8 old-space 为
 
 **执行画像**是从已发布的 flow 事实派生的静态充分性分类，不是执行结果。分类顺序是 `unsupported` → `needs_entry_driver` → `needs_context` → `pure_callable`，每条降级理由都带 `code/detail/evidence`，`evidence` 指回它读的那个字段（`effects.unknown_call`、`block_states[].bindings[].value.origins` 等）。关键保守点：`status != complete_within_profile` 一律降级——partial 分析的 frontier 恰恰是事实缺失的块，"没有未知副作用"没有被证明。`needs_context` 在本切片不可运行，因为不合成上下文。
 
+**"外部"分三类，而且必须分开**：函数自己的运行时 **import** 是模块状态（模块整体被复制，导入时就在，不需要声明）；**运行时内建与宿主全局**（`Error`/`Math`/`JSON`/`console`/`process`…）由运行时提供，Atlas 不要求声明——把 `Error` 当成"要声明的输入"会诱导调用者用 JSON 覆盖真构造器，实测就是这个后果（`--global Error=null` 之后 `new Error(...)` 抛 TypeError）；只有**真正的自由标识符**会被要求声明，并在拒绝里具名。这条区分要在 worker 侧就能表达：`FlowFunction.imports` 列出运行时可导入名（`import type` 不算，它被擦除），engine 的 `ReadExternal` 只有在该名字不在 imports 里时才算全局访问。版本用单一常量 `WORKER_PRODUCER` 对齐：`imports` 缺席的旧 worker 无法表达"这是导入还是全局"，它的输出会被**具名拒绝**（`worker_producer_not_supported`）而不是被读成相反的结论。`FLOW_SCHEMA` 保持 `atlas.flow-ir.v1`：新增字段带 `serde(default)`，形状兼容；改变的是**语义**，语义由 producer 声明。
+
 画像把要求分成两类，混在一起会让"缺什么"变得不可行动：**可声明的输入**（`this` 与具名全局；调用者用 `--this` / `--global NAME=<json>` 给出，记录里写明声明了什么）与**必须承认的未知**（未建模构造、未完成事实、堆近似、未知调用；用 `unknown_calls` 这一条明确承认）。没有任何名字可指的全局读取不会被要求"声明某个值"——那不可行动；它落在承认项里。读取**模块级状态**不需要声明：模块整体被复制，导入时它就在。嵌套函数的外层绑定无法用数据声明，因此那类函数直接不可运行。
 
 **受控运行**只在一个条件下发生：静态画像允许，且 spec 已显式授予/声明所需项。执行路径：

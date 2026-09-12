@@ -32,14 +32,15 @@ pub fn analyze_controlled(
     control: &ExecutionControl,
 ) -> Result<Analysis> {
     control.checkpoint()?;
-    let producer_matches = facts.producer == "typescript/5.9.3;worker/0.1.0"
-        || facts.producer == "typescript/5.9.3;worker/0.2.0";
-    if facts.schema != FACTS_SCHEMA
-        || facts.snapshot_id != snapshot.id
-        || !producer_matches
-        || (facts.flow.is_some() && facts.producer != "typescript/5.9.3;worker/0.2.0")
-    {
+    if facts.schema != FACTS_SCHEMA || facts.snapshot_id != snapshot.id {
         return Err(invalid("language_contract_mismatch"));
+    }
+    if facts.producer != atlas_contract::WORKER_PRODUCER {
+        return Err(invalid(&format!(
+            "worker_producer_not_supported:got={}:expected={}",
+            facts.producer,
+            atlas_contract::WORKER_PRODUCER
+        )));
     }
     let sources: HashMap<_, _> = store
         .sources_controlled(snapshot, control)?

@@ -301,14 +301,137 @@ fn params_from_fact(fact: &serde_json::Value) -> (Vec<ParamProfile>, Option<usiz
     (params, arity)
 }
 
-/// Every `External(name)` origin seen in the published facts, sorted. The names
-/// are what makes "this function needs a global" actionable: a category with no
-/// names tells a caller nothing they can act on.
+/// Names the JavaScript runtime itself provides.
+///
+/// A caller cannot "declare" these: `--global Error=null` does not supply an
+/// Error constructor, it removes one -- and a run that overwrites the runtime's
+/// own globals fails for a reason that has nothing to do with the function under
+/// test. They are built-ins or Node globals, present in whatever runtime the
+/// copy is executed with, so they are never asked for as inputs.
+const RUNTIME_GLOBALS: &[&str] = &[
+    "AggregateError",
+    "Array",
+    "ArrayBuffer",
+    "AsyncFunction",
+    "Atomics",
+    "BigInt",
+    "BigInt64Array",
+    "BigUint64Array",
+    "Boolean",
+    "DataView",
+    "Date",
+    "Error",
+    "EvalError",
+    "FinalizationRegistry",
+    "Float32Array",
+    "Float64Array",
+    "Function",
+    "Infinity",
+    "Int16Array",
+    "Int32Array",
+    "Int8Array",
+    "Intl",
+    "JSON",
+    "Map",
+    "Math",
+    "NaN",
+    "Number",
+    "Object",
+    "Promise",
+    "Proxy",
+    "RangeError",
+    "ReferenceError",
+    "Reflect",
+    "RegExp",
+    "Set",
+    "SharedArrayBuffer",
+    "String",
+    "Symbol",
+    "SyntaxError",
+    "TypeError",
+    "URIError",
+    "Uint16Array",
+    "Uint32Array",
+    "Uint8Array",
+    "Uint8ClampedArray",
+    "WeakMap",
+    "WeakRef",
+    "WeakSet",
+    "decodeURI",
+    "decodeURIComponent",
+    "encodeURI",
+    "encodeURIComponent",
+    "escape",
+    "eval",
+    "globalThis",
+    "isFinite",
+    "isNaN",
+    "parseFloat",
+    "parseInt",
+    "undefined",
+    "unescape",
+    "queueMicrotask",
+    "structuredClone",
+    "setTimeout",
+    "clearTimeout",
+    "setInterval",
+    "clearInterval",
+    "setImmediate",
+    "clearImmediate",
+    "console",
+    "process",
+    "performance",
+    "fetch",
+    "URL",
+    "URLSearchParams",
+    "TextEncoder",
+    "TextDecoder",
+    "AbortController",
+    "AbortSignal",
+    "Event",
+    "EventTarget",
+    "Buffer",
+    "__dirname",
+    "__filename",
+    "require",
+    "module",
+    "exports",
+];
+
+fn is_runtime_global(name: &str) -> bool {
+    RUNTIME_GLOBALS.contains(&name)
+}
+
+/// The names this function reads from outside its own bindings, minus the ones
+/// it imports.
+///
+/// Three sources, because none is complete on its own: `read_external` ops name
+/// every external read including ones that never reach a value origin, and
+/// `External(name)` origins catch a name that reached a summary. Imports are
+/// subtracted because an imported binding is module state the copied module
+/// provides; asking a caller to declare it would be asking for a value that is
+/// already there.
 fn external_names(
     fact: &serde_json::Value,
     blocks: Option<&Vec<serde_json::Value>>,
 ) -> Vec<String> {
     let mut names = std::collections::BTreeSet::new();
+    // Imports are recorded with a sentinel prefix so they can be subtracted
+    // after every other source has contributed.
+    if let Some(imports) = fact.get("imports").and_then(|v| v.as_array()) {
+        for name in imports.iter().filter_map(|v| v.as_str()) {
+            names.insert(format!("\u{0}import:{name}"));
+        }
+    }
+    if let Some(ops) = fact.get("ops").and_then(|v| v.as_array()) {
+        for op in ops {
+            if op.get("kind").and_then(|v| v.as_str()) == Some("read_external")
+                && let Some(name) = op.get("detail").and_then(|v| v.as_str())
+            {
+                names.insert(name.to_string());
+            }
+        }
+    }
     let mut collect = |origins: &serde_json::Value| {
         if let Some(items) = origins.as_array() {
             for origin in items.iter().filter_map(|v| v.as_str()) {
@@ -316,7 +439,13 @@ fn external_names(
                     .strip_prefix("External(")
                     .and_then(|rest| rest.strip_suffix(')'))
                 {
-                    names.insert(name.to_string());
+                    // `<unmodeled>` is the engine's marker for a construct it
+                    // does not model. It is not a name a caller could declare,
+                    // and an identifier cannot contain angle brackets, so it
+                    // cannot collide with a real name either.
+                    if !name.starts_with('<') {
+                        names.insert(name.to_string());
+                    }
                 }
             }
         }
@@ -337,7 +466,18 @@ fn external_names(
             }
         }
     }
-    names.into_iter().collect()
+    // Imports are only used to exclude; a name that appears both as an import
+    // and as a read is module state.
+    let imports: std::collections::BTreeSet<String> = names
+        .iter()
+        .filter_map(|name| name.strip_prefix("\u{0}import:").map(str::to_string))
+        .collect();
+    names
+        .into_iter()
+        .filter(|name| !name.starts_with("\u{0}import:"))
+        .filter(|name| !imports.contains(name))
+        .filter(|name| !is_runtime_global(name))
+        .collect()
 }
 
 /// Origins observed anywhere in the published facts, counted by kind.
@@ -1172,12 +1312,54 @@ mod tests {
     }
 
     #[test]
+    fn an_imported_binding_is_not_a_global_the_caller_must_declare() {
+        // `import fs from 'node:fs'` is module state the copied module provides.
+        // Reporting it as a global access made the profile ask the caller to
+        // declare a value that was already there -- and hid the true global,
+        // which is the one the caller can actually act on.
+        let mut f = clean();
+        f["imports"] = serde_json::json!(["fs", "helper"]);
+        f["ops"] = serde_json::json!([
+            {"index": 0, "kind": "read_external", "detail": "fs"},
+            {"index": 1, "kind": "read_external", "detail": "CONFIG"},
+        ]);
+        f["effects"]["may_access_global"] = true.into();
+        let p = profile("a", "s", "x.ts", "f", &f, true);
+        assert_eq!(p.required_globals, vec!["CONFIG".to_string()]);
+        assert_eq!(p.required_context, vec!["globals".to_string()]);
+        let spec = RunSpec {
+            schema: RUN_SPEC_SCHEMA.into(),
+            analysis_id: "a".into(),
+            symbol: "s".into(),
+            args: vec![],
+            timeout_ms: 1000,
+            output_limit: 1024,
+            grants: Grants::default(),
+            node: "node".into(),
+            env: BTreeMap::new(),
+            this_arg: None,
+            globals: BTreeMap::new(),
+            fixtures: false,
+            fixture_note: None,
+            label: None,
+        };
+        let refused = decide(&p, &spec);
+        assert!(!refused.allowed);
+        assert_eq!(refused.missing_context, vec!["global:CONFIG".to_string()]);
+        let declared = RunSpec {
+            globals: BTreeMap::from([("CONFIG".to_string(), serde_json::json!(1))]),
+            ..spec
+        };
+        assert!(decide(&p, &declared).allowed);
+    }
+
+    #[test]
     fn a_receiver_or_a_global_must_be_declared_and_is_then_runnable() {
         let mut f = clean();
         f["block_states"] = serde_json::json!([
             {"block": 0, "bindings": [
                 {"binding": "b:x.ts:30:b", "name": "b", "value": {"origins": ["This"]}},
-                {"binding": "b:x.ts:10:a", "name": "a", "value": {"origins": ["External(console)"]}}
+                {"binding": "b:x.ts:10:a", "name": "a", "value": {"origins": ["External(CONFIG)"]}}
             ]}
         ]);
         let p = profile("a", "s", "x.ts", "method", &f, true);
@@ -1207,7 +1389,7 @@ mod tests {
         assert_eq!(decide(&p, &spec).missing_context.len(), 2);
         let declared = RunSpec {
             this_arg: Some(serde_json::json!({"n": 1})),
-            globals: BTreeMap::from([("console".to_string(), serde_json::json!({"log": null}))]),
+            globals: BTreeMap::from([("CONFIG".to_string(), serde_json::json!({"value": 1}))]),
             ..spec
         };
         assert!(decide(&p, &declared).allowed);
