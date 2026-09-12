@@ -372,6 +372,41 @@ class Execution(unittest.TestCase):
         plain = self.exec("add", [1, 2])
         self.assertFalse(plain["isolation"]["mocks"])
 
+    # -- effect journal ---------------------------------------------------
+    def test_a_denied_attempt_is_journalled_with_its_permission_and_target(self):
+        record = self.exec("writeOutside", ["x"], grants=GRANTS,
+                           extra=self.declared_context("writeOutside"))
+        journal = record["effect_journal"]
+        self.assertEqual(journal["schema"], "atlas.effect-journal.v1")
+        self.assertEqual(journal["denied_count"], 1)
+        entry = journal["entries"][0]
+        self.assertEqual(entry["permission"], "FileSystemWrite")
+        self.assertIn("atlas-exec-escape.txt", entry["resource"],
+                      "the journal must name what the run tried to touch")
+        self.assertEqual(entry["outcome"], "denied")
+
+    def test_the_journal_names_the_permission_kind_for_each_blocked_attempt(self):
+        child = self.exec("spawnEcho", grants=GRANTS, extra=self.declared_context("spawnEcho"))
+        self.assertEqual(child["effect_journal"]["entries"][0]["permission"], "ChildProcess")
+        read = self.exec("readOutside", grants=GRANTS, extra=self.declared_context("readOutside"))
+        self.assertEqual(read["effect_journal"]["entries"][0]["permission"], "FileSystemRead")
+        self.assertIn("/etc/hosts", read["effect_journal"]["entries"][0]["resource"])
+
+    def test_an_allowed_run_does_not_claim_it_had_no_effects(self):
+        # Node reports denials, not allowances, so an empty journal means "no
+        # denied attempt was reported" -- never "nothing happened". The note and
+        # the granted set are what keep that distinction visible.
+        record = self.exec("add", [1, 2])
+        journal = record["effect_journal"]
+        self.assertEqual(journal["denied_count"], 0)
+        self.assertEqual(journal["observed"], 0)
+        self.assertIn("不声称", journal["note"])
+        self.assertFalse(journal["granted"]["fs_write"])
+        granted = self.exec("writeInside", grants=GRANTS + ",fs_write",
+                            extra=self.declared_context("writeInside"))
+        self.assertTrue(granted["effect_journal"]["granted"]["fs_write"],
+                        "the bound must be recorded alongside the attempts")
+
     # -- declared context -------------------------------------------------
     def test_a_receiver_is_declared_by_the_caller_and_recorded_as_declared(self):
         profile = self.profile("self")

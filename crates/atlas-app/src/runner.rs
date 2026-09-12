@@ -596,6 +596,7 @@ pub async fn execute(
     let mut value = Value::Null;
     let mut thrown = Value::Null;
     let mut source_location = Value::Null;
+    let mut trace_async_events: Value = json!([]);
     let mut events: Vec<Value> = vec![json!({
         "kind": "call",
         "symbol": spec.symbol,
@@ -658,6 +659,7 @@ pub async fn execute(
             "threw" | "returned_with_async_error" => "threw",
             _ => "not_run",
         };
+        trace_async_events = report["async_events"].clone();
         events.push(json!({
             "kind": event_kind,
             "export_name": report["export_name"],
@@ -698,13 +700,17 @@ pub async fn execute(
     object.insert("verdict".into(), json!(verdict));
     object.insert("refusal".into(), Value::Null);
     object.insert("value".into(), value);
-    object.insert("thrown".into(), thrown);
+    object.insert("thrown".into(), thrown.clone());
     object.insert("console".into(), console);
     object.insert("duration_ms".into(), json!(supervised.duration_ms));
     object.insert("exit_code".into(), json!(supervised.exit_code));
     object.insert("signal".into(), json!(supervised.signal));
     object.insert("source_binding".into(), source_binding);
     object.insert("isolation".into(), isolation);
+    object.insert(
+        "effect_journal".into(),
+        effect_journal(&thrown, &trace_async_events, spec),
+    );
     object.insert(
         "environment".into(),
         json!({
@@ -736,6 +742,50 @@ fn read_target_source(store: &Store, pinned: &Pinned) -> Option<String> {
         .read_blob(&pinned.blob)
         .ok()
         .and_then(|bytes| String::from_utf8(bytes).ok())
+}
+
+/// What the run *tried* to do outside the sandbox, as far as the runtime reports
+/// it.
+///
+/// Only denials are individually observable: Node attaches the attempted
+/// permission and its target to the error it throws. Allowed operations leave no
+/// per-operation trace, so the journal does not pretend to list them -- the
+/// granted set is the bound, and the note says so. Reporting "no denied
+/// attempts" as "no effects" would be exactly the kind of claim this project
+/// refuses to make.
+fn effect_journal(thrown: &Value, async_events: &Value, spec: &RunSpec) -> Value {
+    let mut entries: Vec<Value> = Vec::new();
+    let mut collect = |error: &Value| {
+        if let Some(permission) = error.get("permission").and_then(|value| value.as_str()) {
+            entries.push(json!({
+                "outcome": "denied",
+                "permission": permission,
+                "resource": error.get("resource"),
+                "error_code": error.get("code"),
+                "evidence": "运行时抛出 ERR_ACCESS_DENIED，并带回被尝试的操作与目标",
+            }));
+        }
+    };
+    collect(thrown);
+    if let Some(events) = async_events.as_array() {
+        for event in events {
+            if let Some(error) = event.get("thrown") {
+                collect(error);
+            }
+        }
+    }
+    json!({
+        "schema": "atlas.effect-journal.v1",
+        "entries": entries,
+        "denied_count": entries.len(),
+        "granted": {
+            "fs_write": spec.grants.fs_write,
+            "child_process": spec.grants.child_process,
+            "network": spec.grants.network,
+        },
+        "observed": entries.len(),
+        "note": "只记录运行时明确报告的拒绝尝试（含权限种类与目标）。被允许的操作没有逐条日志，因此这里不声称'没有效果'；授予集合就是这次运行的边界。",
+    })
 }
 
 /// What the called code itself wrote to stdout. The harness report is removed,

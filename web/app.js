@@ -549,6 +549,16 @@ function renderExecRecord(body,record){
   if(lines.length)body.append(flowNode('flow-line',`console（受预算限制）${lines.slice(0,4).join(' | ')}`));
   if(record.console?.stdout)body.append(flowNode('flow-line',`stdout ${String(record.console.stdout).slice(0,200)}`));
   body.append(flowNode('exec-note',`观测边界：coverage=${record.trace?.coverage} · unknown_paths=${record.trace?.unknown_paths}。只有入口调用的返回/抛出被观测，没有行级覆盖采样；未观测路径保持未知，静态 BFS 不作为执行顺序。`));
+  const journal=record.effect_journal;
+  if(journal){
+    const granted=journal.granted||{};
+    body.append(flowNode('flow-line',`授予边界：fs_write=${granted.fs_write} · child_process=${granted.child_process} · network=${granted.network}`));
+    if(journal.denied_count){
+      for(const entry of journal.entries.slice(0,6))body.append(flowNode('flow-unknown',`被拒绝的尝试 · ${entry.permission} → ${entry.resource}`));
+    }else{
+      body.append(flowNode('flow-line','没有运行时报告的拒绝尝试。这不等于没有副作用：被允许的操作没有逐条日志，授予集合就是边界。'));
+    }
+  }
   if(record.isolation?.permission_model)body.append(flowNode('flow-line',`隔离：${record.isolation.permission_model}；授予 ${(record.isolation.effective_flags||[]).filter(f=>!f.startsWith('--allow-fs-read')).join(' ')||'（仅只读副本）'}`));
   if(record.source_binding)body.append(flowNode('flow-line',`绑定来源 analysis ${String(record.source_binding.analysis_id).slice(0,12)} · snapshot ${String(record.source_binding.snapshot_id).slice(0,12)} · blob ${String(record.source_binding.blob).slice(0,12)}（读取时重新哈希校验）`));
 }

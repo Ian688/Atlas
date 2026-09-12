@@ -209,6 +209,15 @@
       ],
       "note": "提案审阅面接通：页面可登记提案并读验证结果，验证与应用仍只在 CLI；HTTP 与 CLI 共用同一校验路径。",
       "report": "evidence/development/2026-09-12-w09-ai-coding/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/w08-effect-journal",
+      "status": "DELIVERED",
+      "work_items": [
+        "W08-effect-journal"
+      ],
+      "note": "Effect journal：记录运行时报告的拒绝尝试（权限种类+目标）与授予集合，并写明空 journal 不等于没有副作用。",
+      "report": "evidence/development/2026-09-12-w08/REPORT.md"
     }
   ],
   "next_work_item": "宿主侧 E2E 与旧入口切换（需要 Modus 检出）；或回到 W08/W09 的深化项",
@@ -576,7 +585,8 @@
         "具名 globals 从 External(name) 来源提取，因此要求是可行动的（拒绝里写明 global:NAME）；没有名字可指的全局读取不要求声明一个假值，而是落在承认项里",
         "模块级状态不需要声明：顶层函数的 Capture 来源视为模块初始化状态（模块整体被复制），只要求承认未知；嵌套函数的外层绑定标记为 unsatisfiable_context，函数不可运行",
         "拒绝可行动：refusal 带 missing_grants 与 missing_context 列表，一次列全，不让调用者改一个再试一次",
-        "结果记录写明声明了什么：isolation.declared_context 与 trace 事件里的 declared_globals / receiver_declared"
+        "结果记录写明声明了什么：isolation.declared_context 与 trace 事件里的 declared_globals / receiver_declared",
+        "Effect journal（atlas.effect-journal.v1）：记录被拒绝的尝试（permission/resource/error_code）与授予集合；harness 从 ERR_ACCESS_DENIED 上带出 permission 与 resource；节点明确写明「被允许的操作没有逐条日志，空 journal 不等于没有副作用」"
       ],
       "evidence": [
         "crates/atlas-engine/src/exec.rs（8 个单测：分类顺序/arity/参数顺序/partial 降级/dynamic 拒绝/缺授权/路径校验/栈帧映射）",
@@ -588,12 +598,14 @@
         "workers/typescript/tests/flow.test.mjs（GE-2 回归：嵌套函数不得被外层认领声明）",
         "evidence/development/2026-09-12-w08/verification.json",
         "scripts/test_execution.py（32 个用例，新增 5 项上下文模型用例）",
-        "evidence/development/2026-09-12-w08/REPORT.md（上下文模型一节）"
+        "evidence/development/2026-09-12-w08/REPORT.md（上下文模型一节）",
+        "scripts/test_execution.py（35 个用例，新增 3 项 effect journal 用例）",
+        "web/tests/app.behavior.test.mjs（25 项，新增 1 项 journal 呈现）"
       ],
       "blockers": [
         "needs_context 仍不完整：嵌套函数的闭包实例无法用数据声明，因此这类函数不可运行；worker 仍把 ES import 绑定当作 External 名称（导入绑定与真正的全局在已发布事实里无法区分），因此读取导入模块的函数会被要求承认未知——保守但不够精确",
         "没有行级覆盖、运行期调用图与因果链：只有入口调用的返回/抛出与运行时报告的源码位置；未知路径保持未知",
-        "effects 只有静态分类标签，没有 Effect journal：fs/net/env/子进程的实际行为由运行时权限模型强制，Atlas 不记录执行期效果清单",
+        "Effect journal 只覆盖被拒绝的尝试：Node 不为被允许的操作提供逐条日志，也没有系统调用级审计；因此 journal 无法回答「这次运行真的写了哪些文件」，只能回答「哪些尝试被挡住了」",
         "fixtures 只是声明标签：不注入 mock、不做依赖切片、不校验 mock 与真实依赖的区别，仅保证运行结果不会被读作真实环境观测",
         "profile 的 external/global 判定偏保守，真实项目里大量函数会落入 needs_entry_driver（rxjs 上 add 之外基本如此），精度未做评估",
         "子进程按组 SIGKILL 依赖 POSIX 进程组；Windows 未资格",

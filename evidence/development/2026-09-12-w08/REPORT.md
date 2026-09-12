@@ -156,3 +156,30 @@ divide          needs_entry_driver runnable  grants=['unknown_calls'] ctx=[]
 ```
 
 **仍未解决**：worker 仍把 ES `import` 绑定当作 `External` 名称——已发布事实里"导入绑定"与"真正的全局"无法区分，所以读取导入模块的函数会被要求承认未知。保守，但不够精确；要修正得让 worker 把 import 绑定登记为模块绑定并区分二者。
+
+---
+
+## 九、补片（同日）：Effect journal —— 只能记录"被挡住"的那一半
+
+执行画像有静态 effects 标签，但"这次运行到底碰了什么"没有记录。补上后，界限必须说清楚：
+
+- Node 的权限模型把 `permission` 与 `resource` 附在它抛出的 `ERR_ACCESS_DENIED` 上。这是**唯一**可得的逐操作证据，所以 journal 只记录被拒绝的尝试，原样带出：
+
+```
+被拒绝的尝试 · FileSystemWrite → /tmp/atlas-exec-escape.txt
+被拒绝的尝试 · FileSystemRead  → /etc/hosts
+被拒绝的尝试 · ChildProcess    → /bin/sh
+```
+
+- **被允许的操作没有逐条日志。** Node 不提供系统调用级审计，所以 journal 同时记录授予集合，并写明"被允许的操作没有逐条日志，因此这里不声称'没有效果'；授予集合就是这次运行的边界"。空 journal 是"没有拒绝被报告"，不是"没有副作用"——这两种读法在 UI 上也分开呈现（`没有运行时报告的拒绝尝试。这不等于没有副作用…`）。
+
+实测（真实 CLI 输出）：
+
+```
+writeOutside  denial: FileSystemWrite /tmp/atlas-exec-escape.txt
+spawnEcho     denial: ChildProcess /bin/sh
+readOutside   denial: FileSystemRead /etc/hosts
+add           denied_count 0 · granted {fs_write:false, child_process:false, network:false}
+```
+
+**仍未解决**：journal 回答不了"这次运行真的写了哪些文件"。那需要系统调用级审计（或每类能力的包装层），本切片没有做。

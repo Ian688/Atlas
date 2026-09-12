@@ -931,6 +931,11 @@ const describe = error => ({
   name: error && error.name ? String(error.name) : typeof error,
   message: String(error && error.message !== undefined ? error.message : error).slice(0, 500),
   code: error && error.code ? String(error.code) : null,
+  // Node's permission model puts the attempted operation and its target on the
+  // error. That is the only per-operation evidence the runtime gives us, so it
+  // is carried out verbatim instead of being summarised away.
+  permission: error && error.permission ? String(error.permission) : null,
+  resource: error && error.resource !== undefined ? String(error.resource).slice(0, 500) : null,
   stack: String(error && error.stack ? error.stack : '').split('\n').slice(0, 16)
 });
 const lines = [];

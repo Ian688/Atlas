@@ -121,6 +121,8 @@ worker stdin ≤160 MiB、stdout ≤32 MiB、stderr ≤64 KiB，V8 old-space 为
 3. 用**目标 Node**（由调用者指定，不是 Atlas 自己的运行时）以 `--permission` 启动，只授予隔离副本的读权限，以及 spec 里显式声明的项。权限模型不是"接受了 flag"就算数：每次进程内首次使用都会先跑一个能力探针，要求一次真实的写被拒绝（`ERR_ACCESS_DENIED`），否则拒绝执行。
 4. 子进程自成进程组，超时或取消按组 `SIGKILL` 并回收；stdin/stdout/stderr 都有预算；harness 报告带每轮唯一标记并最后写入、显式退出，因此目标自己写到 stdout 的内容不会被误当作报告。
 
+**Effect journal**：记录只包含运行时明确报告的**拒绝尝试**——Node 把 `permission` 与 `resource` 附在 `ERR_ACCESS_DENIED` 上，这是唯一可得的逐操作证据。被允许的操作没有逐条日志，因此 journal 同时记录授予集合并写明"这不等于没有效果"。空 journal 是"没有拒绝被报告"，不是"没有副作用"。
+
 **观测合同**：`trace.coverage = "not_sampled"`，`trace.unknown_paths = "not_observed"`。只记录入口调用的返回/抛出、运行时报告的源码位置（映射回快照的字节偏移）、进程输出与退出状态。没有行级覆盖采样，没有运行期调用图，静态 BFS 不作为执行顺序。
 
 **记录身份**：`exec_records.id = digest(固定问题 + 观测到的答案)`，其中刻意排除耗时与绝对临时路径。因此同一问题得到同一答案就是同一行（可重复运行、可幂等查询），而答案不同会产生第二条记录——两条不同的观测结果，而不是静默覆盖。mock/fixture 运行必须在记录里标为 `isolation.mocks=true`，它的结果不得被读作真实环境观测。

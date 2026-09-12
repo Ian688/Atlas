@@ -364,8 +364,40 @@ function record(over = {}) {
     isolation: { mocks: false, permission_model: 'node --permission (probe-verified: an attempted write was denied)', effective_flags: ['--permission', '--allow-fs-read=/tmp/x'] },
     source_binding: { analysis_id: report.id, snapshot_id: 's'.repeat(64), path: 'a.js', blob: 'b'.repeat(64), bytes_verified: true },
     trace: { kind: 'observed-entry-call', coverage: 'not_sampled', unknown_paths: 'not_observed', events: [] },
+    effect_journal: {
+      schema: 'atlas.effect-journal.v1', entries: [], denied_count: 0, observed: 0,
+      granted: { fs_write: false, child_process: false, network: false },
+      note: '被允许的操作没有逐条日志，因此这里不声称没有效果。',
+    },
   }, over);
 }
+
+check('the effect journal is shown, and an empty journal is not read as "no effects"', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = profile();
+  t.routes.exec = record({
+    effect_journal: {
+      schema: 'atlas.effect-journal.v1', denied_count: 1, observed: 1,
+      granted: { fs_write: false, child_process: false, network: false },
+      entries: [{ outcome: 'denied', permission: 'FileSystemWrite', resource: '/tmp/escape.txt', error_code: 'ERR_ACCESS_DENIED' }],
+      note: 'x',
+    },
+  });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  await t.run('runControlled()');
+  const shown = t.el('exec-body').textContent;
+  assert.match(shown, /授予边界：fs_write=false/, 'the granted bound must be visible');
+  assert.match(shown, /FileSystemWrite/, 'the blocked permission kind must be shown');
+  assert.match(shown, /\/tmp\/escape\.txt/, 'the target of the blocked attempt must be shown');
+
+  // And with nothing denied, the panel must not claim there were no effects.
+  t.routes.exec = record();
+  await t.run('runControlled()');
+  const quiet = t.el('exec-body').textContent;
+  assert.match(quiet, /不等于没有副作用/, 'an empty journal must not read as "nothing happened"');
+});
 
 check('a refused profile disables the run button and names the evidence', async () => {
   const t = boot(routeBase());
