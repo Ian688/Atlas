@@ -30,6 +30,11 @@ struct App {
     /// declares a different owner is not believed -- letting one page write rows
     /// under another's name would make the owner column meaningless.
     owner: String,
+    /// The one directory this server is allowed to write into, if the operator
+    /// started it with `--allow-writes`. `None` means every write endpoint
+    /// refuses, and no request can turn that on: an HTTP request may not widen
+    /// the boundary it arrives through.
+    write_root: Option<std::path::PathBuf>,
 }
 #[derive(Deserialize)]
 struct Request {
@@ -380,6 +385,155 @@ struct ProposeBody {
 /// page may *register* a diff (which is an Intent and changes nothing), but
 /// verifying and applying it stay on the CLI, where the person doing it can see
 /// which directory is about to be written.
+#[derive(Deserialize)]
+struct PatchWriteBody {
+    id: String,
+    /// The absolute directory the page believes it is writing into. The write
+    /// only happens if this equals the directory the operator named, so the page
+    /// cannot target a path the operator never saw.
+    confirm_path: String,
+}
+
+/// The shared gate for both write endpoints.
+///
+/// Returns the refused response boxed: a `Response` is much larger than the
+/// directory it stands beside, and every caller turns the error straight into a
+/// reply anyway.
+fn write_gate(
+    app: &App,
+    confirm_path: &str,
+) -> std::result::Result<std::path::PathBuf, Box<Response>> {
+    let Some(root) = app.write_root.clone() else {
+        return Err(Box::new(
+            (
+                StatusCode::FORBIDDEN,
+                axum::Json(serde_json::json!({
+                    "error": "http_writes_disabled",
+                    "detail": "这个服务启动时没有 --allow-writes，因此 HTTP 不提供写路径；请在 CLI 上执行 atlas patch apply/revert。",
+                })),
+            )
+                .into_response(),
+        ));
+    };
+    if std::path::Path::new(confirm_path) != root {
+        return Err(Box::new(
+            (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({
+                    "error": "confirmation_mismatch",
+                    "expected": root.display().to_string(),
+                    "got": confirm_path,
+                    "detail": "写入只发生在启动时指定的那个目录；请求里的 confirm_path 必须与它逐字相同。",
+                })),
+            )
+                .into_response(),
+        ));
+    }
+    Ok(root)
+}
+
+async fn apply_patch(
+    State(app): State<App>,
+    headers: HeaderMap,
+    axum::Json(body): axum::Json<PatchWriteBody>,
+) -> Response {
+    if !allowed(&app, &headers) {
+        return (StatusCode::UNAUTHORIZED, "local session required").into_response();
+    }
+    let root = match write_gate(&app, &body.confirm_path) {
+        Ok(root) => root,
+        Err(response) => return *response,
+    };
+    let store = app.store.clone();
+    let owner = app.owner.clone();
+    let outcome = tokio::task::spawn_blocking(move || {
+        let proposal = store.patch_proposal(&body.id).map_err(|e| e.to_string())?;
+        crate::patchwork::apply_proposal(&store, &proposal, &root, &owner)
+    })
+    .await;
+    patch_write_response(outcome)
+}
+
+async fn revert_patch(
+    State(app): State<App>,
+    headers: HeaderMap,
+    axum::Json(body): axum::Json<PatchWriteBody>,
+) -> Response {
+    if !allowed(&app, &headers) {
+        return (StatusCode::UNAUTHORIZED, "local session required").into_response();
+    }
+    let root = match write_gate(&app, &body.confirm_path) {
+        Ok(root) => root,
+        Err(response) => return *response,
+    };
+    let store = app.store.clone();
+    let owner = app.owner.clone();
+    let outcome = tokio::task::spawn_blocking(move || {
+        let proposal = store.patch_proposal(&body.id).map_err(|e| e.to_string())?;
+        // A revert writes back the bytes the proposal recorded, so the recorded
+        // directory must be the one this server is allowed to write into. A
+        // proposal applied somewhere else is not this server's to undo.
+        let recorded = proposal
+            .target
+            .clone()
+            .ok_or("proposal_has_no_target")
+            .map(std::path::PathBuf::from)?;
+        let recorded = recorded.canonicalize().unwrap_or_else(|_| recorded.clone());
+        if recorded != root {
+            return Err(format!(
+                "revert_target_is_not_this_checkout:recorded={}:allowed={}",
+                recorded.display(),
+                root.display()
+            ));
+        }
+        crate::patchwork::revert_proposal(&store, &proposal, &owner)
+    })
+    .await;
+    patch_write_response(outcome)
+}
+
+/// One shape for both write outcomes: a refusal is a named error with the state
+/// it refused from, never a 200 that reads as success.
+fn patch_write_response(
+    outcome: std::result::Result<
+        std::result::Result<atlas_engine::patch::PatchProposal, String>,
+        tokio::task::JoinError,
+    >,
+) -> Response {
+    let outcome = match outcome {
+        Ok(outcome) => outcome,
+        Err(error) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({"error": format!("patch_task_failed:{error}")})),
+            )
+                .into_response();
+        }
+    };
+    match outcome {
+        Ok(proposal) => match serde_json::to_vec(&serde_json::json!({"proposal": proposal})) {
+            Ok(bytes) => (
+                [
+                    (header::CONTENT_TYPE, "application/json"),
+                    (header::CACHE_CONTROL, "no-store"),
+                ],
+                bytes,
+            )
+                .into_response(),
+            Err(error) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({"error": error.to_string()})),
+            )
+                .into_response(),
+        },
+        Err(error) => (
+            StatusCode::CONFLICT,
+            axum::Json(serde_json::json!({"error": error})),
+        )
+            .into_response(),
+    }
+}
+
 async fn propose_patch(
     State(app): State<App>,
     headers: HeaderMap,
@@ -1051,9 +1205,25 @@ const CONTRACT: &[(&str, &str, &str, &str, &str, &str)] = &[
         "apply 之后被修改即拒绝",
         "同上",
     ),
+    (
+        "patch/apply",
+        "POST",
+        "http",
+        "把已验证的提案写进检出目录",
+        "只在启动时用 --allow-writes <目录> 指定的那一个目录内写入；请求必须回显该绝对路径",
+        "未启用时一律 403 http_writes_disabled；按形式校验字节（新建要求路径为空）",
+    ),
+    (
+        "patch/revert",
+        "POST",
+        "http",
+        "撤销已应用的提案",
+        "只撤销记录里那个目录，且必须等于启动时指定的目录",
+        "撤销新建=删文件、撤销删除=按钉住字节恢复；目标被改动即拒绝",
+    ),
 ];
 
-fn contract(analysis: &str) -> serde_json::Value {
+fn contract(analysis: &str, write_root: Option<&std::path::Path>) -> serde_json::Value {
     let endpoints: Vec<serde_json::Value> = CONTRACT
         .iter()
         .map(|(name, method, transport, purpose, guarantee, limit)| {
@@ -1078,6 +1248,12 @@ fn contract(analysis: &str) -> serde_json::Value {
             "未解析、未知与截断必须原样呈现给最终用户，不能因为界面上不好看而丢掉。",
             "静态候选、静态推导与执行观测是三类证据，展示时必须能分辨。",
         ],
+        "writes": {
+            "enabled": write_root.is_some(),
+            "root": write_root.map(|root| root.display().to_string()),
+            "how_to_enable": "atlas --store S serve <analysis> --allow-writes <目录>",
+            "scope": "只有 patch/apply 与 patch/revert；页面不能指定目录，只能在请求里回显这里给出的 root",
+        },
         "qualification": "只描述本服务当前的接口；不构成完整 AL/ET/GE/MT/HI/DV 或成熟产品验收。",
     })
 }
@@ -1095,7 +1271,7 @@ async fn contract_endpoint(
     if !allowed(&app, &headers) {
         return (StatusCode::UNAUTHORIZED, "local session required").into_response();
     }
-    let mut value = contract(&app.analysis);
+    let mut value = contract(&app.analysis, app.write_root.as_deref());
     if let Some(transport) = query.transport.as_deref()
         && let Some(list) = value["endpoints"].as_array()
     {
@@ -1117,6 +1293,7 @@ pub async fn serve(
     store: Store,
     analysis: String,
     port: u16,
+    write_root: Option<std::path::PathBuf>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let listener =
         tokio::net::TcpListener::bind(SocketAddrV4::new(Ipv4Addr::LOCALHOST, port)).await?;
@@ -1150,6 +1327,15 @@ pub async fn serve(
         authority: address.to_string(),
         slots: Arc::new(Semaphore::new(8)),
         owner: format!("session-{}", &token[..12]),
+        // Canonicalised once, at startup: every later comparison is between two
+        // absolute paths, and a page cannot contribute to either.
+        write_root: match write_root {
+            Some(root) => Some(
+                root.canonicalize()
+                    .map_err(|error| format!("write_root_unreadable:{}:{error}", root.display()))?,
+            ),
+            None => None,
+        },
     };
     let router = Router::new()
         .route(
@@ -1227,6 +1413,10 @@ pub async fn serve(
         .route("/api/patches", get(patches))
         .route("/api/patch", get(patch_detail))
         .route("/api/patch/propose", post(propose_patch))
+        // Writes exist only when the operator allowed them at startup, and even
+        // then the page must echo the exact directory it was shown.
+        .route("/api/patch/apply", post(apply_patch))
+        .route("/api/patch/revert", post(revert_patch))
         // The seam, published as data so a host integration can be checked
         // against it instead of against prose.
         .route("/api/contract", get(contract_endpoint))

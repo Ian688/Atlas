@@ -442,7 +442,7 @@ class Queued(Base):
 
 
 class Http(Base):
-    """The review surface: a page may register and read, never verify or apply."""
+    """The review surface: a page may register and read; writes are opt-in."""
 
     def setUp(self):
         super().setUp()
@@ -492,6 +492,36 @@ class Http(Base):
         self.assertIn("patch_does_not_apply", payload["proposal"]["terminal_reason"])
         self.assertEqual(self.math.read_text(encoding="utf-8"), MATH)
 
+    def verified_proposal_over_http(self):
+        """Register and verify a proposal, so a write has something to act on."""
+        posted = json.load(self.post("api/patch/propose", {
+            "entity": "add",
+            "diff": ("--- a/src/math.js\n+++ b/src/math.js\n@@ -1,1 +1,1 @@\n"
+                     "-export function add(left, right) { return left + right; }\n"
+                     "+export function add(left, right) { return left + right + 7; }\n"),
+        }))
+        proposal = posted["proposal"]
+        self.cli("patch", "verify", proposal["id"])
+        return proposal
+
+    def test_http_has_no_write_path_unless_the_operator_allowed_one(self):
+        proposal = self.verified_proposal_over_http()
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            self.post("api/patch/apply", {"id": proposal["id"], "confirm_path": str(self.project)})
+        self.assertEqual(error.exception.code, 403)
+        payload = json.load(error.exception)
+        error.exception.close()
+        self.assertEqual(payload["error"], "http_writes_disabled")
+        self.assertIn("--allow-writes", payload["detail"])
+        # And nothing was written: the refusal happened before any file opened.
+        self.assertEqual(self.math.read_text(encoding="utf-8"), MATH)
+        contract = self.get("api/contract")
+        self.assertFalse(contract["writes"]["enabled"])
+        self.assertIsNone(contract["writes"]["root"])
+        published = {entry["name"] for entry in contract["endpoints"]}
+        self.assertIn("patch/apply", published)
+        self.assertIn("patch/revert", published)
+
     def test_a_page_can_register_a_proposal_and_the_cli_can_verify_it(self):
         posted = json.load(self.post("api/patch/propose", {
             "entity": "add",
@@ -517,6 +547,120 @@ class Http(Base):
             self.opener.open(urllib.request.Request(self.base_url + "api/patches"), timeout=20)
         self.assertEqual(error.exception.code, 401)
         error.exception.close()
+
+
+class HttpWrites(Base):
+    """The same surface with the operator's write permission switched on."""
+
+    def setUp(self):
+        super().setUp()
+        self.proc = subprocess.Popen(
+            [str(BIN), "--store", str(self.store), "serve", self.analysis,
+             "--allow-writes", str(self.project)],
+            cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        self.addCleanup(self.stop)
+        with selectors.DefaultSelector() as ready:
+            ready.register(self.proc.stdout, selectors.EVENT_READ)
+            self.assertTrue(ready.select(15), "HTTP server readiness deadline")
+        boot = json.loads(self.proc.stdout.readline())
+        session = json.loads(Path(boot["session_file"]).read_text())
+        self.base_url = session["url"]
+        self.auth = {
+            "Authorization": "Bearer " + session["token"],
+            "Content-Type": "application/json",
+        }
+        self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+    def stop(self):
+        if self.proc.poll() is None:
+            self.proc.kill()
+            self.proc.wait(timeout=10)
+
+    def get(self, path):
+        with self.opener.open(urllib.request.Request(self.base_url + path, headers=self.auth), timeout=20) as response:
+            return json.load(response)
+
+    def post(self, path, body):
+        return self.opener.open(urllib.request.Request(
+            self.base_url + path, headers=self.auth,
+            data=json.dumps(body).encode(), method="POST"), timeout=60)
+
+    def proposal(self, replacement="left + right + 7"):
+        posted = json.load(self.post("api/patch/propose", {
+            "entity": "add",
+            "diff": ("--- a/src/math.js\n+++ b/src/math.js\n@@ -1,1 +1,1 @@\n"
+                     "-export function add(left, right) { return left + right; }\n"
+                     f"+export function add(left, right) {{ return {replacement}; }}\n"),
+        }))
+        self.cli("patch", "verify", posted["proposal"]["id"])
+        return posted["proposal"]
+
+    def test_a_one_click_revert_writes_only_the_directory_the_operator_named(self):
+        proposal = self.proposal()
+        root = self.get("api/contract")["writes"]["root"]
+        applied = json.load(self.post("api/patch/apply", {"id": proposal["id"], "confirm_path": root}))
+        self.assertEqual(applied["proposal"]["state"], "applied")
+        self.assertIn("left + right + 7", self.math.read_text(encoding="utf-8"))
+        # The actor is recorded, because "applied" without "by whom, through
+        # which path" is not reviewable.
+        self.assertTrue(applied["proposal"]["proposal"]["terminal_reason"].startswith("applied_by:session-")
+                        if "terminal_reason" in applied["proposal"]["proposal"]
+                        else applied["proposal"]["terminal_reason"].startswith("applied_by:session-"))
+        reverted = json.load(self.post("api/patch/revert", {"id": proposal["id"], "confirm_path": root}))
+        self.assertEqual(reverted["proposal"]["state"], "reverted")
+        self.assertEqual(self.math.read_text(encoding="utf-8"), MATH)
+
+    def test_a_write_must_echo_the_directory_it_was_shown(self):
+        proposal = self.proposal()
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            self.post("api/patch/apply", {"id": proposal["id"], "confirm_path": "/tmp"})
+        self.assertEqual(error.exception.code, 400)
+        payload = json.load(error.exception)
+        error.exception.close()
+        self.assertEqual(payload["error"], "confirmation_mismatch")
+        self.assertEqual(payload["expected"], self.get("api/contract")["writes"]["root"])
+        self.assertEqual(self.math.read_text(encoding="utf-8"), MATH, "a mismatch must write nothing")
+
+    def test_a_page_cannot_name_a_directory_of_its_own(self):
+        # The request type has no target field at all: an injected one is not
+        # read, so the only directory that can be written is the operator's.
+        proposal = self.proposal()
+        root = self.get("api/contract")["writes"]["root"]
+        applied = json.load(self.post("api/patch/apply", {
+            "id": proposal["id"], "confirm_path": root,
+            "target": "/", "root": "/etc", "path": "/etc/passwd",
+        }))
+        self.assertEqual(applied["proposal"]["state"], "applied")
+        self.assertEqual(applied["proposal"]["target"], root)
+        self.assertIn("left + right + 7", self.math.read_text(encoding="utf-8"))
+
+    def test_a_checkout_that_moved_after_verification_is_refused_over_http(self):
+        proposal = self.proposal()
+        root = self.get("api/contract")["writes"]["root"]
+        self.math.write_text(MATH.replace("left + right", "left + right + 1"), encoding="utf-8")
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            self.post("api/patch/apply", {"id": proposal["id"], "confirm_path": root})
+        self.assertEqual(error.exception.code, 409)
+        payload = json.load(error.exception)
+        error.exception.close()
+        self.assertIn("target_changed_since_apply", payload["error"])
+        self.assertIn("left + right + 1", self.math.read_text(encoding="utf-8"))
+
+    def test_a_create_applied_over_http_reverts_by_removing_the_file(self):
+        posted = json.load(self.post("api/patch/propose", {
+            "entity": "src/extra.js",
+            "diff": "--- /dev/null\n+++ b/src/extra.js\n@@ -0,0 +1,1 @@\n+export const X = 1;\n",
+        }))
+        proposal = posted["proposal"]
+        self.assertFalse(proposal["proposal"]["target_exists"])
+        self.cli("patch", "verify", proposal["id"])
+        root = self.get("api/contract")["writes"]["root"]
+        json.load(self.post("api/patch/apply", {"id": proposal["id"], "confirm_path": root}))
+        created = self.project / "src" / "extra.js"
+        self.assertEqual(created.read_text(encoding="utf-8"), "export const X = 1;\n")
+        json.load(self.post("api/patch/revert", {"id": proposal["id"], "confirm_path": root}))
+        self.assertFalse(created.exists(), "a one-click revert of a create removes the file")
 
 
 if __name__ == "__main__":

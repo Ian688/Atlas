@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id);
-const state = {token:'',nodes:[],edges:[],nodePage:null,edgePage:null,selected:null,focus:null,request:0,exportUrl:null,execProfile:null,report:null,selection:null,pendingSelection:null,annotations:[],patches:[],execRender:0,ancestorChain:null};
+const state = {token:'',nodes:[],edges:[],nodePage:null,edgePage:null,selected:null,focus:null,request:0,exportUrl:null,execProfile:null,report:null,selection:null,pendingSelection:null,annotations:[],patches:[],execRender:0,ancestorChain:null,contract:null};
 const ns='http://www.w3.org/2000/svg';
 function svg(tag, attrs={}, text) {const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));if(text!==undefined)e.textContent=text;return e;}
 function text(tag,value,cls) {const e=document.createElement(tag);e.textContent=value;if(cls)e.className=cls;return e;}
@@ -95,8 +95,39 @@ ${String(inner.diff||'').slice(0,1200)}`));
       body.append(flowNode('flow-line','还没有验证：没有派生补丁树，也没有跑测试。'));
     }
     if(proposal.state==='applied')body.append(flowNode('flow-line',`已应用到 ${proposal.target}`));
+    const writes=state.contract&&state.contract.writes;
+    if(writes&&writes.enabled){
+      // The operator named exactly one directory at startup; the page shows it
+      // and echoes it back, so a click can only write where it was told.
+      const actions=document.createElement('div');actions.className='context-actions';
+      const apply=document.createElement('button');
+      apply.textContent='应用（写入 '+writes.root+'）';
+      apply.disabled=proposal.state!=='verified';
+      apply.onclick=()=>writePatch('patch/apply',proposal.id,writes.root);
+      const revert=document.createElement('button');
+      revert.textContent='一键撤销';
+      revert.disabled=proposal.state!=='applied';
+      revert.onclick=()=>writePatch('patch/revert',proposal.id,writes.root);
+      actions.append(apply,revert);
+      body.append(actions);
+      body.append(flowNode('flow-line',`写路径由启动参数 --allow-writes 指定：${writes.root}。页面不能指定目录，只能在请求里回显它；服务端逐字比对，不一致就拒绝且不写任何文件。`));
+    }else{
+      body.append(flowNode('flow-unknown','验证与应用只能在本机 CLI 上做：atlas patch verify / apply / revert。这个服务启动时没有 --allow-writes，因此 HTTP 没有写路径。'));
+    }
   }
-  body.append(flowNode('flow-unknown','验证与应用只能在本机 CLI 上做：atlas patch verify / apply / revert。页面不提供这两个动作，因为它无法让你看见将要写入哪个目录。'));
+}
+// One click writes, but only through the boundary the operator opened at
+// startup. The page does not choose the directory; it echoes the one the
+// contract published, and the server refuses anything else.
+async function writePatch(endpoint,id,root){
+  try{
+    const result=await apiJson(endpoint,{id,confirm_path:root});
+    status(`提案 ${result.proposal.state==='applied'?'已应用':'已撤销'}：${id.slice(0,12)}`);
+    await loadPatches(state.selected);
+  }catch(e){
+    status(`写入未发生：${e.message}（服务器拒绝时不写任何文件）`);
+    await loadPatches(state.selected);
+  }
 }
 async function loadPatches(node){
   state.patches=[];
@@ -193,6 +224,10 @@ async function connect(){
   try {
     const report=await api('report');
     resetDetail();state.nodes=[];state.edges=[];state.nodePage=null;state.edgePage=null;state.report=report;
+    // The contract says whether this server has a write path at all, and into
+    // which single directory. If the query fails the page assumes no writes:
+    // guessing "yes" would offer a button that cannot work.
+    try{state.contract=await api('contract');}catch{state.contract=null;}
     await loadNodes();await loadEdges();
     $('metrics').replaceChildren(metric(report.file_count,'文件'),metric(report.function_count,'函数'),metric(report.call_count,'调用点'));
     $('revision').textContent=`分析版本 ${report.id.slice(0,12)}`;$('revision').title=report.id;

@@ -893,6 +893,42 @@ check('a proposal with no verification says so instead of implying one', async (
   assert.match(shown, /没有派生补丁树，也没有跑测试/, 'and must not imply a test ran');
 });
 
+check('a one-click revert appears only when the operator allowed writes', async () => {
+  const t = boot(routeBase());
+  const id = 'w'.repeat(64);
+  const applied = () => ({ proposals: [{ id, state: 'applied', proposed_by: 'session-1', target: '/tmp/checkout',
+    proposal: { intent: true, code_exists: false, target_exists: true, summary: 'edit',
+      diff: '--- a/src/math.js +++ b/src/math.js',
+      validation: { ok: true, hunks: 1, patched_paths: ['src/math.js'], deleted_paths: [],
+        forms: [{ path: 'src/math.js', form: 'modify' }] } } }] });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  // No contract with writes in it: the page must not offer a write it cannot do.
+  t.routes.patches = applied();
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  const withoutWrites = t.el('patch-body').textContent;
+  assert.doesNotMatch(withoutWrites, /一键撤销/, 'no write buttons without an explicit opt-in');
+  assert.match(withoutWrites, /没有 --allow-writes/, 'and the reason must be stated');
+
+  // Now the server says writes are enabled into one named directory.
+  t.routes.contract = { writes: { enabled: true, root: '/tmp/checkout' }, endpoints: [] };
+  t.routes.patches = applied();
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  const withWrites = t.el('patch-body').textContent;
+  assert.match(withWrites, /一键撤销/, 'an applied proposal may be reverted from the page');
+  assert.match(withWrites, /\/tmp\/checkout/, 'the directory that would be written must be shown');
+  assert.match(withWrites, /页面不能指定目录/, 'and the boundary must be stated, not implied');
+
+  t.routes['patch/revert'] = { proposal: { id, state: 'reverted' } };
+  await t.run(`writePatch('patch/revert','${id}','/tmp/checkout')`);
+  const posted = t.requests.filter((r) => r.name === 'patch/revert');
+  assert.equal(posted.length, 1, 'the click must post exactly once');
+  const body = JSON.parse(posted[0].body);
+  assert.equal(body.id, id);
+  assert.equal(body.confirm_path, '/tmp/checkout', 'the page echoes the published directory');
+});
+
 check('proposing posts the diff and reports a refusal without pretending it worked', async () => {
   const t = boot(routeBase());
   t.routes['patch/propose'] = { __status: 400 };

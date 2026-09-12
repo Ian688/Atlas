@@ -193,6 +193,11 @@ enum Action {
         analysis: String,
         #[arg(long, default_value_t = 0)]
         port: u16,
+        /// Allow the local page to apply and revert patch proposals, but only
+        /// inside this one directory. Absent means HTTP has no write path at
+        /// all; a request cannot turn it on.
+        #[arg(long, value_name = "DIR")]
+        allow_writes: Option<PathBuf>,
     },
     /// Durable job identity: idempotent submit, lease, and crash recovery.
     Job {
@@ -1031,18 +1036,6 @@ async fn run_claimed_job(
     }
 }
 
-/// The blob id of a snapshot entry, which is also the digest of its bytes: the
-/// check "the file on disk is still the bytes this proposal was verified
-/// against" is a comparison of content addresses, not of timestamps.
-fn pinned_digest(snapshot: &atlas_contract::Snapshot, path: &str) -> Result<String, String> {
-    snapshot
-        .entries
-        .iter()
-        .find(|entry| entry.path == path)
-        .and_then(|entry| entry.blob.clone())
-        .ok_or_else(|| format!("pinned_blob_missing:{path}"))
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
@@ -1669,93 +1662,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             PatchAction::Apply { id, target } => {
                 let proposal = store.patch_proposal(&id)?;
-                if proposal.state != patch::STATE_VERIFIED {
-                    return Err(format!("proposal_not_applicable:{}", proposal.state).into());
-                }
-                let parsed = patchwork::reparsed(&proposal)?;
-                let metadata = store.metadata(&proposal.analysis_id)?;
-                let snapshot = store.snapshot(
-                    metadata["snapshot_id"]
-                        .as_str()
-                        .ok_or("analysis_has_no_snapshot")?,
-                )?;
-                let files = patch::snapshot_files(&store, &snapshot)?;
-                let outcome = patch::apply(&files, &parsed)?;
-                let target = target.canonicalize()?;
-                // The bytes on disk must still be the bytes this proposal was
-                // verified against. Each form checks a different thing: a
-                // modify and a delete require the pinned bytes to be there, a
-                // create requires that nothing is.
-                for entry in &outcome.report {
-                    match entry.form.as_str() {
-                        "create" => {
-                            let bytes = outcome
-                                .files
-                                .get(&entry.path)
-                                .ok_or_else(|| format!("patched_bytes_missing:{}", entry.path))?;
-                            patch::create_checked(&target, &entry.path, bytes)?;
-                        }
-                        "delete" => {
-                            let pinned = pinned_digest(&snapshot, &entry.path)?;
-                            patch::remove_checked(&target, &entry.path, &pinned)?;
-                        }
-                        _ => {
-                            let pinned = pinned_digest(&snapshot, &entry.path)?;
-                            let bytes = outcome
-                                .files
-                                .get(&entry.path)
-                                .ok_or_else(|| format!("patched_bytes_missing:{}", entry.path))?;
-                            patch::write_checked(&target, &entry.path, bytes, &pinned)?;
-                        }
-                    }
-                }
-                if !store.mark_patch_applied(&id, &target.display().to_string())? {
-                    return Err("proposal_apply_lost_a_race".into());
-                }
-                print(store.patch_proposal(&id)?)?
+                print(patchwork::apply_proposal(
+                    &store, &proposal, &target, "cli",
+                )?)?
             }
             PatchAction::Revert { id } => {
                 let proposal = store.patch_proposal(&id)?;
-                if proposal.state != patch::STATE_APPLIED {
-                    return Err(format!("proposal_not_revertible:{}", proposal.state).into());
-                }
-                let target =
-                    PathBuf::from(proposal.target.clone().ok_or("proposal_has_no_target")?);
-                let parsed = patchwork::reparsed(&proposal)?;
-                let metadata = store.metadata(&proposal.analysis_id)?;
-                let snapshot = store.snapshot(
-                    metadata["snapshot_id"]
-                        .as_str()
-                        .ok_or("analysis_has_no_snapshot")?,
-                )?;
-                let files = patch::snapshot_files(&store, &snapshot)?;
-                let outcome = patch::apply(&files, &parsed)?;
-                for entry in &outcome.report {
-                    let path = entry.path.as_str();
-                    match entry.form.as_str() {
-                        // Undoing a create is removing the file, and only if it
-                        // is still exactly what apply wrote.
-                        "create" => {
-                            patch::remove_checked(&target, path, &entry.patched_digest)?;
-                        }
-                        // Undoing a delete is restoring the pinned bytes, and
-                        // only into a path nothing has taken.
-                        "delete" => {
-                            let pinned = pinned_digest(&snapshot, path)?;
-                            let original = store.read_blob(&pinned)?;
-                            patch::restore_checked(&target, path, &original)?;
-                        }
-                        // Refuse if the file moved since apply: reverting over a
-                        // newer edit would delete that edit.
-                        _ => {
-                            let pinned = pinned_digest(&snapshot, path)?;
-                            let original = store.read_blob(&pinned)?;
-                            patch::write_checked(&target, path, &original, &entry.patched_digest)?;
-                        }
-                    }
-                }
-                store.mark_patch_reverted(&id, Some("reverted_by_operator"))?;
-                print(store.patch_proposal(&id)?)?
+                print(patchwork::revert_proposal(&store, &proposal, "cli")?)?
             }
             PatchAction::Status { id } => print(store.patch_proposal(&id)?)?,
             PatchAction::List {
@@ -1774,9 +1687,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }))?
             }
         },
-        Action::Serve { analysis, port } => {
+        Action::Serve {
+            analysis,
+            port,
+            allow_writes,
+        } => {
             store.metadata(&analysis)?;
-            server::serve(store, analysis, port).await?;
+            server::serve(store, analysis, port, allow_writes).await?;
         }
     }
     Ok(())

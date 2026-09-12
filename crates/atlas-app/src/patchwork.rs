@@ -368,6 +368,137 @@ pub async fn run_declared_test(
 /// Shared by the CLI and the HTTP review surface so that "a proposal was
 /// validated against the pinned bytes" means the same thing on both, and so a
 /// page cannot register something the CLI would have refused.
+/// Apply a verified proposal to a checkout, checking the bytes each form needs.
+///
+/// The CLI and the local page both call this: two implementations of "write the
+/// patched bytes, but only if the checkout is still what was reviewed" would
+/// drift, and the one that drifted would be the one nobody tested.
+pub fn apply_proposal(
+    store: &Store,
+    proposal: &patch::PatchProposal,
+    target: &std::path::Path,
+    actor: &str,
+) -> Result<patch::PatchProposal, String> {
+    if proposal.state != patch::STATE_VERIFIED {
+        return Err(format!("proposal_not_applicable:{}", proposal.state));
+    }
+    let (snapshot, outcome) = proposal_outcome(store, proposal)?;
+    let target = target
+        .canonicalize()
+        .map_err(|error| format!("target_unreadable:{}:{error}", target.display()))?;
+    for entry in &outcome.report {
+        match entry.form.as_str() {
+            "create" => {
+                let bytes = outcome
+                    .files
+                    .get(&entry.path)
+                    .ok_or_else(|| format!("patched_bytes_missing:{}", entry.path))?;
+                patch::create_checked(&target, &entry.path, bytes).map_err(|e| e.to_string())?;
+            }
+            "delete" => {
+                let pinned = pinned_digest(&snapshot, &entry.path)?;
+                patch::remove_checked(&target, &entry.path, &pinned).map_err(|e| e.to_string())?;
+            }
+            _ => {
+                let pinned = pinned_digest(&snapshot, &entry.path)?;
+                let bytes = outcome
+                    .files
+                    .get(&entry.path)
+                    .ok_or_else(|| format!("patched_bytes_missing:{}", entry.path))?;
+                patch::write_checked(&target, &entry.path, bytes, &pinned)
+                    .map_err(|e| e.to_string())?;
+            }
+        }
+    }
+    if !store
+        .mark_patch_applied(&proposal.id, &target.display().to_string(), actor)
+        .map_err(|e| e.to_string())?
+    {
+        return Err("proposal_apply_lost_a_race".into());
+    }
+    store
+        .patch_proposal(&proposal.id)
+        .map_err(|e| e.to_string())
+}
+
+/// Undo an applied proposal, per form, refusing when the checkout moved.
+pub fn revert_proposal(
+    store: &Store,
+    proposal: &patch::PatchProposal,
+    actor: &str,
+) -> Result<patch::PatchProposal, String> {
+    if proposal.state != patch::STATE_APPLIED {
+        return Err(format!("proposal_not_revertible:{}", proposal.state));
+    }
+    let target = proposal
+        .target
+        .clone()
+        .ok_or("proposal_has_no_target")
+        .map(PathBuf::from)?;
+    let (snapshot, outcome) = proposal_outcome(store, proposal)?;
+    for entry in &outcome.report {
+        let path = entry.path.as_str();
+        match entry.form.as_str() {
+            // Undoing a create is removing the file, and only if it is still
+            // exactly what apply wrote.
+            "create" => patch::remove_checked(&target, path, &entry.patched_digest)
+                .map_err(|e| e.to_string())?,
+            // Undoing a delete is restoring the pinned bytes, and only into a
+            // path nothing has taken.
+            "delete" => {
+                let pinned = pinned_digest(&snapshot, path)?;
+                let original = store.read_blob(&pinned).map_err(|e| e.to_string())?;
+                patch::restore_checked(&target, path, &original).map_err(|e| e.to_string())?;
+            }
+            // Refuse if the file moved since apply: reverting over a newer edit
+            // would delete that edit.
+            _ => {
+                let pinned = pinned_digest(&snapshot, path)?;
+                let original = store.read_blob(&pinned).map_err(|e| e.to_string())?;
+                patch::write_checked(&target, path, &original, &entry.patched_digest)
+                    .map_err(|e| e.to_string())?;
+            }
+        }
+    }
+    store
+        .mark_patch_reverted(&proposal.id, Some(&format!("reverted_by:{actor}")))
+        .map_err(|e| e.to_string())?;
+    store
+        .patch_proposal(&proposal.id)
+        .map_err(|e| e.to_string())
+}
+
+/// The snapshot a proposal was made against, and what applying it does.
+pub fn proposal_outcome(
+    store: &Store,
+    proposal: &patch::PatchProposal,
+) -> Result<(atlas_contract::Snapshot, patch::PatchOutcome), String> {
+    let metadata = store
+        .metadata(&proposal.analysis_id)
+        .map_err(|e| e.to_string())?;
+    let snapshot = store
+        .snapshot(
+            metadata["snapshot_id"]
+                .as_str()
+                .ok_or("analysis_has_no_snapshot")?,
+        )
+        .map_err(|e| e.to_string())?;
+    let files = patch::snapshot_files(store, &snapshot).map_err(|e| e.to_string())?;
+    let parsed = reparsed(proposal)?;
+    let outcome = patch::apply(&files, &parsed).map_err(|e| e.to_string())?;
+    Ok((snapshot, outcome))
+}
+
+/// The blob id of a snapshot entry, which is also the digest of its bytes.
+fn pinned_digest(snapshot: &atlas_contract::Snapshot, path: &str) -> Result<String, String> {
+    snapshot
+        .entries
+        .iter()
+        .find(|entry| entry.path == path)
+        .and_then(|entry| entry.blob.clone())
+        .ok_or_else(|| format!("pinned_blob_missing:{path}"))
+}
+
 /// Resolve the entity a proposal is about.
 ///
 /// A proposal that *creates* a file names a path the analysis does not have --

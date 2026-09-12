@@ -154,21 +154,25 @@ impl Store {
     }
 
     /// Record that the verified bytes were written to a target checkout.
-    pub fn mark_patch_applied(&self, id: &str, target: &str) -> Result<bool> {
+    /// Mark a proposal applied. `actor` is recorded, not trusted: the CLI and
+    /// the local page are different ways to reach the same write, and a record
+    /// that does not say which one was used cannot be reviewed.
+    pub fn mark_patch_applied(&self, id: &str, target: &str, actor: &str) -> Result<bool> {
         let conn = self.connection()?;
         let tx = crate::store::publication_transaction(
             &conn,
             &crate::control::ExecutionControl::new(None),
         )?;
         let updated = tx.execute(
-            "UPDATE patch_proposals SET state=?2, target=?3, updated_at=?4
+            "UPDATE patch_proposals SET state=?2, target=?3, terminal_reason=?6, updated_at=?4
              WHERE id=?1 AND state=?5",
             params![
                 id,
                 STATE_APPLIED,
                 target,
                 crate::job::now_ms(),
-                STATE_VERIFIED
+                STATE_VERIFIED,
+                format!("applied_by:{actor}")
             ],
         )?;
         tx.commit()?;
