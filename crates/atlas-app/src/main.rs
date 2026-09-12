@@ -173,6 +173,15 @@ enum Action {
         #[command(subcommand)]
         command: JobAction,
     },
+    /// Relocate a selection pinned to another analysis onto this one.
+    Relocate {
+        /// The analysis the selection was pinned to.
+        from: String,
+        entity: String,
+        /// The analysis to relocate into.
+        #[arg(long)]
+        to: String,
+    },
     /// Pin a selection: an entity plus the analysis version it was chosen in.
     Select {
         analysis: String,
@@ -1286,6 +1295,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         },
+        Action::Relocate { from, entity, to } => {
+            let entity = runner::resolve_entity(&store, &from, &entity)?;
+            let relocation = atlas_engine::relocate::relocate(&store, &from, &entity, &to)?;
+            let selection = relocation
+                .matched_entity_id
+                .as_ref()
+                .map(|matched| bridge::selection(&to, matched, "entity"));
+            print(json!({
+                "relocation": atlas_engine::relocate::summary(&relocation),
+                "detail": relocation,
+                "selection": selection,
+                "note": "重定位只给出建议与依据，不改变任何已存记录；是否采用由调用方决定。",
+            }))?
+        }
         Action::Select { analysis, entity } => {
             // A selection must name something that exists. Returning a pin for
             // an invented id would make "no such object" indistinguishable from

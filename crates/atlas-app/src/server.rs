@@ -41,6 +41,9 @@ struct Request {
     /// A direct object reference where `entity` would be ambiguous, as in
     /// `/api/patch?id=<proposal id>`.
     id: Option<String>,
+    /// The analysis a selection was pinned to, for `/api/relocate`.
+    #[serde(rename = "from")]
+    from_analysis: Option<String>,
 }
 
 fn allowed(app: &App, headers: &HeaderMap) -> bool {
@@ -197,6 +200,31 @@ async fn query(
                 "requests": app.store.agent_requests(q.kind.as_deref(), q.limit.unwrap_or(50))?,
             }))
             .map_err(Into::into),
+            "relocate" => {
+                let reference = q.entity.as_deref().unwrap_or("");
+                // Relocation is defined relative to a *pinned* analysis, so the
+                // caller must say which one; defaulting to the served analysis
+                // would make every call a no-op.
+                let from = q
+                    .from_analysis
+                    .as_deref()
+                    .ok_or_else(|| atlas_engine::invalid("relocate_requires_from_analysis"))?;
+                let entity = crate::runner::resolve_entity(&app.store, from, reference)
+                    .map_err(|error| atlas_engine::invalid(&error))?;
+                let relocation = atlas_engine::relocate::relocate(&app.store, from, &entity, id)
+                    .map_err(|error| atlas_engine::invalid(&error.to_string()))?;
+                let selection = relocation
+                    .matched_entity_id
+                    .as_ref()
+                    .map(|matched| atlas_engine::bridge::selection(id, matched, "entity"));
+                serde_json::to_value(serde_json::json!({
+                    "relocation": atlas_engine::relocate::summary(&relocation),
+                    "detail": relocation,
+                    "selection": selection,
+                    "note": "重定位只给出建议与依据，不改变任何已存记录；调用方决定是否采用。",
+                }))
+                .map_err(Into::into)
+            }
             "run-markers" => {
                 let markers = app.store.run_markers(id, q.limit.unwrap_or(200))?;
                 serde_json::to_value(serde_json::json!({
@@ -305,6 +333,7 @@ endpoint!(flows, "flows");
 endpoint!(profile, "profile");
 endpoint!(exec_records, "exec-records");
 endpoint!(run_markers, "run-markers");
+endpoint!(relocate, "relocate");
 endpoint!(selection, "selection");
 endpoint!(annotations, "annotations");
 endpoint!(agent_requests, "agent-requests");
@@ -778,6 +807,14 @@ const CONTRACT: &[(&str, &str, &str, &str, &str, &str)] = &[
         "单次上限 500；只说明入口运行结论，不是调用路径",
     ),
     (
+        "relocate",
+        "GET",
+        "http",
+        "把固定版本上的选区重定位到当前版本（`from=<分析 id>`）",
+        "只给建议与依据；不确定就拒绝，绝不静默改指",
+        "依据限于 path+name / 字节相同 / 仅同名；改名到无法识别即拒绝",
+    ),
+    (
         "exec-records",
         "GET",
         "http",
@@ -1057,6 +1094,7 @@ pub async fn serve(
         .route("/api/profile", get(profile))
         .route("/api/exec-records", get(exec_records))
         .route("/api/run-markers", get(run_markers))
+        .route("/api/relocate", get(relocate))
         .route("/api/exec", post(exec))
         .route("/api/selection", get(selection))
         .route("/api/annotations", get(annotations))

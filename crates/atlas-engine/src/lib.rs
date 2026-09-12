@@ -9,6 +9,7 @@ pub mod inter;
 pub mod job;
 pub mod patch;
 pub mod query;
+pub mod relocate;
 pub mod scan;
 pub mod solve;
 pub mod store;

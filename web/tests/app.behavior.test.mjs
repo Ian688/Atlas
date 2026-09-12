@@ -571,13 +571,53 @@ check('a shared selection from the same analysis is applied on connect', async (
   assert.equal(t.el('inspector')['data-selection-entity'], FN_B.id);
 });
 
-check('a shared selection from another analysis is refused, not re-anchored', async () => {
+check('a shared selection from another analysis is relocated with its evidence stated', async () => {
   const t = boot(routeBase(), { hash: `#selection=${encodeURIComponent(FN_A.id)}&analysis=${'f'.repeat(64)}` });
+  t.routes.relocate = {
+    relocation: {
+      schema: 'atlas.selection-relocation.v1', from_analysis: 'f'.repeat(64),
+      to_analysis: report.id, entity_id: FN_A.id, relocated: true,
+      matched_entity_id: FN_A.id, matched_by: 'path_and_name', bytes_changed: true,
+      refusal: null, candidate_count: 1,
+    },
+    selection: { entity_id: FN_A.id, analysis_id: report.id, version: report.id },
+  };
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  assert.match(t.el('selection-name').textContent, /fnA/, 'a confident relocation selects the counterpart');
+  const shown = t.el('status').textContent;
+  assert.match(shown, /重定位/, 'the relocation must be reported, not silent');
+  assert.match(shown, /path_and_name/, 'the evidence that carried it must be shown');
+  assert.match(shown, /源码字节已变化/, 'and whether the bytes changed');
+});
+
+check('a refused relocation leaves the selection alone and says why', async () => {
+  const t = boot(routeBase(), { hash: `#selection=${encodeURIComponent(FN_A.id)}&analysis=${'f'.repeat(64)}` });
+  t.routes.relocate = {
+    relocation: {
+      from_analysis: 'f'.repeat(64), to_analysis: report.id, entity_id: FN_A.id,
+      relocated: false, matched_entity_id: null, matched_by: null, bytes_changed: null,
+      refusal: 'no_counterpart', candidate_count: 3,
+    },
+    detail: { note: '没有同名或字节相同的对应物；选区保持原样，不重指。' },
+    selection: null,
+  };
   t.el('token').value = 'TOKEN-1';
   await t.run('connect()');
   assert.doesNotMatch(t.el('selection-name').textContent, /fnA/,
-    'an object from another version must not be silently re-anchored here');
-  assert.match(t.el('status').textContent, /另一个分析版本/, 'the refusal must be explained');
+    'a refused relocation must not select anything');
+  assert.match(t.el('status').textContent, /no_counterpart/, 'the refusal code must be shown');
+  assert.match(t.el('status').textContent, /保持原样/, 'and the reason in the engine\'s own words');
+});
+
+check('a failed relocation query is reported as a failure, not as a refusal', async () => {
+  const t = boot(routeBase(), { hash: `#selection=${encodeURIComponent(FN_A.id)}&analysis=${'f'.repeat(64)}` });
+  t.routes.relocate = { __status: 500 };
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  assert.match(t.el('status').textContent, /重定位查询失败/,
+    'a broken query must not read as "the service decided not to relocate"');
+  assert.doesNotMatch(t.el('selection-name').textContent, /fnA/);
 });
 
 check('the bridge exposes bounded actions only, and none of them writes code', async () => {

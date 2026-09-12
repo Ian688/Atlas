@@ -121,6 +121,9 @@ const markers = await client.runMarkers();
 record('run_markers', markers.markers.length);
 record('run_markers_note', markers.note.includes('不是调用路径'));
 
+const relocation = await client.relocate({ entity: 'double', fromAnalysis: report.id });
+record('relocate_same_version', relocation.relocation.matched_by);
+
 record('required_endpoints', AtlasHostClient.requiredEndpoints());
 process.stdout.write(JSON.stringify(out));
 """
@@ -219,6 +222,10 @@ class HostSeam(unittest.TestCase):
         self.assertTrue(report["annotation_author"].startswith("session-"),
                         report["annotation_author"])
         self.assertGreaterEqual(report["annotation_count"], 1)
+
+    def test_a_host_can_ask_what_an_old_selection_becomes_here(self):
+        report = self.drive()
+        self.assertEqual(report["relocate_same_version"], "same_version")
 
     def test_a_host_can_register_and_read_a_patch_proposal(self):
         report = self.drive()

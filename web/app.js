@@ -146,10 +146,13 @@ function installBridge(){
   if(typeof globalThis==='undefined')return;
   globalThis.atlasBridge={
     version:'atlas.agent-bridge.v1',
-    bounded_actions:['getSelection','getAnnotations','getPatches','select','propose','proposePatch','openProjection','runControlled'],
+    bounded_actions:['getSelection','getAnnotations','getPatches','relocate','select','propose','proposePatch','openProjection','runControlled'],
     getSelection(){return state.selection?{...state.selection}:null;},
     getAnnotations(){return state.annotations;},
     getPatches(){return state.patches;},
+    // Read-only: it asks the service what a pinned selection would become here,
+    // and changes nothing until the caller acts on the answer.
+    async relocate(fromAnalysis,entityId){if(!fromAnalysis||!entityId)return {ok:false,error:'from_and_entity_required'};const result=await api('relocate',{entity:entityId,from:fromAnalysis});return {ok:true,relocation:result.relocation,detail:result.detail,selection:result.selection};},
     // Registering a proposal is an Intent, so the bridge may do it; verifying
     // and applying are not exposed here at all.
     async proposePatch(diff){if(!state.selected)return {ok:false,error:'no_selection'};$('patch-input').value=diff||'';const result=await proposePatch();return result?{ok:true,proposal:result.proposal}:{ok:false,error:'proposal_rejected'};},
@@ -190,11 +193,28 @@ async function connect(){
     const pending=state.pendingSelection;
     if(pending&&pending.entity_id){
       // A selection carries the version it was made in. If this server is
-      // serving a different analysis the fragment is refused, not re-anchored:
-      // silently pointing an old name at a new function is how a stale
-      // conclusion gets attached to code nobody looked at.
+      // serving a different analysis, ask for a *reported* relocation: the
+      // service either finds a counterpart and says what evidence carried it, or
+      // refuses. What never happens is silently pointing the old name at
+      // whatever now sits there.
       if(pending.analysis&&pending.analysis!==report.id){
-        status('该选区固定在另一个分析版本上，未自动选中。请在这里重新选择，或打开那个版本。');
+        try{
+          const relocated=await api('relocate',{entity:pending.entity_id,from:pending.analysis});
+          const summary=relocated.relocation||{};
+          if(summary.relocated&&relocated.selection){
+            const node=state.nodes.find(n=>n.id===relocated.selection.entity_id);
+            if(node){
+              await select(node);
+              status(`已从版本 ${String(pending.analysis).slice(0,8)} 重定位到当前版本：依据 ${summary.matched_by}${summary.bytes_changed?'，源码字节已变化':'，源码字节相同'}。`);
+            }else{
+              status('重定位找到了对应对象，但它不在当前已加载的节点里，未自动选中。');
+            }
+          }else{
+            status(`该选区固定在另一个分析版本上，重定位被拒绝（${summary.refusal||'unknown'}）：${relocated.detail?.note||''}`);
+          }
+        }catch(e){
+          status(`该选区固定在另一个分析版本上，且重定位查询失败：${e.message}。请在这里重新选择。`);
+        }
       }else{
         const node=state.nodes.find(n=>n.id===pending.entity_id);
         if(node)await select(node);

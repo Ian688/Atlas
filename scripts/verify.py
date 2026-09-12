@@ -51,6 +51,9 @@ CHECKS = [
     # that reads Atlas' store would be coupled to a layout the contract
     # explicitly does not promise.
     ("host-adapter", [sys.executable, "scripts/test_host_adapter.py"]),
+    # Relocating a pinned selection across versions: the reported relocations and
+    # the refusals, which are the part that keeps an old name off a new function.
+    ("relocate", [sys.executable, "scripts/test_relocate.py"]),
     ("calculator", ["node", "examples/calculator/demo.mjs"]),
     ("web-syntax", ["node", "--check", "web/app.js"]),
     ("city3d-syntax", ["node", "--check", "web/city3d.js"]),
