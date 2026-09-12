@@ -553,14 +553,105 @@ check('the bridge exposes bounded actions only, and none of them writes code', a
   for (const name of ['getSelection', 'getAnnotations', 'select', 'propose', 'openProjection']) {
     assert.ok(bridge.bounded_actions.includes(name), `${name} must be declared bounded`);
   }
-  const forbidden = ['write', 'apply', 'patch', 'exec', 'delete', 'index'];
+  // Reading or proposing a patch is not a code write, so the check is on the
+  // verbs that change something rather than on the noun.
+  const forbidden = ['write', 'apply', 'revert', 'exec', 'delete', 'index'];
   for (const action of bridge.bounded_actions) {
     for (const word of forbidden) {
       assert.ok(!action.toLowerCase().includes(word), `${action} looks like a code-writing action`);
     }
   }
+  assert.ok(bridge.bounded_actions.includes('proposePatch'),
+    'registering a proposal is allowed; it is an Intent, not a write');
+  for (const absent of ['applyPatch', 'revertPatch', 'verifyPatch']) {
+    assert.ok(!bridge.bounded_actions.includes(absent),
+      `${absent} must not be reachable from a page: verify re-indexes and apply writes a checkout`);
+  }
   const missing = await t.run('atlasBridge.select("symbol:not-loaded:0:1")');
   assert.equal(missing.ok, false, 'selecting an unloaded entity must fail loudly');
+});
+
+// --- W09: the patch review surface ------------------------------------------
+// The panel is where a proposal could most easily be mistaken for a change.
+// These checks pin the two readings that must never happen: a rejected proposal
+// shown as reviewable, and a verified proposal shown as applied.
+function proposal(over = {}) {
+  const inner = Object.assign({
+    schema: 'atlas.patch-proposal.v1', analysis_id: report.id, entity_id: FN_A.id,
+    proposed_by: 'model-x', summary: 'make it exact', intent: true, code_exists: false,
+    diff: '--- a/src/a.js\n+++ b/src/a.js\n@@ -1,1 +1,1 @@\n-return a + b;\n+return a + b + 0;\n',
+    validation: { ok: true, hunks: 1, patched_paths: ['src/a.js'] },
+  }, over.proposal || {});
+  return Object.assign({
+    schema: 'atlas.patch-proposal.v1', id: 'p'.repeat(64), analysis_id: report.id,
+    entity_id: FN_A.id, proposed_by: 'model-x', state: 'proposed', proposal: inner,
+    verification: null, target: null, terminal_reason: null, created_at: 1, updated_at: 1,
+  }, over.outer || {});
+}
+
+check('a rejected proposal is shown as unreviewable, never as verified', async () => {
+  const t = boot(routeBase());
+  t.routes.patches = { analysis_id: report.id, entity_id: FN_A.id, proposals: [proposal({
+    proposal: { validation: { ok: false, reason: 'patch_does_not_apply:src/a.js:上下文不匹配' } },
+    outer: { state: 'rejected' },
+  })] };
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  const shown = t.el('patch-body').textContent;
+  assert.match(shown, /rejected/, 'the state must be shown');
+  assert.match(shown, /校验未通过/, 'the refusal must be named');
+  assert.match(shown, /上下文不匹配/, 'the reason must be quoted');
+  assert.match(shown, /还没有写进任何检出目录/, 'a proposal must not read as an applied change');
+});
+
+check('a verified proposal shows the graph diff, the observed test and the CLI-only boundary', async () => {
+  const t = boot(routeBase());
+  t.routes.patches = { analysis_id: report.id, entity_id: FN_A.id, proposals: [proposal({
+    outer: {
+      state: 'verified',
+      verification: {
+        base_analysis_id: report.id, patched_analysis_id: 'q'.repeat(64),
+        graph_diff: { nodes: { added_count: 0, removed_count: 0, changed_count: 3 },
+          counts: { unresolved_calls: { before: 2, after: 1 } } },
+        test: { observed: true, ran: true, passed: true, exit_code: 0, argv: ['node', '--test'] },
+        isolation: { user_checkout_touched: false },
+      },
+    },
+  })] };
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  const shown = t.el('patch-body').textContent;
+  assert.match(shown, /变更节点 3/, 'the graph diff must be shown');
+  assert.match(shown, /未解析调用 前 2 → 后 1/, 'the derived analysis must be compared');
+  assert.match(shown, /退出码 0/, 'the observed test result must be shown');
+  assert.match(shown, /验证与应用只能在本机 CLI 上做/, 'the boundary must be stated');
+});
+
+check('a proposal with no verification says so instead of implying one', async () => {
+  const t = boot(routeBase());
+  t.routes.patches = { analysis_id: report.id, entity_id: FN_A.id, proposals: [proposal()] };
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  const shown = t.el('patch-body').textContent;
+  assert.match(shown, /还没有验证/, 'an unverified proposal must say it has not been verified');
+  assert.match(shown, /没有派生补丁树，也没有跑测试/, 'and must not imply a test ran');
+});
+
+check('proposing posts the diff and reports a refusal without pretending it worked', async () => {
+  const t = boot(routeBase());
+  t.routes['patch/propose'] = { __status: 400 };
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  t.el('patch-input').value = '--- a/x\n+++ b/x\n@@ -1,1 +1,1 @@\n-a\n+b\n';
+  await t.run('proposePatch()');
+  const posted = t.requests.filter((r) => r.name === 'patch/propose');
+  assert.equal(posted.length, 1, 'exactly one proposal must be posted');
+  assert.match(JSON.parse(posted[0].body).diff, /\+\+\+ b\/x/, 'the diff must be sent unchanged');
+  assert.match(t.el('status').textContent, /未通过固定快照校验/, 'a refusal must be reported as one');
 });
 
 let failed = 0;

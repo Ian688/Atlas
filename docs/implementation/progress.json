@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w10-host-seam",
+    "window": "2026-09-12/w09-patch-review",
     "status": "DELIVERED",
-    "note": "宿主接缝：合同即数据 + 参考客户端 + 无存储访问与不泄露布局的可执行检查 + 宿主 E2E；旧 Modus 入口按可验证性理由未切换。",
-    "evidence_dir": "evidence/development/2026-09-12-w10",
-    "verification": "evidence/development/2026-09-12-w10/verification.json"
+    "note": "提案审阅面：页面可登记与读取提案，验证/应用保留在 CLI；HTTP 与 CLI 共用同一校验路径。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-patch-review",
+    "verification": "evidence/development/2026-09-12-w09-patch-review/verification.json"
   },
   "windows": [
     {
@@ -198,6 +198,17 @@
       ],
       "note": "执行画像把要求分成两类：可声明的输入（this、具名全局）与必须承认的未知（未建模构造/未完成事实/堆近似/未知调用）。读取模块级状态不需要声明（模块整体在副本里）；嵌套函数的外层绑定不可运行。拒绝一次性列出缺什么。",
       "report": "evidence/development/2026-09-12-w08/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/w09-patch-review",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09-patch-review-http-surface",
+        "W09-patch-review-panel",
+        "W09-shared-propose-path"
+      ],
+      "note": "提案审阅面接通：页面可登记提案并读验证结果，验证与应用仍只在 CLI；HTTP 与 CLI 共用同一校验路径。",
+      "report": "evidence/development/2026-09-12-w09-ai-coding/REPORT.md"
     }
   ],
   "next_work_item": "宿主侧 E2E 与旧入口切换（需要 Modus 检出）；或回到 W08/W09 的深化项",
@@ -628,17 +639,22 @@
         "图差异：节点按 path+name 配对（id 绑定字节区间，按 id 比较会把编辑读成删除+新增），给出 added/removed/changed 与函数/文件/调用/未解析调用的前后计数；id 原样保留",
         "声明的 argv 测试命令（不是 shell 字符串）在副本内运行，超时按进程组杀死；退出码与输出作为 Observed 证据；未声明时写明「没有跑任何测试，这不是通过」",
         "apply/revert：apply 校验目标当前字节仍等于提案依据的固定快照 blob（否则 target_changed_since_apply），revert 校验当前字节等于 apply 写入的字节；状态机 proposed→verified→applied→reverted 单向",
-        "Intent/Static/Observed 三类证据分开存放：proposal 带 intent=true/code_exists=false，verification 里 graph_diff 与 test 各自标注"
+        "Intent/Static/Observed 三类证据分开存放：proposal 带 intent=true/code_exists=false，verification 里 graph_diff 与 test 各自标注",
+        "提案审阅面：GET /api/patches、GET /api/patch?id=、POST /api/patch/propose 与函数面板提案面板；页面可登记（Intent）并读校验结果/图差异/测试退出码，验证与应用仍只在 CLI",
+        "HTTP 与 CLI 共用 patchwork::propose_from_diff：同一校验路径，页面无法登记一个 CLI 会拒绝的 diff；跨分析的提案查询被拒绝"
       ],
       "evidence": [
         "crates/atlas-engine/src/patch.rs（11 个 diff 单测 + 提案存储与状态迁移）",
         "crates/atlas-app/src/patchwork.rs（图差异、声明的 argv 测试运行）",
         "crates/atlas-app/src/main.rs（atlas patch propose|verify|apply|revert|status|list）",
         "scripts/test_patch.py（16 个用例：全部拒绝路径 + apply/revert 字节校验）",
-        "evidence/development/2026-09-12-w09-ai-coding/verification.json"
+        "evidence/development/2026-09-12-w09-ai-coding/verification.json",
+        "scripts/test_patch.py（35 个用例：CLI 32 + HTTP 3）",
+        "web/tests/app.behavior.test.mjs（24 项，新增 4 项提案面板行为）",
+        "adapters/modus/atlas_host_client.mjs（patches/patch/proposePatch）"
       ],
       "blockers": [
-        "AI Coding 链仍未进持久作业队列与 Web 审阅界面：verify 是前台 CLI；没有图形化的 diff/图差异审阅与一键撤销；提案形式只支持统一 diff（新建/删除/重命名文件不支持）",
+        "AI Coding 链仍未进持久作业队列：verify 是前台 CLI；应用/撤销只有 CLI，没有图形化的一键撤销；提案形式只支持统一 diff（新建/删除/重命名文件不支持）",
         "选区只在同一 analysis 内互通；跨版本选区被拒绝而不是重定位（relocation 需要实体级重命名/移动追踪，未做）",
         "LOD 与正式 3D 层级未实现：城市仍按固定规则投影，没有细节层级切换，也没有「激活路径来自 Run」的图例分离（因为还没有 Run 轨迹）",
         "Agent Bridge 没有 owner 认证：owner 是调用者声明；服务端验证权限与版本仍未实现（与 W06 同一缺口）",

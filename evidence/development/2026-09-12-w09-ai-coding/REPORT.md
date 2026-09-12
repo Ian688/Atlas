@@ -94,3 +94,29 @@ python3 scripts/verify.py --label w09-ai-coding \
 | `node web/tests/city3d.behavior.test.mjs` | 0 | 14 |
 
 资格范围：只覆盖上列检查，不构成完整 AL/ET/GE/MT/HI/DV 或成熟 Atlas 验收。
+
+---
+
+## 八、补片（同日）：提案审阅面
+
+补上了工作单里"审阅"那一步的人机入口，同时把写路径继续留在 CLI。
+
+| 位置 | 内容 |
+|---|---|
+| `crates/atlas-app/src/patchwork.rs` | `propose_from_diff`：CLI 与 HTTP 共用的提案校验路径 |
+| `crates/atlas-app/src/server.rs` | `GET /api/patches`、`GET /api/patch?id=`、`POST /api/patch/propose` + 合同条目 |
+| `web/app.js` / `web/index.html` | 补丁提案面板：登记、状态、校验结果、diff、图差异计数、测试退出码 |
+| `adapters/modus/atlas_host_client.mjs` | `patches` / `patch` / `proposePatch` |
+| `scripts/test_patch.py` | 新增 `Http` 类 3 个用例（共 35） |
+
+**为什么验证与应用不通过 HTTP 暴露**：`verify` 会派生出新的 analysis（重活，应该进 W06 的持久作业队列），
+`apply` 会写用户检出目录。页面能让人看见 diff，但看不见"将要写入哪个目录、当前字节是不是提案依据的那份"。
+把这两个动作留在 CLI，是让做决定的人在同一屏里看到这些前提。
+
+**两条传输共用一条校验路径**（`propose_from_diff`），所以"对固定快照校验过"不是两套语义：
+测试断言页面登记的提案可以随后被 CLI 验证，且两者指向同一条记录（`state` 从 proposed 变 verified）。
+页面无法登记一个 CLI 会拒绝的 diff；跨分析的提案查询被拒绝（`proposal_belongs_to_another_analysis`）。
+
+**面板不冒充**：未验证的提案写"还没有验证：没有派生补丁树，也没有跑测试"；校验失败的提案写"不可验证"并引用原因；
+未跑测试写"没有跑任何测试，这不是通过"；面板底部固定写明验证与应用只能在 CLI。
+这四条都有 web 行为测试（24 项中的 4 项）。

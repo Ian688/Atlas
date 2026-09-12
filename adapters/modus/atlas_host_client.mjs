@@ -94,6 +94,10 @@ export class AtlasHostClient {
   agentRequests({ state, limit = 50 } = {}) {
     return this.request('agent/requests', { params: { ...(state ? { state } : {}), limit } });
   }
+  patches({ entity, limit = 50 } = {}) {
+    return this.request('patches', { params: { ...(entity ? { entity } : {}), limit } });
+  }
+  patch({ id }) { return this.request('patch', { params: { id } }); }
 
   // -- act ----------------------------------------------------------------
   /** Pin a selection context. Content-addressed, so the same request is the same id. */
@@ -111,6 +115,16 @@ export class AtlasHostClient {
   /** Perform queued bounded actions. */
   agentWork({ max = 4 } = {}) { return this.request('agent/work', { body: { max } }); }
   /**
+   * Register a unified diff as a proposal. This is an Intent: it changes
+   * nothing. Verifying (which re-indexes) and applying (which writes a
+   * checkout) are CLI operations -- a host must not do them behind a page.
+   */
+  proposePatch({ entity, diff, summary, proposedBy = 'host' }) {
+    return this.request('patch/propose', {
+      body: { entity, diff, ...(summary ? { summary } : {}), proposed_by: proposedBy },
+    });
+  }
+  /**
    * Run one controlled call. Only a static profile that allows a run will
    * actually start a process; a refusal comes back as a record, not a throw.
    */
@@ -124,6 +138,7 @@ export class AtlasHostClient {
   static requiredEndpoints() {
     return ['report', 'nodes', 'edges', 'reach', 'flow', 'flows', 'source', 'context',
       'profile', 'exec-records', 'exec', 'selection', 'annotations', 'annotation',
-      'agent/requests', 'agent/request', 'agent/work', 'contract'];
+      'agent/requests', 'agent/request', 'agent/work', 'contract',
+      'patches', 'patch', 'patch/propose'];
   }
 }

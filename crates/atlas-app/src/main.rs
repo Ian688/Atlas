@@ -1301,70 +1301,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             } => {
                 let entity = runner::resolve_entity(&store, &analysis, &entity)?;
                 let text = std::fs::read_to_string(&diff)?;
-                let selection = bridge::selection(&analysis, &entity, "entity");
-                let metadata = store.metadata(&analysis)?;
-                let snapshot = store.snapshot(
-                    metadata["snapshot_id"]
-                        .as_str()
-                        .ok_or("analysis_has_no_snapshot")?,
-                )?;
-                let files = patch::snapshot_files(&store, &snapshot)?;
                 // The diff is checked against the pinned bytes before the
                 // proposal is stored. Storing an unapplicable proposal would
                 // make it look reviewable when it is not.
-                let outcome = patch::parse_unified_diff(&text).and_then(|parsed| {
-                    patch::apply(&files, &parsed).map(|(patched, report)| (parsed, patched, report))
-                });
-                let proposal = match outcome {
-                    Ok((parsed, patched, report)) => json!({
-                        "schema": patch::PATCH_SCHEMA,
-                        "analysis_id": analysis,
-                        "entity_id": entity,
-                        "selection_id": selection.id,
-                        "proposed_by": proposed_by,
-                        "summary": summary,
-                        "diff": text,
-                        "intent": true,
-                        "code_exists": false,
-                        "validation": {
-                            "ok": true,
-                            "files": report,
-                            "hunks": parsed.iter().map(|file| file.hunks.len()).sum::<usize>(),
-                            "patched_paths": patched.keys().collect::<Vec<_>>(),
-                        },
-                        "note": "这是 Intent：一份提案。它还没有写进任何检出目录，也没有改变已发布的分析。",
-                    }),
-                    Err(error) => json!({
-                        "schema": patch::PATCH_SCHEMA,
-                        "analysis_id": analysis,
-                        "entity_id": entity,
-                        "selection_id": selection.id,
-                        "proposed_by": proposed_by,
-                        "summary": summary,
-                        "diff": text,
-                        "intent": true,
-                        "code_exists": false,
-                        "validation": {"ok": false, "reason": error.to_string()},
-                        "note": "这份提案没有通过固定快照的校验，因此它不会进入可验证状态。",
-                    }),
-                };
-                let valid = proposal["validation"]["ok"].as_bool() == Some(true);
-                let (stored, created) = store.record_patch_proposal(
+                let (stored, created) = patchwork::propose_from_diff(
+                    &store,
                     &analysis,
                     &entity,
+                    &text,
                     &proposed_by,
-                    &proposal,
-                    if valid {
-                        patch::STATE_PROPOSED
-                    } else {
-                        patch::STATE_REJECTED
-                    },
-                    if valid {
-                        None
-                    } else {
-                        proposal["validation"]["reason"].as_str()
-                    },
+                    summary.as_deref(),
                 )?;
+                let valid = stored.state != patch::STATE_REJECTED;
                 print(json!({
                     "outcome": if created { if valid {"proposed"} else {"rejected"} } else {"already_proposed"},
                     "proposal": stored,

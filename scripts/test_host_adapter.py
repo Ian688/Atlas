@@ -88,6 +88,17 @@ const worked = await client.agentWork({ max: 2 });
 record('agent_ran', worked.ran);
 record('agent_observed', worked.outcomes[0].result.observed);
 
+const proposalsBefore = await client.patches({ entity: 'double' });
+record('patches_before', proposalsBefore.proposals.length);
+const proposed = await client.proposePatch({
+  entity: 'double',
+  diff: '--- a/src/lib.js\n+++ b/src/lib.js\n@@ -1,1 +1,1 @@\n-export function double(value) { return value * 2; }\n+export function double(value) { return value + value; }\n',
+});
+record('proposal_state', proposed.proposal.state);
+record('proposal_exists', proposed.proposal.proposal.code_exists);
+const detail = await client.patch({ id: proposed.proposal.id });
+record('patch_detail_state', detail.state);
+
 const plan = await client.exec({ symbol: 'double', args: [21], plan: true });
 record('plan_starts_process', plan.will_start_process);
 const run = await client.exec({ symbol: 'double', args: [21] });
@@ -199,6 +210,15 @@ class HostSeam(unittest.TestCase):
         self.assertFalse(report["annotation_exists"], "an Intent is not existing code")
         self.assertEqual(report["annotation_author"], "host")
         self.assertGreaterEqual(report["annotation_count"], 1)
+
+    def test_a_host_can_register_and_read_a_patch_proposal(self):
+        report = self.drive()
+        self.assertEqual(report["patches_before"], 0)
+        self.assertEqual(report["proposal_state"], "proposed")
+        self.assertFalse(report["proposal_exists"], "a proposal is an Intent, not code")
+        self.assertEqual(report["patch_detail_state"], "proposed")
+        # Registering a proposal must not rewrite the project.
+        self.assertIn("value * 2", (self.project / "src" / "lib.js").read_text(encoding="utf-8"))
 
     def test_the_bounded_bridge_is_reachable_from_a_host(self):
         report = self.drive()

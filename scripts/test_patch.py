@@ -19,10 +19,12 @@ Standard-library only.
 """
 import json
 from pathlib import Path
-import shutil
+import selectors
 import subprocess
 import tempfile
 import unittest
+import urllib.error
+import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 BIN = ROOT / "target/debug/atlas"
@@ -33,7 +35,7 @@ MATH = (
 )
 
 
-class PatchChain(unittest.TestCase):
+class Harness(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="atlas-patch-")
         self.addCleanup(self.tmp.cleanup)
@@ -240,6 +242,84 @@ class PatchChain(unittest.TestCase):
                             "--diff", self.edit_diff(), "--proposed-by", "model-x")["proposal"]
         self.assertEqual(proposal["proposed_by"], "model-x")
         self.assertEqual(proposal["proposal"]["proposed_by"], "model-x")
+
+
+class Http(Harness):
+    """The review surface: a page may register and read, never verify or apply."""
+
+    def setUp(self):
+        super().setUp()
+        self.proc = subprocess.Popen(
+            [str(BIN), "--store", str(self.store), "serve", self.analysis],
+            cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        self.addCleanup(self.stop)
+        with selectors.DefaultSelector() as ready:
+            ready.register(self.proc.stdout, selectors.EVENT_READ)
+            self.assertTrue(ready.select(15), "HTTP server readiness deadline")
+        boot = json.loads(self.proc.stdout.readline())
+        session = json.loads(Path(boot["session_file"]).read_text())
+        self.base_url = session["url"]
+        self.auth = {
+            "Authorization": "Bearer " + session["token"],
+            "Content-Type": "application/json",
+        }
+        self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+    def stop(self):
+        if self.proc.poll() is None:
+            self.proc.kill()
+            self.proc.wait(timeout=10)
+
+    def get(self, path):
+        with self.opener.open(urllib.request.Request(self.base_url + path, headers=self.auth), timeout=20) as response:
+            return json.load(response)
+
+    def post(self, path, body):
+        return self.opener.open(urllib.request.Request(
+            self.base_url + path, headers=self.auth,
+            data=json.dumps(body).encode(), method="POST"), timeout=30)
+
+    def test_a_page_cannot_skip_the_pinned_snapshot_check(self):
+        # The HTTP path calls the same validation as the CLI, so a page cannot
+        # register a diff the CLI would refuse.
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            self.post("api/patch/propose", {
+                "entity": "add",
+                "diff": "--- a/src/math.js\n+++ b/src/math.js\n@@ -2,1 +2,1 @@\n-nonexistent line\n+other\n",
+            })
+        self.assertEqual(error.exception.code, 400)
+        payload = json.load(error.exception)
+        error.exception.close()
+        self.assertEqual(payload["proposal"]["state"], "rejected")
+        self.assertIn("patch_does_not_apply", payload["proposal"]["terminal_reason"])
+        self.assertEqual(self.math.read_text(encoding="utf-8"), MATH)
+
+    def test_a_page_can_register_a_proposal_and_the_cli_can_verify_it(self):
+        posted = json.load(self.post("api/patch/propose", {
+            "entity": "add",
+            "diff": ("--- a/src/math.js\n+++ b/src/math.js\n@@ -1,1 +1,1 @@\n"
+                     "-export function add(left, right) { return left + right; }\n"
+                     "+export function add(left, right) { return left + right + 0; }\n"),
+            "summary": "from the page",
+        }))
+        self.assertEqual(posted["outcome"], "proposed")
+        proposal_id = posted["proposal"]["id"]
+        listed = self.get("api/patches?entity=add")
+        self.assertEqual([item["id"] for item in listed["proposals"]], [proposal_id])
+        # The page registered it; the CLI verifies it. Both address one record.
+        verified = self.cli("patch", "verify", proposal_id)
+        self.assertEqual(verified["id"], proposal_id)
+        self.assertEqual(verified["state"], "verified")
+        self.assertEqual(self.get("api/patch?id=" + proposal_id)["state"], "verified")
+        self.assertEqual(self.math.read_text(encoding="utf-8"), MATH,
+                         "registering and verifying must not touch the checkout")
+
+    def test_the_review_surface_requires_the_session(self):
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            self.opener.open(urllib.request.Request(self.base_url + "api/patches"), timeout=20)
+        self.assertEqual(error.exception.code, 401)
+        error.exception.close()
 
 
 if __name__ == "__main__":

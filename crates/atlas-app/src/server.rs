@@ -31,6 +31,9 @@ struct Request {
     cursor: Option<String>,
     entity: Option<String>,
     direction: Option<String>,
+    /// A direct object reference where `entity` would be ambiguous, as in
+    /// `/api/patch?id=<proposal id>`.
+    id: Option<String>,
 }
 
 fn allowed(app: &App, headers: &HeaderMap) -> bool {
@@ -149,6 +152,40 @@ async fn query(
                 }))
                 .map_err(Into::into)
             }
+            "patches" => {
+                let entity = q.entity.as_deref().unwrap_or("");
+                let entity = if entity.is_empty() {
+                    None
+                } else {
+                    Some(
+                        crate::runner::resolve_entity(&app.store, id, entity)
+                            .map_err(|error| atlas_engine::invalid(&error))?,
+                    )
+                };
+                serde_json::to_value(serde_json::json!({
+                    "analysis_id": id,
+                    "entity_id": entity,
+                    "proposals": app.store.patch_proposals(id, entity.as_deref(), q.limit.unwrap_or(50))?,
+                }))
+                .map_err(Into::into)
+            }
+            "patch" => {
+                let reference = q
+                    .id
+                    .as_deref()
+                    .or(q.entity.as_deref())
+                    .unwrap_or("");
+                let proposal = app
+                    .store
+                    .patch_proposal(reference)
+                    .map_err(|error| atlas_engine::invalid(&error.to_string()))?;
+                // A proposal belongs to one analysis; serving it under another
+                // would attach someone else's diff to this version.
+                if proposal.analysis_id.as_str() != id.as_str() {
+                    return Err(atlas_engine::invalid("proposal_belongs_to_another_analysis"));
+                }
+                serde_json::to_value(proposal).map_err(Into::into)
+            }
             "agent-requests" => serde_json::to_value(serde_json::json!({
                 "requests": app.store.agent_requests(q.kind.as_deref(), q.limit.unwrap_or(50))?,
             }))
@@ -253,6 +290,74 @@ endpoint!(exec_records, "exec-records");
 endpoint!(selection, "selection");
 endpoint!(annotations, "annotations");
 endpoint!(agent_requests, "agent-requests");
+endpoint!(patches, "patches");
+endpoint!(patch_detail, "patch");
+
+#[derive(Deserialize)]
+struct ProposeBody {
+    entity: String,
+    diff: String,
+    summary: Option<String>,
+    #[serde(default = "default_human")]
+    proposed_by: String,
+}
+
+/// Register a proposal over HTTP. This is the review surface's entry point: a
+/// page may *register* a diff (which is an Intent and changes nothing), but
+/// verifying and applying it stay on the CLI, where the person doing it can see
+/// which directory is about to be written.
+async fn propose_patch(
+    State(app): State<App>,
+    headers: HeaderMap,
+    axum::Json(body): axum::Json<ProposeBody>,
+) -> Response {
+    if !allowed(&app, &headers) {
+        return (StatusCode::UNAUTHORIZED, "local session required").into_response();
+    }
+    let entity = match crate::runner::resolve_entity(&app.store, &app.analysis, &body.entity) {
+        Ok(entity) => entity,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({"error": error})),
+            )
+                .into_response();
+        }
+    };
+    let store = app.store.clone();
+    let analysis = app.analysis.clone();
+    let outcome = tokio::task::spawn_blocking(move || {
+        crate::patchwork::propose_from_diff(
+            &store,
+            &analysis,
+            &entity,
+            &body.diff,
+            &body.proposed_by,
+            body.summary.as_deref(),
+        )
+    })
+    .await;
+    match outcome {
+        Ok(Ok((proposal, created))) => {
+            let rejected = proposal.state == "rejected";
+            let payload = serde_json::json!({
+                "outcome": if created { if rejected {"rejected"} else {"proposed"} } else {"already_proposed"},
+                "proposal": proposal,
+            });
+            if rejected {
+                (StatusCode::BAD_REQUEST, axum::Json(payload)).into_response()
+            } else {
+                axum::Json(payload).into_response()
+            }
+        }
+        Ok(Err(error)) => (
+            StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({"error": error})),
+        )
+            .into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "propose failed").into_response(),
+    }
+}
 
 #[derive(Deserialize)]
 struct AnnotationRequest {
@@ -716,6 +821,30 @@ const CONTRACT: &[(&str, &str, &str, &str, &str, &str)] = &[
         "单次最多 32 个",
     ),
     (
+        "patches",
+        "GET",
+        "http",
+        "列出某个分析的提案",
+        "提案内容不可变（diff 与校验结果）",
+        "单页上限 100",
+    ),
+    (
+        "patch",
+        "GET",
+        "http",
+        "读取一份提案及其验证结果（`id=<提案 id>`）",
+        "状态单向：proposed→verified→applied→reverted",
+        "不含检出目录写入",
+    ),
+    (
+        "patch/propose",
+        "POST",
+        "http",
+        "登记一份统一 diff 提案并对固定快照校验",
+        "与 CLI 同一校验路径；不匹配即拒绝",
+        "不写源码；验证与应用只在 CLI",
+    ),
+    (
         "patch propose",
         "CLI",
         "cli",
@@ -912,6 +1041,12 @@ pub async fn serve(
         .route("/api/agent/requests", get(agent_requests))
         .route("/api/agent/request", post(agent_request))
         .route("/api/agent/work", post(agent_work))
+        // Review surface for the AI Coding chain: register and read proposals.
+        // Verify (which re-indexes) and apply (which writes a checkout) stay on
+        // the CLI.
+        .route("/api/patches", get(patches))
+        .route("/api/patch", get(patch_detail))
+        .route("/api/patch/propose", post(propose_patch))
         // The seam, published as data so a host integration can be checked
         // against it instead of against prose.
         .route("/api/contract", get(contract_endpoint))

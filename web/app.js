@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id);
-const state = {token:'',nodes:[],edges:[],nodePage:null,edgePage:null,selected:null,focus:null,request:0,exportUrl:null,execProfile:null,report:null,selection:null,pendingSelection:null,annotations:[]};
+const state = {token:'',nodes:[],edges:[],nodePage:null,edgePage:null,selected:null,focus:null,request:0,exportUrl:null,execProfile:null,report:null,selection:null,pendingSelection:null,annotations:[],patches:[]};
 const ns='http://www.w3.org/2000/svg';
 function svg(tag, attrs={}, text) {const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));if(text!==undefined)e.textContent=text;return e;}
 function text(tag,value,cls) {const e=document.createElement(tag);e.textContent=value;if(cls)e.className=cls;return e;}
@@ -50,6 +50,72 @@ function renderAnnotations(annotations){
       `${item.kind} · ${item.proposed_by} · ${item.exists?'标记为已存在':'提案（尚未存在）'} · ${item.body}`));
   }
 }
+// --- W09: the patch review surface ------------------------------------------
+// A page may register a proposal -- that is an Intent and changes nothing --
+// and read what verification found. It deliberately cannot verify (which
+// re-indexes) or apply (which writes a checkout): those stay on the CLI, where
+// the person doing it can see which directory is about to be written.
+function renderPatches(proposals){
+  const panel=$('patch-panel'),body=$('patch-body');if(!panel||!body)return;
+  if(!state.selected){panel.hidden=true;body.replaceChildren();return;}
+  panel.hidden=false;body.replaceChildren();
+  body.append(flowNode('flow-line','提案是 Intent：它还没有写进任何检出目录，也没有改变已发布的分析。'));
+  if(!proposals.length){body.append(flowNode('flow-line','当前选区还没有提案。'));return;}
+  for(const proposal of proposals.slice(0,8)){
+    const inner=proposal.proposal||{};
+    const validation=inner.validation||{};
+    body.append(flowNode('flow-head',`提案 ${proposal.id.slice(0,12)} · ${proposal.state} · ${proposal.proposed_by}${inner.summary?` · ${inner.summary}`:''}`));
+    if(validation.ok){
+      body.append(flowNode('flow-line',`对固定快照校验通过：${validation.hunks} 个 hunk · ${(validation.patched_paths||[]).join(', ')}`));
+    }else{
+      body.append(flowNode('flow-unknown',`对固定快照校验未通过，因此它不可验证：${validation.reason||'未知原因'}`));
+    }
+    body.append(flowNode('flow-binding',`diff（受预算截断）
+${String(inner.diff||'').slice(0,1200)}`));
+    const verification=proposal.verification;
+    if(verification){
+      const graph=verification.graph_diff||{};
+      const counts=graph.counts||{};
+      body.append(flowNode('flow-line',`静态：补丁树派生为新分析 ${String(verification.patched_analysis_id||'').slice(0,12)} · 变更节点 ${graph.nodes?.changed_count??'?'} · 新增 ${graph.nodes?.added_count??'?'} · 删除 ${graph.nodes?.removed_count??'?'}`));
+      if(counts.unresolved_calls)body.append(flowNode('flow-line',`未解析调用 前 ${counts.unresolved_calls.before} → 后 ${counts.unresolved_calls.after}`));
+      const test=verification.test||{};
+      if(test.ran){
+        body.append(flowNode(test.passed?'flow-line':'flow-unknown',`观测：测试命令 ${JSON.stringify(test.argv)} 退出码 ${test.exit_code}${test.timed_out?'（超时，不算通过）':''}`));
+      }else{
+        body.append(flowNode('flow-unknown','观测：没有跑任何测试。这不是通过。'));
+      }
+    }else if(validation.ok){
+      body.append(flowNode('flow-line','还没有验证：没有派生补丁树，也没有跑测试。'));
+    }
+    if(proposal.state==='applied')body.append(flowNode('flow-line',`已应用到 ${proposal.target}`));
+  }
+  body.append(flowNode('flow-unknown','验证与应用只能在本机 CLI 上做：atlas patch verify / apply / revert。页面不提供这两个动作，因为它无法让你看见将要写入哪个目录。'));
+}
+async function loadPatches(node){
+  state.patches=[];
+  if(!node){renderPatches([]);return;}
+  try{const page=await api('patches',{entity:node.id,limit:20});state.patches=page.proposals||[];}
+  catch{state.patches=[];}
+  renderPatches(state.patches);
+}
+async function proposePatch(){
+  const selected=state.selected;
+  if(!selected){status('先选择一个对象');return;}
+  const diff=$('patch-input').value;
+  if(!diff.trim()){status('先粘贴一份统一 diff');return;}
+  $('patch-propose').disabled=true;
+  try{
+    const result=await apiJson('patch/propose',{entity:selected.id,diff,proposed_by:'human'});
+    $('patch-input').value='';
+    await loadPatches(selected);
+    status(result.outcome==='proposed'?'提案已登记（未应用，也未验证）':'这份提案已经登记过');
+    return result;
+  }catch(e){
+    await loadPatches(selected);
+    status(`提案未通过固定快照校验：${e.message}。它被记录为 rejected，不可验证。`);
+    return null;
+  }finally{$('patch-propose').disabled=false;}
+}
 async function loadAnnotations(node){
   state.annotations=[];
   if(!node){renderAnnotations([]);return;}
@@ -78,9 +144,13 @@ function installBridge(){
   if(typeof globalThis==='undefined')return;
   globalThis.atlasBridge={
     version:'atlas.agent-bridge.v1',
-    bounded_actions:['getSelection','getAnnotations','select','propose','openProjection','runControlled'],
+    bounded_actions:['getSelection','getAnnotations','getPatches','select','propose','proposePatch','openProjection','runControlled'],
     getSelection(){return state.selection?{...state.selection}:null;},
     getAnnotations(){return state.annotations;},
+    getPatches(){return state.patches;},
+    // Registering a proposal is an Intent, so the bridge may do it; verifying
+    // and applying are not exposed here at all.
+    async proposePatch(diff){if(!state.selected)return {ok:false,error:'no_selection'};$('patch-input').value=diff||'';const result=await proposePatch();return result?{ok:true,proposal:result.proposal}:{ok:false,error:'proposal_rejected'};},
     async select(entityId){const node=state.nodes.find(n=>n.id===entityId);if(!node)return {ok:false,error:'entity_not_loaded'};await select(node);return {ok:true,entity_id:node.id};},
     async propose(kind,body){if(!state.selected)return {ok:false,error:'no_selection'};const result=await apiJson('annotation',{entity:state.selected.id,kind:kind||'constraint',body,proposed_by:'agent'});await loadAnnotations(state.selected);return {ok:true,annotation:result.annotation,exists:false};},
     openProjection(view){const target=view==='3d'?($('open-3d')?.getAttribute('href')||'/city3d'):'/';if(typeof location!=='undefined')location.href=target;return target;},
@@ -506,11 +576,11 @@ async function runControlled(){
 async function select(node){
   const request=++state.request;state.selected=node;state.focus=null;state.execProfile=null;$('export').disabled=true;clearContext();
   $('selection-name').textContent=node.name;$('selection-path').textContent=node.path;$('source').textContent='读取固定快照…';$('selection-facts').textContent='查询关联候选…';
-  publishSelection(node);loadAnnotations(node);
+  publishSelection(node);loadAnnotations(node);loadPatches(node);
   // Clear the previous selection's facts before the new ones arrive. Leaving
   // them up made the panel show function A's conclusion under function B's
   // name whenever the query failed.
-  renderFlow(null);renderExecution(null,null);render();
+  renderFlow(null);renderExecution(null,null);renderPatches([]);render();
   try{
     const [source,reach]=await Promise.all([api('source',{entity:node.id}),api('reach',{entity:node.id})]);
     if(request!==state.request)return;
@@ -534,16 +604,17 @@ async function select(node){
         state.execProfile=profile;
         renderExecution(profile,null);
       }catch{if(request===state.request){state.execProfile=null;renderExecution(null,null);}}
-    } else {renderFlow(null);renderExecution(null,null);}
+    } else {renderFlow(null);renderExecution(null,null);renderPatches([]);}
   }catch(e){
     if(request!==state.request)return;
-    renderFlow(null);renderExecution(null,null);
+    renderFlow(null);renderExecution(null,null);renderPatches([]);
     $('source').textContent=e.message;
     $('selection-facts').textContent=/\(401\)/.test(e.message)
       ?'会话已失效或令牌不正确：请重新粘贴启动命令返回的 session_file 中的 token 后重试。'
       :'该对象可能没有可读取的源码，或查询不可用。';
   }
 }
+$('patch-propose').onclick=()=>proposePatch();
 $('annotation-add').onclick=()=>proposeAnnotation();
 $('exec-run').onclick=()=>runControlled();installBridge();$('connect-button').onclick=connect;$('token').onkeydown=e=>{if(e.key==='Enter')connect();};$('search').oninput=renderTree;
 $('more').onclick=()=>loadNodes().catch(e=>status(e.message));$('more-edges').onclick=()=>loadEdges().catch(e=>status(e.message));

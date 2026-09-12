@@ -1,0 +1,52 @@
+test_a_crlf_target_is_refused_rather_than_normalised (__main__.Harness.test_a_crlf_target_is_refused_rather_than_normalised) ... ok
+test_a_declared_test_runs_in_the_copy_and_reports_its_real_exit_code (__main__.Harness.test_a_declared_test_runs_in_the_copy_and_reports_its_real_exit_code) ... ok
+test_a_diff_for_a_file_outside_the_snapshot_is_rejected (__main__.Harness.test_a_diff_for_a_file_outside_the_snapshot_is_rejected) ... ok
+test_a_diff_that_does_not_match_the_snapshot_is_rejected_with_the_line (__main__.Harness.test_a_diff_that_does_not_match_the_snapshot_is_rejected_with_the_line) ... ok
+test_a_failing_test_is_reported_as_failed_with_its_exit_code (__main__.Harness.test_a_failing_test_is_reported_as_failed_with_its_exit_code) ... ok
+test_a_proposal_is_intent_and_validated_against_pinned_bytes (__main__.Harness.test_a_proposal_is_intent_and_validated_against_pinned_bytes) ... ok
+test_a_proposal_records_who_proposed_it (__main__.Harness.test_a_proposal_records_who_proposed_it) ... ok
+test_a_test_that_reads_the_patched_file_sees_the_patched_bytes (__main__.Harness.test_a_test_that_reads_the_patched_file_sees_the_patched_bytes) ... ok
+test_a_test_timeout_is_not_a_pass (__main__.Harness.test_a_test_timeout_is_not_a_pass) ... ok
+test_apply_before_verification_is_refused (__main__.Harness.test_apply_before_verification_is_refused) ... ok
+test_apply_refuses_when_the_target_moved_after_verification (__main__.Harness.test_apply_refuses_when_the_target_moved_after_verification) ... ok
+test_apply_writes_verified_bytes_and_revert_restores_the_pinned_ones (__main__.Harness.test_apply_writes_verified_bytes_and_revert_restores_the_pinned_ones) ... ok
+test_revert_refuses_when_the_target_changed_after_apply (__main__.Harness.test_revert_refuses_when_the_target_changed_after_apply) ... ok
+test_the_proposal_survives_and_is_queryable_by_entity (__main__.Harness.test_the_proposal_survives_and_is_queryable_by_entity) ... ok
+test_the_same_proposal_twice_is_one_record (__main__.Harness.test_the_same_proposal_twice_is_one_record) ... ok
+test_verification_reindexes_an_isolated_copy_and_leaves_the_checkout_alone (__main__.Harness.test_verification_reindexes_an_isolated_copy_and_leaves_the_checkout_alone) ... ok
+test_a_crlf_target_is_refused_rather_than_normalised (__main__.Http.test_a_crlf_target_is_refused_rather_than_normalised) ... ok
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='UTF-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+test_a_declared_test_runs_in_the_copy_and_reports_its_real_exit_code (__main__.Http.test_a_declared_test_runs_in_the_copy_and_reports_its_real_exit_code) ... ok
+test_a_diff_for_a_file_outside_the_snapshot_is_rejected (__main__.Http.test_a_diff_for_a_file_outside_the_snapshot_is_rejected) ... ok
+test_a_diff_that_does_not_match_the_snapshot_is_rejected_with_the_line (__main__.Http.test_a_diff_that_does_not_match_the_snapshot_is_rejected_with_the_line) ... ok
+test_a_failing_test_is_reported_as_failed_with_its_exit_code (__main__.Http.test_a_failing_test_is_reported_as_failed_with_its_exit_code) ... ok
+test_a_page_can_register_a_proposal_and_the_cli_can_verify_it (__main__.Http.test_a_page_can_register_a_proposal_and_the_cli_can_verify_it) ... ok
+test_a_page_cannot_skip_the_pinned_snapshot_check (__main__.Http.test_a_page_cannot_skip_the_pinned_snapshot_check) ... ok
+test_a_proposal_is_intent_and_validated_against_pinned_bytes (__main__.Http.test_a_proposal_is_intent_and_validated_against_pinned_bytes) ... ok
+test_a_proposal_records_who_proposed_it (__main__.Http.test_a_proposal_records_who_proposed_it) ... ok
+test_a_test_that_reads_the_patched_file_sees_the_patched_bytes (__main__.Http.test_a_test_that_reads_the_patched_file_sees_the_patched_bytes) ... ok
+test_a_test_timeout_is_not_a_pass (__main__.Http.test_a_test_timeout_is_not_a_pass) ... ok
+test_apply_before_verification_is_refused (__main__.Http.test_apply_before_verification_is_refused) ... ok
+test_apply_refuses_when_the_target_moved_after_verification (__main__.Http.test_apply_refuses_when_the_target_moved_after_verification) ... ok
+test_apply_writes_verified_bytes_and_revert_restores_the_pinned_ones (__main__.Http.test_apply_writes_verified_bytes_and_revert_restores_the_pinned_ones) ... ok
+test_revert_refuses_when_the_target_changed_after_apply (__main__.Http.test_revert_refuses_when_the_target_changed_after_apply) ... ok
+test_the_proposal_survives_and_is_queryable_by_entity (__main__.Http.test_the_proposal_survives_and_is_queryable_by_entity) ... ok
+test_the_review_surface_requires_the_session (__main__.Http.test_the_review_surface_requires_the_session) ... ok
+test_the_same_proposal_twice_is_one_record (__main__.Http.test_the_same_proposal_twice_is_one_record) ... ok
+test_verification_reindexes_an_isolated_copy_and_leaves_the_checkout_alone (__main__.Http.test_verification_reindexes_an_isolated_copy_and_leaves_the_checkout_alone) ... ok
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:84: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='UTF-8'>
+  return self.run(*args, **kwds)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:84: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
+  return self.run(*args, **kwds)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+
+----------------------------------------------------------------------
+Ran 35 tests in 31.293s
+
+OK

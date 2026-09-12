@@ -257,6 +257,84 @@ pub async fn run_declared_test(
     }
 }
 
+/// Record a proposal from a unified diff.
+///
+/// Shared by the CLI and the HTTP review surface so that "a proposal was
+/// validated against the pinned bytes" means the same thing on both, and so a
+/// page cannot register something the CLI would have refused.
+pub fn propose_from_diff(
+    store: &Store,
+    analysis: &str,
+    entity: &str,
+    diff: &str,
+    proposed_by: &str,
+    summary: Option<&str>,
+) -> Result<(patch::PatchProposal, bool), String> {
+    let metadata = store.metadata(analysis).map_err(|e| e.to_string())?;
+    let snapshot_id = metadata["snapshot_id"]
+        .as_str()
+        .ok_or("analysis_has_no_snapshot")?;
+    let snapshot = store.snapshot(snapshot_id).map_err(|e| e.to_string())?;
+    let files = patch::snapshot_files(store, &snapshot).map_err(|e| e.to_string())?;
+    let selection = atlas_engine::bridge::selection(analysis, entity, "entity");
+    let outcome = patch::parse_unified_diff(diff).and_then(|parsed| {
+        patch::apply(&files, &parsed).map(|(patched, report)| (parsed, patched, report))
+    });
+    let proposal = match outcome {
+        Ok((parsed, patched, report)) => json!({
+            "schema": patch::PATCH_SCHEMA,
+            "analysis_id": analysis,
+            "entity_id": entity,
+            "selection_id": selection.id,
+            "proposed_by": proposed_by,
+            "summary": summary,
+            "diff": diff,
+            "intent": true,
+            "code_exists": false,
+            "validation": {
+                "ok": true,
+                "files": report,
+                "hunks": parsed.iter().map(|file| file.hunks.len()).sum::<usize>(),
+                "patched_paths": patched.keys().collect::<Vec<_>>(),
+            },
+            "note": "这是 Intent：一份提案。它还没有写进任何检出目录，也没有改变已发布的分析。",
+        }),
+        Err(error) => json!({
+            "schema": patch::PATCH_SCHEMA,
+            "analysis_id": analysis,
+            "entity_id": entity,
+            "selection_id": selection.id,
+            "proposed_by": proposed_by,
+            "summary": summary,
+            "diff": diff,
+            "intent": true,
+            "code_exists": false,
+            "validation": {"ok": false, "reason": error.to_string()},
+            "note": "这份提案没有通过固定快照的校验，因此它不会进入可验证状态。",
+        }),
+    };
+    let valid = proposal["validation"]["ok"].as_bool() == Some(true);
+    let (stored, created) = store
+        .record_patch_proposal(
+            analysis,
+            entity,
+            proposed_by,
+            &proposal,
+            if valid {
+                patch::STATE_PROPOSED
+            } else {
+                patch::STATE_REJECTED
+            },
+            if valid {
+                None
+            } else {
+                proposal["validation"]["reason"].as_str()
+            },
+        )
+        .map_err(|e| e.to_string())?;
+    Ok((stored, created))
+}
+
 /// Re-parse a stored diff. The stored text is authoritative: what was reviewed
 /// is what gets applied.
 pub fn reparsed(proposal: &patch::PatchProposal) -> Result<Vec<FilePatch>, String> {
