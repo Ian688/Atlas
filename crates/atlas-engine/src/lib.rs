@@ -1,5 +1,6 @@
 pub mod analyze;
 pub mod control;
+pub mod exec;
 pub mod facts;
 pub mod flow;
 pub mod incremental;

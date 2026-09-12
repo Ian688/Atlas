@@ -1,0 +1,30 @@
+========================================================================
+Atlas real-project bench: rxjs-7.8.1
+  tarball sha256 match : True (c532167725ab7d085123209156c93cef22f2479cb9c8527060f1cd903aa9d149)
+  project              : /Users/yinsijie/CodeRepo/Atlas/local-state/bench/rxjs
+  source inventory     : 1255 files, 2531086 bytes
+  tree digest          : b2bbb6a149d2cb15d561e44ce88a13f1a47ad8c8c65dc0e4e889fb53436d0ebe
+  cold       : exit=1 wall=61.235725s peak_rss=446050304 B outcome=None id=None
+  hot        : exit=1 wall=13.236433s peak_rss=496726016 B outcome=None id=None
+  edit       : exit=1 wall=15.592051s peak_rss=494120960 B outcome=None id=None
+  edit_full  : exit=1 wall=59.041761s peak_rss=494059520 B outcome=None id=None
+  delete     : exit=1 wall=14.815872s peak_rss=491446272 B outcome=None id=None
+  delete_full: exit=1 wall=60.949353s peak_rss=502345728 B outcome=None id=None
+  assertions           : hot_id_eq=False hot_reused=False edit_eq=False delete_eq=False restore=True
+  errors:
+    - cold exited 1
+    - cold: stdout is not JSON: Expecting value: line 1 column 1 (char 0)
+    - hot exited 1
+    - hot: stdout is not JSON: Expecting value: line 1 column 1 (char 0)
+    - edit exited 1
+    - edit: stdout is not JSON: Expecting value: line 1 column 1 (char 0)
+    - edit_full exited 1
+    - edit_full: stdout is not JSON: Expecting value: line 1 column 1 (char 0)
+    - delete exited 1
+    - delete: stdout is not JSON: Expecting value: line 1 column 1 (char 0)
+    - delete_full exited 1
+    - delete_full: stdout is not JSON: Expecting value: line 1 column 1 (char 0)
+  bench json           : /Users/yinsijie/CodeRepo/Atlas/evidence/development/2026-09-12-real-project/rxjs/bench.json
+  logs                 : /Users/yinsijie/CodeRepo/Atlas/evidence/development/2026-09-12-real-project/rxjs
+  EXIT                 : 1
+========================================================================

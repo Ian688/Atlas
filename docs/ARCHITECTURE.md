@@ -94,7 +94,9 @@ worker stdin ≤160 MiB、stdout ≤32 MiB、stderr ≤64 KiB，V8 old-space 为
 
 ## 7. 工作台与宿主接口
 
-实际接口：CLI `index/report/nodes/edges/reach/source/context/flows/flow/serve` 与 `job submit/status/list/reap`；HTTP GET `report/nodes/edges/reach/source/flow/flows`，POST `context`。均由引擎查询同一分析版本。HTTP 不开放索引任意路径、写代码、执行程序或访问生产数据库。
+实际接口：CLI `index/report/nodes/edges/reach/source/context/flows/flow/profile/exec/serve` 与 `job submit/status/list/reap`；HTTP GET `report/nodes/edges/reach/source/flow/flows/profile/exec-records`，POST `context/exec`。均由引擎查询同一分析版本。HTTP 不开放索引任意路径、写代码或访问生产数据库。
+
+`/api/exec` 是唯一会启动进程的 HTTP 入口，因此它的请求体刻意窄于 CLI：页面可以选择符号、JSON 字面量实参，以及两个**不扩大进程边界**的授权（`unknown_calls`、`globals`）。Node 二进制、环境变量、文件写、子进程与网络授权不在请求类型里，页面无法发送它们；超时被夹到 30 秒。这不是"忽略未知字段"的约定，而是字段根本不存在，因此没有可绕过的解析路径。
 
 服务绑定 loopback；需要 Bearer token 与正确 Host，可带 Origin 时必须匹配本服务；无任意 CORS，静态页有 CSP。令牌每个服务实例独立，保存在该实例独占的本地会话文件，正常退出清理。没有远程/多租户认证。秘密上下文不能因为在本机就自动发给 LLM。
 
@@ -106,6 +108,21 @@ worker stdin ≤160 MiB、stdout ≤32 MiB、stderr ≤64 KiB，V8 old-space 为
 
 用户的最终 3D 约定不变：目录是平面方形分隔框，文件为按对象数量表达体量的玻璃柱，函数为内部层，管道连接实际对应对象，运行激活后保留路径，其余区域变灰。2D/3D 必须消费同一事实与 Selection/Run；不各自猜一张图。当前页面只渲染静态关系，没有模拟运行数据的假动画。
 
+### 7.1 执行画像与受控运行（W08 首片）
+
+**执行画像**是从已发布的 flow 事实派生的静态充分性分类，不是执行结果。分类顺序是 `unsupported` → `needs_entry_driver` → `needs_context` → `pure_callable`，每条降级理由都带 `code/detail/evidence`，`evidence` 指回它读的那个字段（`effects.unknown_call`、`block_states[].bindings[].value.origins` 等）。关键保守点：`status != complete_within_profile` 一律降级——partial 分析的 frontier 恰恰是事实缺失的块，"没有未知副作用"没有被证明。`needs_context` 在本切片不可运行，因为不合成上下文。
+
+**受控运行**只在一个条件下发生：静态画像允许，且 spec 已显式授予所需项。执行路径：
+
+1. 从**不可变快照**的内容寻址 blob 逐个读取并重新哈希校验，物化到一个 `0700` 的隔离副本（临时目录先 canonicalize，否则 Node 的 loader 会在 `/var → /private/var` 上触发一次未被授权的读而死在 loader 里而不是被测代码里）。
+2. 生成 harness，用**源码同一性**而不是名字来选定目标：模块命名空间里每个可调用值的 `Function.toString()` 归一化后必须与快照中该符号的字节切片一致，唯一命中才调用。因此改名、遮蔽导出、同名不同函数都不会被静默执行；命中不了就是 `target_not_exported`，不猜测。
+3. 用**目标 Node**（由调用者指定，不是 Atlas 自己的运行时）以 `--permission` 启动，只授予隔离副本的读权限，以及 spec 里显式声明的项。权限模型不是"接受了 flag"就算数：每次进程内首次使用都会先跑一个能力探针，要求一次真实的写被拒绝（`ERR_ACCESS_DENIED`），否则拒绝执行。
+4. 子进程自成进程组，超时或取消按组 `SIGKILL` 并回收；stdin/stdout/stderr 都有预算；harness 报告带每轮唯一标记并最后写入、显式退出，因此目标自己写到 stdout 的内容不会被误当作报告。
+
+**观测合同**：`trace.coverage = "not_sampled"`，`trace.unknown_paths = "not_observed"`。只记录入口调用的返回/抛出、运行时报告的源码位置（映射回快照的字节偏移）、进程输出与退出状态。没有行级覆盖采样，没有运行期调用图，静态 BFS 不作为执行顺序。
+
+**记录身份**：`exec_records.id = digest(固定问题 + 观测到的答案)`，其中刻意排除耗时与绝对临时路径。因此同一问题得到同一答案就是同一行（可重复运行、可幂等查询），而答案不同会产生第二条记录——两条不同的观测结果，而不是静默覆盖。mock/fixture 运行必须在记录里标为 `isolation.mocks=true`，它的结果不得被读作真实环境观测。
+
 ## 8. 接下来构建的实际子系统
 
 以下为设计要求。"语言中立流 IR"与"本地数据流"在 0.2 已有 JS/TS 声明 profile 内的首个纵向切片（见第 5 节），其余能力与下表完整方向仍是目标，不添加空方法冒充可调用能力。
@@ -115,8 +132,8 @@ worker stdin ≤160 MiB、stdout ≤32 MiB、stderr ≤64 KiB，V8 old-space 为
 | 语言中立流 IR（0.2：JS/TS profile 切片已接通） | CFG block、typed edges、作用域/变量、求值顺序、异常 completion；更多语言与构建变体按版本扩展 | LanguageFacts.flow 版本化载体已落地，不把当前 calls 当作 CFG |
 | 本地数据流（0.2：局部 def-use/来源/常量/循环不动点已接通） | 完整 points-to/alias、字段敏感堆、widen/narrow、效果模型 | facts 表 + flow/values 查询已建立；堆/别名精度与跨过程摘要仍是目标 |
 | 跨过程 | SCC 调度摘要固定点、参数→返回/副作用、递归稳定条件、上下文敏感预算 | 不复用“多跳 BFS 完成”冒充摘要求解 |
-| 执行画像与测试 | pure/contextual/entry-only/unsupported 分类、fixtures、依赖切片、mock 和真依赖来源、RunSpec、Effect journal | 只在新的受控 Runner 中执行，经权限与执行环境合同 |
-| 场景与真实 Trace | 用户业务步骤→入口/动作/断言；执行、source map、事件排序/因果链；未覆盖支路与丢失事件显式 | Observation 与 Static/Intent 分库或强类型隔离，不能凭颜色等价 |
+| 执行画像与测试（0.2/W08：静态分类 + 隔离受控调用已接通；fixtures 只是声明标签） | pure/contextual/entry-only/unsupported 分类、fixtures、依赖切片、mock 和真依赖来源、RunSpec、Effect journal | 只在新的受控 Runner 中执行，经权限与执行环境合同；上下文合成、Effect journal 与依赖切片仍未实现 |
+| 场景与真实 Trace（0.2/W08：RunSpec + scenario 断言 + 入口观测已接通） | 用户业务步骤→入口/动作/断言；执行、source map、事件排序/因果链；未覆盖支路与丢失事件显式 | Observation 与 Static/Intent 分库或强类型隔离，不能凭颜色等价；行级覆盖与因果链仍未实现 |
 | 选区与 Agent Bridge | 稳定选区/标注、版本、最小披露、请求队列、租约/ACK、可恢复状态、宿主能力协商 | 当前导出 Context 是前置材料，不是双向对话集成 |
 | AI Coding | 意图占位→提议→补丁→隔离工作区验证→重新解析→图 diff→应用/撤销；冲突和旧版本拒绝 | 模型输出无法直接写事实；先更新源码再派生 Actual |
 | 长期作业与大项目 | owner/项目/版本隔离、取消/截止/终态、增量失效、并发 worker、预算调度、磁盘事实/索引 | 新建正式服务作业 API；当前单次 CLI 非持久作业系统 |

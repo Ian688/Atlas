@@ -1,0 +1,7 @@
+$ /Users/yinsijie/CodeRepo/Atlas/target/debug/atlas --store /Users/yinsijie/CodeRepo/Atlas/local-state/bench/diag/store index /Users/yinsijie/CodeRepo/Atlas/local-state/bench/diag/tree --node node --worker /Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs --timeout-seconds 600 --scan-deadline-seconds 300 --index-deadline-seconds 1800
+files=1255
+subsetsample=['dist/bundles/rxjs.umd.js', 'dist/bundles/rxjs.umd.min.js', 'dist/cjs/ajax/index.js', 'dist/cjs/fetch/index.js', 'dist/cjs/index.js']
+[exit code: 1]
+[wall seconds: 37.318]
+--- stderr ---
+Error: Invalid("flow_reference_unknown_binding")

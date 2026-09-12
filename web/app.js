@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id);
-const state = {token:'',nodes:[],edges:[],nodePage:null,edgePage:null,selected:null,focus:null,request:0,exportUrl:null};
+const state = {token:'',nodes:[],edges:[],nodePage:null,edgePage:null,selected:null,focus:null,request:0,exportUrl:null,execProfile:null};
 const ns='http://www.w3.org/2000/svg';
 function svg(tag, attrs={}, text) {const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));if(text!==undefined)e.textContent=text;return e;}
 function text(tag,value,cls) {const e=document.createElement(tag);e.textContent=value;if(cls)e.className=cls;return e;}
@@ -7,16 +7,24 @@ async function api(name, params={}, method='GET') {
   const r=await fetch(`/api/${name}?${new URLSearchParams(params)}`,{method,headers:{Authorization:`Bearer ${state.token}`}});
   if(!r.ok)throw new Error(`查询未完成 (${r.status})`);return r.json();
 }
+// A controlled run carries a JSON body. It is the only call the page makes that
+// can start a process, and the server does not trust this body for the process
+// boundary: the Node binary, the environment and the fs/child/network
+// permissions stay server-side.
+async function apiJson(name, body) {
+  const r=await fetch(`/api/${name}`,{method:'POST',headers:{Authorization:`Bearer ${state.token}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok)throw new Error(`请求未完成 (${r.status})`);return r.json();
+}
 function status(message){$('status').textContent=message;}
 function clearContext(){if(state.exportUrl)URL.revokeObjectURL(state.exportUrl);state.exportUrl=null;$('context-panel').hidden=true;$('context-json').value='';$('context-download').removeAttribute('href');}
 // The inspector is one unit: name, path, source and flow must always describe
 // the same selection. Clearing it in one place is what keeps a stale flow fact
 // from sitting under a freshly selected name.
 function resetDetail(){
-  state.request++;state.selected=null;state.focus=null;$('export').disabled=true;clearContext();
+  state.request++;state.selected=null;state.focus=null;state.execProfile=null;$('export').disabled=true;clearContext();
   $('selection-name').textContent='选择一个函数';$('selection-path').textContent='固定分析版本';
   $('selection-facts').textContent='选择对象以查询关联候选。';$('source').textContent='尚未选择对象';$('source-status').textContent='';
-  renderFlow(null);render();
+  renderFlow(null);renderExecution(null,null);render();
 }
 function metric(value,label){const box=text('div','');box.append(text('b',value),text('span',label));return box;}
 async function loadNodes(){const page=await api('nodes',{limit:100,...(state.nodePage?.next_cursor?{cursor:state.nodePage.next_cursor}:{})});state.nodes.push(...page.items);state.nodePage=page;$('more').hidden=!page.next_cursor;render();}
@@ -317,13 +325,102 @@ function renderFlow(flow,symbol){
   }
   if(flow.blocks.length>12)body.append(flowNode('flow-line',`…其余 ${flow.blocks.length-12} 块按预算省略，可查询完整 flow 记录`));
 }
+// --- W08: execution sufficiency and controlled runs -------------------------
+// The classification below is derived from published static facts. It is not an
+// execution result, and the panel says so on every path: a profile that refuses
+// is shown as a refusal, and a run that happened is shown with exactly what was
+// observed (the entry call's outcome) and what was not (line coverage, paths,
+// a run-time call graph).
+function decodeEncoded(value){
+  if(!value||typeof value!=='object'||typeof value.kind!=='string')return value;
+  switch(value.kind){
+    case 'null':return null;
+    case 'number':case 'string':case 'boolean':case 'bigint':return value.value;
+    case 'array':return (value.items||[]).map(decodeEncoded);
+    case 'object':{const out={};for(const [k,v] of Object.entries(value.entries||{}))out[k]=decodeEncoded(v);return out;}
+    default:return `<${value.kind}>`;
+  }
+}
+function renderExecValue(node,label,value,cls){
+  const line=flowNode(cls||'flow-binding',`${label} ${typeof value==='string'?value:JSON.stringify(value)}`);
+  node.append(line);return line;
+}
+function renderExecution(profile,record){
+  const panel=$('exec-panel'),body=$('exec-body');if(!panel||!body)return;
+  if(!profile){panel.hidden=true;body.replaceChildren();$('exec-run').disabled=true;return;}
+  panel.hidden=false;body.replaceChildren();
+  // Same rule as the flow panel: a profile that belongs to a different symbol
+  // would attach A's verdict to B's name, so it is refused rather than shown.
+  if(state.selected&&profile.symbol&&profile.symbol!==state.selected.id){
+    body.append(flowNode('flow-unknown',`已拒绝显示：执行画像属于 ${profile.symbol}，与选中的 ${state.selected.id} 不一致。`));
+    $('exec-run').disabled=true;return;
+  }
+  const runnable=Boolean(profile.runnable);
+  body.append(flowNode('flow-head',`执行画像 ${profile.classification} · ${profile.runnable?'可运行':'不可运行'} · 参数 ${profile.arity===null?'未知':profile.arity} · flow ${profile.flow_status}`));
+  body.append(flowNode('exec-note','这是静态充分性分类，不是执行结果，也不是「已经跑过」的证据。'));
+  for(const reason of profile.reasons.slice(0,8))body.append(flowNode('flow-unknown',`理由 · ${reason.code} — ${reason.detail}（证据：${reason.evidence}）`));
+  if(!profile.reasons.length)body.append(flowNode('flow-line','没有降级理由：已发布事实中没有任何 unknown 分量。'));
+  if(profile.required_grants.length)body.append(flowNode('flow-line',`需要显式授权：${profile.required_grants.join(', ')}`));
+  body.append(flowNode('flow-line',`参数：${profile.params.map(p=>`${p.index}:${p.name}`).join(', ')||'无'}`));
+  for(const note of profile.notes.slice(0,4))body.append(flowNode('flow-line',note));
+  if(record)renderExecRecord(body,record);
+  // The run button is only enabled where the static profile allows a run and
+  // the arity is known, so the page cannot promise what the engine will refuse.
+  const known=profile.arity!==null;
+  $('exec-run').disabled=!(runnable&&known);
+  $('exec-run').title=runnable?(known?'在隔离副本中以目标 Node 的权限模型执行一次固定调用':'参数个数未知，页面不猜测实参'):'静态画像拒绝执行';
+}
+function renderExecRecord(body,record){
+  const verdict=record.verdict;
+  body.append(flowNode('exec-verdict',`观测结果 ${verdict} · ${record.duration_ms} ms · 退出码 ${record.exit_code===null?'无':record.exit_code}`));
+  if(verdict==='refused'){
+    body.append(flowNode('flow-unknown',`拒绝执行：${record.refusal?.code} — ${record.refusal?.detail}`));
+    body.append(flowNode('flow-line','没有进程被启动；这不是一次失败的执行。'));
+    return;
+  }
+  if(record.isolation&&record.isolation.mocks)body.append(flowNode('exec-note',`本次运行声明使用了 mock/fixture：${record.isolation.fixture_note||'未注明'}；结果不得当作真实环境观测。`));
+  if(record.value!==null&&record.value!==undefined){
+    const decoded=decodeEncoded(record.value);
+    body.append(flowNode('flow-line',`返回值 ${typeof decoded==='string'?decoded:JSON.stringify(decoded)}`));
+  }
+  if(record.thrown){
+    body.append(flowNode('flow-unknown',`抛出 ${record.thrown.name}: ${record.thrown.message}${record.thrown.code?`（${record.thrown.code}）`:''}`));
+    const events=record.trace?.events||[];const last=events[events.length-1];
+    if(last&&last.source_location)body.append(flowNode('flow-line',`观测位置 ${last.source_location.path}:${last.source_location.line}:${last.source_location.column} — ${last.source_location.line_text}`));
+  }
+  const lines=record.console?.harness_lines||[];
+  if(lines.length)body.append(flowNode('flow-line',`console（受预算限制）${lines.slice(0,4).join(' | ')}`));
+  if(record.console?.stdout)body.append(flowNode('flow-line',`stdout ${String(record.console.stdout).slice(0,200)}`));
+  body.append(flowNode('exec-note',`观测边界：coverage=${record.trace?.coverage} · unknown_paths=${record.trace?.unknown_paths}。只有入口调用的返回/抛出被观测，没有行级覆盖采样；未观测路径保持未知，静态 BFS 不作为执行顺序。`));
+  if(record.isolation?.permission_model)body.append(flowNode('flow-line',`隔离：${record.isolation.permission_model}；授予 ${(record.isolation.effective_flags||[]).filter(f=>!f.startsWith('--allow-fs-read')).join(' ')||'（仅只读副本）'}`));
+  if(record.source_binding)body.append(flowNode('flow-line',`绑定来源 analysis ${String(record.source_binding.analysis_id).slice(0,12)} · snapshot ${String(record.source_binding.snapshot_id).slice(0,12)} · blob ${String(record.source_binding.blob).slice(0,12)}（读取时重新哈希校验）`));
+}
+async function runControlled(){
+  const selected=state.selected;if(!selected||selected.kind!=='function'){status('先选择一个函数');return;}
+  if(!state.execProfile){status('该函数没有执行画像，页面不会直接执行');return;}
+  let args;
+  try{args=JSON.parse($('exec-args').value||'[]');}catch{status('实参不是合法 JSON 数组');return;}
+  if(!Array.isArray(args)){status('实参必须是 JSON 数组');return;}
+  const allow_effects=state.execProfile.required_grants.filter(name=>name==='unknown_calls'||name==='globals');
+  const request=state.request;$('exec-run').disabled=true;status('在隔离副本中执行…');
+  try{
+    const record=await apiJson('exec',{symbol:selected.id,args,allow_effects});
+    if(request!==state.request)return;
+    renderExecution(state.execProfile,record);
+    status(`受控运行结束：${record.verdict}`);
+  }catch(e){
+    if(request!==state.request)return;
+    status(`受控运行未开始或失败：${e.message}`);
+    renderExecution(state.execProfile,null);
+  }finally{if(request===state.request&&state.execProfile)$('exec-run').disabled=!state.execProfile.runnable;}
+}
 async function select(node){
-  const request=++state.request;state.selected=node;state.focus=null;$('export').disabled=true;clearContext();
+  const request=++state.request;state.selected=node;state.focus=null;state.execProfile=null;$('export').disabled=true;clearContext();
   $('selection-name').textContent=node.name;$('selection-path').textContent=node.path;$('source').textContent='读取固定快照…';$('selection-facts').textContent='查询关联候选…';
   // Clear the previous selection's facts before the new ones arrive. Leaving
   // them up made the panel show function A's conclusion under function B's
   // name whenever the query failed.
-  renderFlow(null);render();
+  renderFlow(null);renderExecution(null,null);render();
   try{
     const [source,reach]=await Promise.all([api('source',{entity:node.id}),api('reach',{entity:node.id})]);
     if(request!==state.request)return;
@@ -338,17 +435,26 @@ async function select(node){
         if(request!==state.request)return;
         renderFlow(flow,node.id);
       }catch{if(request===state.request)renderFlow(null);}
-    } else renderFlow(null);
+      // The static profile is separate from the flow fact on purpose: a symbol
+      // can have flow facts and still be unclassifiable, and the panel must be
+      // able to say "no profile" rather than defaulting to "runnable".
+      try{
+        const profile=await api('profile',{entity:node.id});
+        if(request!==state.request)return;
+        state.execProfile=profile;
+        renderExecution(profile,null);
+      }catch{if(request===state.request){state.execProfile=null;renderExecution(null,null);}}
+    } else {renderFlow(null);renderExecution(null,null);}
   }catch(e){
     if(request!==state.request)return;
-    renderFlow(null);
+    renderFlow(null);renderExecution(null,null);
     $('source').textContent=e.message;
     $('selection-facts').textContent=/\(401\)/.test(e.message)
       ?'会话已失效或令牌不正确：请重新粘贴启动命令返回的 session_file 中的 token 后重试。'
       :'该对象可能没有可读取的源码，或查询不可用。';
   }
 }
-$('connect-button').onclick=connect;$('token').onkeydown=e=>{if(e.key==='Enter')connect();};$('search').oninput=renderTree;
+$('exec-run').onclick=()=>runControlled();$('connect-button').onclick=connect;$('token').onkeydown=e=>{if(e.key==='Enter')connect();};$('search').oninput=renderTree;
 $('more').onclick=()=>loadNodes().catch(e=>status(e.message));$('more-edges').onclick=()=>loadEdges().catch(e=>status(e.message));
 $('reset').onclick=resetDetail;
 $('export').onclick=async()=>{try{const selected=state.selected,request=state.request;if(!selected)return;const context=await api('context',{entity:selected.id},'POST');if(request!==state.request)return;clearContext();const json=JSON.stringify(context,null,2);state.exportUrl=URL.createObjectURL(new Blob([json],{type:'application/json'}));$('context-json').value=json;$('context-download').href=state.exportUrl;$('context-download').download=`atlas-context-${context.selection_id.slice(0,12)}.json`;$('context-panel').hidden=false;$('context-panel').open=true;status('选区上下文已在本地生成，可复制或下载；未发送给 LLM');}catch(e){status(e.message);}};

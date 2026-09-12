@@ -1,0 +1,7 @@
+$ /Users/yinsijie/CodeRepo/Atlas/target/debug/atlas --store /Users/yinsijie/CodeRepo/Atlas/local-state/bench/diag/store index /Users/yinsijie/CodeRepo/Atlas/local-state/bench/diag/tree --node node --worker /Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs --timeout-seconds 600 --scan-deadline-seconds 300 --index-deadline-seconds 1800
+files=7
+subsetsample=['src/Rx.global.js', 'src/ajax/index.ts', 'src/fetch/index.ts', 'src/index.ts', 'src/internal/AnyCatcher.ts']
+[exit code: 0]
+[wall seconds: 0.812]
+--- stderr ---
+

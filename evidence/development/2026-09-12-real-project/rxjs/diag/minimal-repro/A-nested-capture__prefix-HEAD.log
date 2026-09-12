@@ -1,0 +1,9 @@
+$ /Users/yinsijie/CodeRepo/Atlas/target/debug/atlas --store /Users/yinsijie/CodeRepo/Atlas/local-state/bench/ab/A-nested-capture__prefix-HEAD/store index /Users/yinsijie/CodeRepo/Atlas/local-state/bench/ab/A-nested-capture__prefix-HEAD/tree --node node --worker /Users/yinsijie/CodeRepo/Atlas/local-state/bench/prefix-worker/worker.mjs --timeout-seconds 600 --scan-deadline-seconds 300 --index-deadline-seconds 1800
+fixture: A-nested-capture.ts
+worker: /Users/yinsijie/CodeRepo/Atlas/local-state/bench/prefix-worker/worker.mjs
+worker_flow.mjs_sha256: 8988320197b9cdb2e5ac81f2c938adc7315310b334f16196ab487ce8e8a2792f
+--- stdout ---
+
+--- stderr ---
+Error: Invalid("flow_reference_unknown_binding")
+[exit code: 1]

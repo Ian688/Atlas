@@ -1,0 +1,64 @@
+{
+  "worker_flow_sha256": {
+    "prefix-HEAD": "8988320197b9cdb2e5ac81f2c938adc7315310b334f16196ab487ce8e8a2792f",
+    "fixed-current": "c9e8aaedf10dbd5945c2450d110b61d7f0c45e1e0f5c846ef25e37c762a05c5c"
+  },
+  "results": {
+    "A-nested-capture__prefix-HEAD": {
+      "fixture": "A-nested-capture.ts",
+      "worker": "prefix-HEAD",
+      "exit_code": 1,
+      "id": null,
+      "stderr": "Error: Invalid(\"flow_reference_unknown_binding\")"
+    },
+    "B-observable-topromise-member__prefix-HEAD": {
+      "fixture": "B-observable-topromise-member.ts",
+      "worker": "prefix-HEAD",
+      "exit_code": 1,
+      "id": null,
+      "stderr": "Error: Invalid(\"flow_reference_unknown_binding\")"
+    },
+    "C-control-single-arrow__prefix-HEAD": {
+      "fixture": "C-control-single-arrow.ts",
+      "worker": "prefix-HEAD",
+      "exit_code": 0,
+      "id": "828b54a35a0aef17cab6cef1ae28b032c75f6d8facb3039015911d593498fa89",
+      "stderr": ""
+    },
+    "D-control-outer-binding__prefix-HEAD": {
+      "fixture": "D-control-outer-binding.ts",
+      "worker": "prefix-HEAD",
+      "exit_code": 0,
+      "id": "bfbe837447dacf56a8919700281ac947f21dacaf751c0e4f5dab30ced23f18f2",
+      "stderr": ""
+    },
+    "A-nested-capture__fixed-current": {
+      "fixture": "A-nested-capture.ts",
+      "worker": "fixed-current",
+      "exit_code": 0,
+      "id": "127d7ebd744e432a4265323fec5f2cce4182eac5dfaa3ca187b964a0e6d4d549",
+      "stderr": ""
+    },
+    "B-observable-topromise-member__fixed-current": {
+      "fixture": "B-observable-topromise-member.ts",
+      "worker": "fixed-current",
+      "exit_code": 0,
+      "id": "9f977fbcef3bdf465ee2642fb77e4cf4995728e336d3ff88416efd4b36c16868",
+      "stderr": ""
+    },
+    "C-control-single-arrow__fixed-current": {
+      "fixture": "C-control-single-arrow.ts",
+      "worker": "fixed-current",
+      "exit_code": 0,
+      "id": "97ea095aefb6839031485b94821dd823a61af6719ed36b319c8251031e1be536",
+      "stderr": ""
+    },
+    "D-control-outer-binding__fixed-current": {
+      "fixture": "D-control-outer-binding.ts",
+      "worker": "fixed-current",
+      "exit_code": 0,
+      "id": "bfbe837447dacf56a8919700281ac947f21dacaf751c0e4f5dab30ced23f18f2",
+      "stderr": ""
+    }
+  }
+}

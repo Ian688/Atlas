@@ -1,0 +1,26 @@
+$ /usr/bin/time -l cargo --version
+cwd: /Users/yinsijie/CodeRepo/Atlas
+--- stdout ---
+cargo 1.96.1 (356927216 2026-06-26) (Homebrew)
+--- stderr ---
+        0.02 real         0.01 user         0.00 sys
+             7323648  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+                2571  page reclaims
+                   2  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                  10  voluntary context switches
+                  92  involuntary context switches
+            84353839  instructions retired
+            71840322  cycles elapsed
+             3891200  peak memory footprint
+[exit code: 0]
+[wall seconds: 0.034081]
+[peak rss: 7323648 (measured)]

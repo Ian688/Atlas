@@ -141,3 +141,57 @@ test('finite numeric literals are unaffected by the non-finite guard', () => {
   assert.equal(value.value.const, 'num');
   assert.equal(value.value.value, 1e308);
 });
+
+test('a nested function keeps its own declarations out of the enclosing function (GE-2 regression)', () => {
+  // Found by indexing the real rxjs@7.8.1 tree: `src/internal/Observable.ts`
+  // declares `let value` inside a Promise executor arrow. The enclosing method
+  // used to claim that binding for itself while collecting declarations, so the
+  // arrow's own declarator referenced a binding it did not declare and the Rust
+  // validator refused the whole response as flow_reference_unknown_binding.
+  const source = [
+    'class A {',
+    '  m() {',
+    '    return new Promise((resolve, reject) => {',
+    '      let value;',
+    '      this.subscribe(',
+    '        (x) => (value = x),',
+    '        (err) => reject(err),',
+    '        () => resolve(value)',
+    '      );',
+    '    });',
+    '  }',
+    '}',
+  ].join('\n');
+  const parsed = facts({'a.ts': source});
+  // The invariant the Rust validator enforces, checked here over every emitted
+  // function: each binding reference must be declared or captured by that same
+  // function. A violation would fail validation for the whole response.
+  const violations = [];
+  for (const fn of parsed.flow.functions) {
+    const declared = new Set([...fn.bindings.map(b => b.id), ...fn.captures]);
+    const collect = value => {
+      if (Array.isArray(value)) return value.forEach(collect);
+      if (!value || typeof value !== 'object') return;
+      if (typeof value.binding === 'string' && !declared.has(value.binding)) {
+        violations.push(`${fn.name} -> ${value.binding}`);
+      }
+      Object.values(value).forEach(collect);
+    };
+    collect(fn.body);
+  }
+  assert.deepEqual(violations, [], 'every binding reference must be declared or captured in its function');
+  // The declaration must belong to the function that declares it, not to an
+  // enclosing one that merely walked past it.
+  const executor = parsed.flow.functions.find(fn => fn.bindings.some(b => b.name === 'value'));
+  assert.ok(executor, 'the promise executor must declare its own `value` binding');
+  assert.equal(executor.bindings.find(b => b.name === 'value').kind, 'let');
+  const valueId = executor.bindings.find(b => b.name === 'value').id;
+  assert.ok(
+    parsed.flow.functions.some(fn => fn !== executor && fn.captures.includes(valueId)),
+    'a nested arrow reading `value` must record it as a capture',
+  );
+  // The enclosing method must not have claimed it.
+  const method = flowOf(parsed, 'm');
+  assert.equal(method.bindings.some(b => b.name === 'value'), false,
+    'an enclosing function must not declare a nested function\'s local');
+});

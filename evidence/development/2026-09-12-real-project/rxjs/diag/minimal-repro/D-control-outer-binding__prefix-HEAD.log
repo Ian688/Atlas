@@ -1,0 +1,46 @@
+$ /Users/yinsijie/CodeRepo/Atlas/target/debug/atlas --store /Users/yinsijie/CodeRepo/Atlas/local-state/bench/ab/D-control-outer-binding__prefix-HEAD/store index /Users/yinsijie/CodeRepo/Atlas/local-state/bench/ab/D-control-outer-binding__prefix-HEAD/tree --node node --worker /Users/yinsijie/CodeRepo/Atlas/local-state/bench/prefix-worker/worker.mjs --timeout-seconds 600 --scan-deadline-seconds 300 --index-deadline-seconds 1800
+fixture: D-control-outer-binding.ts
+worker: /Users/yinsijie/CodeRepo/Atlas/local-state/bench/prefix-worker/worker.mjs
+worker_flow.mjs_sha256: 8988320197b9cdb2e5ac81f2c938adc7315310b334f16196ab487ce8e8a2792f
+--- stdout ---
+{
+  "binary_fingerprint": "6c5a3150e755b75513a82dcfe8131e16c0f86bd4af0bf316b7920058f0a07917",
+  "call_count": 1,
+  "coverage": {
+    "catalog_entries": 2,
+    "disposition:captured": 1,
+    "disposition:directory": 1,
+    "encountered_source_files": 1,
+    "flow_complete_within_profile": 3,
+    "flow_frontier_functions": 0,
+    "flow_functions": 3,
+    "flow_partial": 0,
+    "flow_unknown_regions": 0,
+    "interproc_recursive_sccs": 0,
+    "interproc_sccs": 3,
+    "parsed_source_files": 1
+  },
+  "diagnostics": [],
+  "edge_count": 5,
+  "engine": "foundation-flow-0.2.1",
+  "file_count": 1,
+  "flow_digest": "3ea009b924e13a0a526d6193c8fd094eff28e3dd283ea624910f3a9a1caf149d",
+  "function_count": 3,
+  "id": "bfbe837447dacf56a8919700281ac947f21dacaf751c0e4f5dab30ced23f18f2",
+  "limitations": [
+    "Lexical declaration candidates, not a complete runtime call graph or execution trace.",
+    "Snapshot captures files over an interval; it is not an atomic filesystem transaction.",
+    "Only captured UTF-8 JS/TS inputs; external dependencies, standard library and project tsconfig are not loaded.",
+    "Ignored directories are explicit boundaries; their unvisited descendants are not counted.",
+    "Local flow facts cover declared profile js-structured-control.v1 only; other constructs are explicit unknowns. Interprocedural summaries are symbolic per function, with up to 8 scalar-argument calling contexts per callee; other calls use the symbolic fallback. Captured origins are not re-substituted and unknown callees stay top."
+  ],
+  "node_count": 5,
+  "producer": "typescript/5.9.3;worker/0.2.0",
+  "recursive_components": [],
+  "schema": "atlas.analysis.v1",
+  "snapshot_id": "d6e3fd144c654a72dce1d49ba9b50b1e87ca32fe34393a68da7a20892ea4094f",
+  "unresolved_call_count": 1
+}
+--- stderr ---
+
+[exit code: 0]

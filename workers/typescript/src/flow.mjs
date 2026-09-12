@@ -137,10 +137,15 @@ class FileBuilder {
     // mutual references between functions resolve to real bindings.
     const moduleNames = [];
     const walkModule = (node) => {
-      // Module scope only: never descend into function/class bodies, whose
-      // locals belong to their own functions.
-      if (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) {
-        if (node.name) moduleNames.push(node.name);
+      // Module scope only: never descend into a function or class body, whose
+      // locals belong to their own scope. Stopping only at *declarations* left
+      // function expressions and arrow IIFEs exposed, so a UMD bundle's factory
+      // IIFE contributed its whole local list to `moduleNames`. Every function
+      // then tried to register those names, the first one built claimed them,
+      // and the IIFE that really declared them was left with 100+ dangling
+      // references (found by indexing the real rxjs@7.8.1 UMD bundle).
+      if (ts.isFunctionLike(node) || ts.isClassDeclaration(node) || ts.isClassExpression(node)) {
+        if ((ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) && node.name) moduleNames.push(node.name);
         return;
       }
       if (ts.isVariableStatement(node)) {
@@ -234,6 +239,28 @@ class FileBuilder {
   collectDeclarations(root, fn, fnScope) {
     const enter = (node, scope) => {
       let childScope = scope;
+      // A nested function's own declarations belong to that function, never to
+      // this one. Descending through a function body here used to claim an
+      // inner `let` for the enclosing function, so the inner function's own
+      // declarator referenced a binding it did not declare -- which the Rust
+      // validator correctly rejected as flow_reference_unknown_binding. Found
+      // by indexing the real rxjs@7.8.1 tree (src/internal/Observable.ts).
+      if (ts.isFunctionLike(node)) {
+        if (ts.isFunctionDeclaration(node) && node.name) {
+          const sym = this.checker.getSymbolAtLocation(node.name);
+          const nested = this.recordForName(node.name);
+          if (sym) this.register(sym, node.name, 'function', fnScope, { hoisted: true, function_symbol: nested && nested.id });
+        }
+        return;
+      }
+      // Class bodies are their own function scopes for the same reason.
+      if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) {
+        if (node.name) {
+          const sym = this.checker.getSymbolAtLocation(node.name);
+          if (sym) this.register(sym, node.name, 'let', scope);
+        }
+        return;
+      }
       if (ts.isVariableDeclaration(node)) {
         if (ts.isIdentifier(node.name)) {
           const sym = this.checker.getSymbolAtLocation(node.name);
@@ -250,13 +277,6 @@ class FileBuilder {
             }
           }
         }
-      } else if (ts.isFunctionDeclaration(node) && node.name) {
-        const sym = this.checker.getSymbolAtLocation(node.name);
-        const nested = this.recordForName(node.name);
-        if (sym) this.register(sym, node.name, 'function', fnScope, { hoisted: true, function_symbol: nested && nested.id });
-      } else if (ts.isClassDeclaration(node) && node.name) {
-        const sym = this.checker.getSymbolAtLocation(node.name);
-        if (sym) this.register(sym, node.name, 'let', scope);
       } else if (ts.isBlock(node) || ts.isForStatement(node) || ts.isForOfStatement(node) || ts.isForInStatement(node)) {
         childScope = this.newScope(fn, ts.isBlock(node) ? 'block' : 'for', scope, this.offsets[node.getStart(this.sf)]);
       } else if (ts.isSwitchStatement(node)) {

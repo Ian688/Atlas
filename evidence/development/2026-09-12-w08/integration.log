@@ -1,0 +1,56 @@
+Synthetic boundary: 120 files / 1200 functions / 5.36s incl. CLI queries; not GE qualification
+test_alpha_renaming_yields_equivalent_flow_facts (__main__.Integration.test_alpha_renaming_yields_equivalent_flow_facts)
+D21: same-length alpha renaming must produce byte-identical flow ... ok
+test_calculator_actual_cross_file_chain_and_unknown_denominator (__main__.Integration.test_calculator_actual_cross_file_chain_and_unknown_denominator) ... ok
+test_corrupted_blob_is_refused_and_old_flow_facts_survive (__main__.Integration.test_corrupted_blob_is_refused_and_old_flow_facts_survive)
+D20: a corrupted captured blob must fail source reads cleanly while ... ok
+test_flow_facts_through_real_worker_store_cli_and_http (__main__.Integration.test_flow_facts_through_real_worker_store_cli_and_http)
+D22 pipeline: JS source -> worker IR -> Rust CFG/solver -> SQLite -> ... /usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/decoder.py:361: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x10f802200>
+  obj, end = self.scan_once(s, idx)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_flow_queries_reject_unknown_symbols (__main__.Integration.test_flow_queries_reject_unknown_symbols)
+D20-lite: invented flow facts cannot be queried into existence. ... ok
+test_getters_and_proxies_are_data_never_executed_and_effects_stay_unknown (__main__.Integration.test_getters_and_proxies_are_data_never_executed_and_effects_stay_unknown)
+D06: analysis reads text; a getter that would write a marker never ... ok
+test_http_execution_keeps_the_process_boundary_server_side (__main__.Integration.test_http_execution_keeps_the_process_boundary_server_side)
+W08 over HTTP: a local page can ask for a run, not redefine its sandbox. ... /usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py:1139: ResourceWarning: subprocess 35067 is still running
+  _warn("subprocess %s is still running" % self.pid,
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/case.py:615: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='UTF-8'>
+  result = method()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/case.py:615: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
+  result = method()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_index_does_not_execute_project_or_load_ambient_node_options (__main__.Integration.test_index_does_not_execute_project_or_load_ambient_node_options) ... ok
+test_k1_context_sensitive_folding_end_to_end (__main__.Integration.test_k1_context_sensitive_folding_end_to_end)
+k=1: the same callee called with different constants folds each ... ok
+test_local_web_authorization_revision_and_shutdown (__main__.Integration.test_local_web_authorization_revision_and_shutdown) ... ok
+test_multi_project_store_isolation (__main__.Integration.test_multi_project_store_isolation)
+W06-lite: two projects in one store stay version-isolated; no query ... ok
+test_nested_finally_and_wide_branch_stay_linear_within_budget (__main__.Integration.test_nested_finally_and_wide_branch_stay_linear_within_budget)
+D19/AL-05: shared finally dispatch must keep the CFG linear under ... ok
+test_old_revision_context_and_query_cursor_survive_reindex (__main__.Integration.test_old_revision_context_and_query_cursor_survive_reindex) ... ok
+test_sigint_cancels_index_kills_worker_and_publishes_nothing (__main__.Integration.test_sigint_cancels_index_kills_worker_and_publishes_nothing)
+W06: SIGINT during the worker stage terminates atlas with a nonzero ... /usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/case.py:615: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='UTF-8'>
+  result = method()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/case.py:615: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
+  result = method()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_synthetic_pagination_counts_all_1200_functions_without_claiming_scale (__main__.Integration.test_synthetic_pagination_counts_all_1200_functions_without_claiming_scale) ... /usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/decoder.py:361: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x10f801b70>
+  obj, end = self.scan_once(s, idx)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_worker_crash_leaves_store_intact_and_old_analyses_readable (__main__.Integration.test_worker_crash_leaves_store_intact_and_old_analyses_readable)
+W06: a worker that exits non-zero mid-pipeline publishes nothing, ... ok
+test_worker_ir_tampering_is_rejected_before_derived_facts (__main__.Integration.test_worker_ir_tampering_is_rejected_before_derived_facts)
+R6 formalization: duplicate binding ids, dangling local references ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 52.799s
+
+OK

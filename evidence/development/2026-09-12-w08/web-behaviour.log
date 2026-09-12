@@ -1,0 +1,17 @@
+ok   a second connect() with the emptied field keeps the live session
+ok   an empty field with no session asks for a token instead of querying
+ok   a failed selection clears the previous flow facts
+ok   a flow fact from another symbol is refused, not rendered
+ok   reset clears the inspector as one unit
+ok   the selection canvas draws resolved targets, unresolved targets and edge labels
+ok   the overview aggregates file-to-file candidates, not a function list
+ok   the block-by-binding state map marks each kind without inventing records
+ok   a refused profile disables the run button and names the evidence
+ok   an unknown arity disables the run instead of guessing arguments
+ok   pressing run posts the pinned request and draws the observed boundary
+ok   a refused record is shown as a refusal, never as a result
+ok   a mock-labelled run says so and an observed record keeps its identity
+ok   a profile from another symbol is refused, not rendered
+ok   a missing profile leaves the run button disabled and says why
+
+all 15 web behaviour checks passed

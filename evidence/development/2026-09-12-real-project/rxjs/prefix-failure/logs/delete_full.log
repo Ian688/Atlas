@@ -1,0 +1,27 @@
+$ /usr/bin/time -l /Users/yinsijie/CodeRepo/Atlas/target/debug/atlas --store /Users/yinsijie/CodeRepo/Atlas/local-state/bench/store-delete-full index /Users/yinsijie/CodeRepo/Atlas/local-state/bench/rxjs --node node --worker /Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs --timeout-seconds 600 --scan-deadline-seconds 300 --index-deadline-seconds 1800
+cwd: /Users/yinsijie/CodeRepo/Atlas
+--- stdout ---
+
+--- stderr ---
+Error: Invalid("flow_reference_unknown_binding")
+       60.93 real        13.12 user         3.47 sys
+           502345728  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              162613  page reclaims
+                 297  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   1  messages sent
+                   1  messages received
+                   1  signals received
+               12666  voluntary context switches
+               44348  involuntary context switches
+         28593351376  instructions retired
+         21435525324  cycles elapsed
+            82796544  peak memory footprint
+[exit code: 1]
+[wall seconds: 60.949353]
+[peak rss: 502345728 (measured)]

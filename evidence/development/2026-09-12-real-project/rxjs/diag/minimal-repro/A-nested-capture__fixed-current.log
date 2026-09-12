@@ -1,0 +1,46 @@
+$ /Users/yinsijie/CodeRepo/Atlas/target/debug/atlas --store /Users/yinsijie/CodeRepo/Atlas/local-state/bench/ab/A-nested-capture__fixed-current/store index /Users/yinsijie/CodeRepo/Atlas/local-state/bench/ab/A-nested-capture__fixed-current/tree --node node --worker /Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs --timeout-seconds 600 --scan-deadline-seconds 300 --index-deadline-seconds 1800
+fixture: A-nested-capture.ts
+worker: /Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs
+worker_flow.mjs_sha256: c9e8aaedf10dbd5945c2450d110b61d7f0c45e1e0f5c846ef25e37c762a05c5c
+--- stdout ---
+{
+  "binary_fingerprint": "6c5a3150e755b75513a82dcfe8131e16c0f86bd4af0bf316b7920058f0a07917",
+  "call_count": 2,
+  "coverage": {
+    "catalog_entries": 2,
+    "disposition:captured": 1,
+    "disposition:directory": 1,
+    "encountered_source_files": 1,
+    "flow_complete_within_profile": 3,
+    "flow_frontier_functions": 0,
+    "flow_functions": 3,
+    "flow_partial": 0,
+    "flow_unknown_regions": 0,
+    "interproc_recursive_sccs": 0,
+    "interproc_sccs": 3,
+    "parsed_source_files": 1
+  },
+  "diagnostics": [],
+  "edge_count": 6,
+  "engine": "foundation-flow-0.2.1",
+  "file_count": 1,
+  "flow_digest": "88aae930266f0a0394d6c3974c2fc34228f0313cb871e22149eebf4b56ada742",
+  "function_count": 3,
+  "id": "127d7ebd744e432a4265323fec5f2cce4182eac5dfaa3ca187b964a0e6d4d549",
+  "limitations": [
+    "Lexical declaration candidates, not a complete runtime call graph or execution trace.",
+    "Snapshot captures files over an interval; it is not an atomic filesystem transaction.",
+    "Only captured UTF-8 JS/TS inputs; external dependencies, standard library and project tsconfig are not loaded.",
+    "Ignored directories are explicit boundaries; their unvisited descendants are not counted.",
+    "Local flow facts cover declared profile js-structured-control.v1 only; other constructs are explicit unknowns. Interprocedural summaries are symbolic per function, with up to 8 scalar-argument calling contexts per callee; other calls use the symbolic fallback. Captured origins are not re-substituted and unknown callees stay top."
+  ],
+  "node_count": 5,
+  "producer": "typescript/5.9.3;worker/0.2.0",
+  "recursive_components": [],
+  "schema": "atlas.analysis.v1",
+  "snapshot_id": "69d91ffe3a1eeb8d9e570736ec027a0d8ccf29ec2de69b22f2d88650d53ec3af",
+  "unresolved_call_count": 2
+}
+--- stderr ---
+
+[exit code: 0]

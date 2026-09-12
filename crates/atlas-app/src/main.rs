@@ -1,7 +1,9 @@
+mod runner;
 mod server;
 mod worker;
 
 use atlas_contract::{ParseRequest, ScanLimits};
+use atlas_engine::exec::{Grants, RunSpec};
 use atlas_engine::job::{self, Lease, STATE_COMPLETED, STATE_FAILED};
 use atlas_engine::{analyze, control::ExecutionControl, incremental, scan, store::Store};
 use clap::{Args, Parser, Subcommand};
@@ -101,6 +103,50 @@ enum Action {
     Flow {
         analysis: String,
         entity: String,
+    },
+    /// Static execution sufficiency profile for one function (W08).
+    Profile {
+        analysis: String,
+        entity: String,
+    },
+    /// Controlled execution of one pinned function call in an isolated copy of
+    /// the immutable snapshot, under the target Node's permission model.
+    Exec {
+        analysis: String,
+        /// Symbol id, `path:name`, or a bare function name.
+        entity: String,
+        /// JSON array of literal arguments.
+        #[arg(long, default_value = "[]")]
+        args: String,
+        /// A scenario file: {"schema":"atlas.scenario.v1","cases":[...]}.
+        #[arg(long)]
+        scenario: Option<PathBuf>,
+        /// Print the static plan and stop before any process is started.
+        #[arg(long)]
+        plan: bool,
+        #[arg(long, default_value_t = 5000)]
+        timeout_ms: u64,
+        #[arg(long, default_value_t = 65536)]
+        output_limit: usize,
+        /// Comma-separated runtime permissions: fs_write, child_process,
+        /// network, unknown_calls, globals.
+        #[arg(long, default_value = "")]
+        allow_effects: String,
+        #[arg(long, default_value = "node")]
+        node: PathBuf,
+        /// Repeatable explicit environment entry `KEY=VALUE`; nothing else is
+        /// inherited except PATH.
+        #[arg(long = "env")]
+        env: Vec<String>,
+        /// Declare that this run used mocks/fixtures, so its result can never
+        /// be read as an observation of the real project environment.
+        #[arg(long)]
+        fixtures: bool,
+        #[arg(long)]
+        fixture_note: Option<String>,
+        /// List previously published execution records for this symbol.
+        #[arg(long)]
+        history: bool,
     },
     Serve {
         analysis: String,
@@ -311,6 +357,24 @@ struct StoredOptions {
 /// binary can never be mistaken for one holder.
 fn new_holder() -> String {
     format!("{}-{}", std::process::id(), uuid::Uuid::new_v4())
+}
+
+/// Explicit `KEY=VALUE` environment for a controlled run. Nothing is inherited
+/// except PATH, so a variable the caller did not name cannot reach the child.
+fn parse_env(
+    entries: &[String],
+) -> Result<std::collections::BTreeMap<String, String>, Box<dyn std::error::Error>> {
+    let mut env = std::collections::BTreeMap::new();
+    for entry in entries {
+        let (key, value) = entry
+            .split_once('=')
+            .ok_or_else(|| format!("environment entry must be KEY=VALUE: {entry}"))?;
+        if key.is_empty() || key.contains('\0') || key.contains('=') {
+            return Err(format!("invalid environment key: {key}").into());
+        }
+        env.insert(key.to_string(), value.to_string());
+    }
+    Ok(env)
 }
 
 struct PipelineResult {
@@ -664,6 +728,71 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             cursor,
         } => print(store.flow_symbols(&analysis, limit, cursor.as_deref())?)?,
         Action::Flow { analysis, entity } => print(store.flow_fact(&analysis, &entity)?)?,
+        Action::Profile { analysis, entity } => {
+            let symbol = runner::resolve_symbol(&store, &analysis, &entity)?;
+            print(runner::profile_for(&store, &analysis, &symbol)?)?
+        }
+        Action::Exec {
+            analysis,
+            entity,
+            args,
+            scenario,
+            plan,
+            timeout_ms,
+            output_limit,
+            allow_effects,
+            node,
+            env,
+            fixtures,
+            fixture_note,
+            history,
+        } => {
+            let symbol = runner::resolve_symbol(&store, &analysis, &entity)?;
+            if history {
+                print(json!({
+                    "analysis_id": analysis,
+                    "symbol": symbol,
+                    "records": store.exec_records(&analysis, &symbol, 20)?,
+                }))?;
+                return Ok(());
+            }
+            let names: Vec<String> = allow_effects
+                .split(',')
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .map(str::to_string)
+                .collect();
+            let spec = RunSpec {
+                schema: atlas_engine::exec::RUN_SPEC_SCHEMA.into(),
+                analysis_id: analysis.clone(),
+                symbol: symbol.clone(),
+                args: serde_json::from_str(&args)?,
+                timeout_ms,
+                output_limit,
+                grants: Grants::parse(&names)?,
+                node: node.display().to_string(),
+                env: parse_env(&env)?,
+                fixtures,
+                fixture_note,
+                label: None,
+            };
+            if plan {
+                print(runner::plan(&store, &spec)?)?;
+                return Ok(());
+            }
+            // Ctrl-C must reach the child process group, not just this process.
+            let control = ExecutionControl::new(None);
+            let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+            let _signal_watcher = signal_watcher(control, cancel_tx)?;
+            match scenario {
+                Some(path) => {
+                    let text = std::fs::read_to_string(&path)?;
+                    let document: serde_json::Value = serde_json::from_str(&text)?;
+                    print(runner::run_scenario(&store, &spec, &document, cancel_rx).await?)?
+                }
+                None => print(runner::execute(&store, &spec, cancel_rx).await?)?,
+            }
+        }
         Action::Job { command } => match command {
             JobAction::Status { id } => print(store.job(&id)?)?,
             JobAction::List { state, limit } => print(store.jobs(state.as_deref(), limit)?)?,

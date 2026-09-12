@@ -2,7 +2,7 @@
 
 独立的本地代码分析服务与可视化工作台。Modus 是未来的一个宿主，Atlas 的解析引擎、事实、查询和工作台不依赖 Modus、Python 服务或 LLM。
 
-这是 **Foundation 0.2：一条真实可运行的架构切片**，不是成熟 Atlas 的能力验收。已打通文件清点 → 内容快照 → JavaScript/TypeScript 语言材料 → Rust 关系图 → **版本化 Flow IR → CFG → 局部抽象解释（def-use、值来源、常量折叠、循环不动点）** → 查询 → 2D 工作台 → 固定选区上下文。完整目标仍包含跨过程摘要、函数与场景测试、正式 2D/3D、Agent 操作与 AI Coding。
+这是 **Foundation 0.2：一条真实可运行的架构切片**，不是成熟 Atlas 的能力验收。已打通文件清点 → 内容快照 → JavaScript/TypeScript 语言材料 → Rust 关系图 → **版本化 Flow IR → CFG → 局部抽象解释（def-use、值来源、常量折叠、循环不动点）** → 跨过程摘要 → 查询 → 持久作业与增量失效 → 2D/3D 工作台 → **执行画像与隔离受控运行** → 固定选区上下文。完整目标仍包含上下文合成、正式 Source/Scenario Trace、Agent 操作与 AI Coding。
 
 ## 启动
 
@@ -42,8 +42,13 @@ target/debug/atlas --store local-state serve <上一步返回的id>
 - 作业可以**排队**而不是只能即刻执行：`job enqueue` 只登记请求（runner 参数随行存储，所以排队请求描述自己怎么跑），工人按优先级降序、同级最旧优先认领。排队中的作业可以取消；运行中的不行——它属于租约持有者。
 - `index --incremental` 在字节与版本都没变时直接返回已发布的分析，并报告一次局部改动会失效什么：每个文件按自身内容与依赖闭包（在导入图 SCC 凝聚上折叠）得到一个键，因此失效**不需要**额外的一遍扫描，且改叶子不会反向失效共享模块。`withdrawn` 列出上次分析过、这次已不存在的文件。**承重断言**：增量与全量必须发布同一个 analysis id，冷/热/编辑/删除四条路径都有测试。已知边界：局部改动仍需重新派生全部函数（Rust 侧是全程序 SCC 不动点）。
 - 外部 Agent 可以调用 CLI/本地 HTTP，或操作有语义标签的网页；导出上下文不会自动发送给任何模型。
+- **执行画像**（`atlas profile` / `/api/profile`）把每个函数按已发布事实分成 `pure_callable` / `needs_context` / `needs_entry_driver` / `unsupported`，每条降级理由都指回它读的那个字段。partial 分析一律降级：frontier 就是事实缺失的块，「没有副作用」没有被证明。
+- **受控运行**（`atlas exec` / `/api/exec`）只对通过画像的函数生效：它把快照字节物化成隔离副本，用调用者指定的**目标 Node** 在 `--permission` 下启动，只授予副本只读与显式声明的项。权限是强制的而不是声明式的——每个进程首次运行前先跑一次能力探针，要求一次真实写入被 `ERR_ACCESS_DENIED` 拒绝，否则拒绝执行。目标函数按**源码同一性**选定（命名空间里某个值的 `toString()` 必须等于快照中该符号的字节），因此同名的另一个函数不会被静默执行，导不出的函数直接报 `target_not_exported`。超时/取消按进程组 `SIGKILL` 回收。
+- **观测边界写在记录里**：`coverage=not_sampled`、`unknown_paths=not_observed`。只观测入口调用的返回/抛出、运行时报告的源码位置、进程输出与退出码；没有行级覆盖，没有运行期调用图，静态 BFS 不作为执行顺序。`--scenario` 可对一组用例断言返回/抛出/被拒绝，`refused` 与「断言失败」是两种结果。声明 `--fixtures` 的运行会在记录里标为 mock，结果不得读作真实环境观测。
 
-**当前连线是静态候选，不是数据流执行顺序或运行血流。** 计算器同时出现加、减、除候选，不能据此声称一次加法执行过所有分支。Flow 事实是声明 profile 内的静态推导：未知构造、外部调用效果与跨过程值流都保留为显式 unknown。当前按钮没有修改代码、运行任意函数或调用模型的能力。`examples/flow-lab` 是局部语义事实的集成测试样例（finally、短路、循环、分支候选、显式 unknown）。
+**当前连线是静态候选，不是数据流执行顺序或运行血流。** 计算器同时出现加、减、除候选，不能据此声称一次加法执行过所有分支。Flow 事实是声明 profile 内的静态推导：未知构造、外部调用效果与跨过程值流都保留为显式 unknown。`examples/flow-lab` 是局部语义事实的集成测试样例（finally、短路、循环、分支候选、显式 unknown）。
+
+受控运行**不是**在项目目录里执行用户代码：它跑的是从不可变快照物化出来的副本，被测项目的文件不会被写；页面按钮只能选择符号与字面量实参，不能自己放宽沙箱。仍未实现：上下文合成（`needs_context` 不可运行）、依赖切片、Effect journal、行级覆盖与运行期调用图、AI 代码写入。
 
 ## 工程入口
 
@@ -70,6 +75,7 @@ python3 scripts/test_cancellation.py
 python3 scripts/test_jobs.py
 python3 scripts/test_incremental.py
 python3 scripts/test_semantic_contracts.py
+python3 scripts/test_execution.py
 node examples/calculator/demo.mjs
 node web/tests/app.behavior.test.mjs
 node web/tests/city3d.behavior.test.mjs
@@ -77,4 +83,4 @@ node web/tests/city3d.behavior.test.mjs
 
 自动化分别覆盖存储/遍历/边界、真实编译器材料、完整 CLI/HTTP 链路和独立计算器断言。`web/tests/app.behavior.test.mjs` 在 `node:vm` 的 DOM 里真正驱动 `web/app.js`（会话保持、失败路径清空、事实与选中的 symbol 一致性），因此工作台的行为不再只靠 `node --check` 的语法检查。
 
-自动化分别覆盖存储/遍历/边界、真实编译器材料、完整 CLI/HTTP 链路和独立计算器断言。120 文件、1,200 函数是合成分页与预算样本；10,000 节点 SCC 是图算法样本；两者均不构成大型真实项目资格。
+自动化分别覆盖存储/遍历/边界、真实编译器材料、完整 CLI/HTTP 链路、独立计算器断言、持久作业与队列、增量等价性、CLI/HTTP 受控执行，以及网页行为。120 文件、1,200 函数是合成分页与预算样本；10,000 节点 SCC 是图算法样本；两者均不构成大型真实项目资格。真实第三方项目的成本记录见 [GE-2/GE-3 证据](evidence/development/2026-09-12-real-project/REPORT.md)，它证明的是单机单项目成本，不是大仓库或多语言资格。

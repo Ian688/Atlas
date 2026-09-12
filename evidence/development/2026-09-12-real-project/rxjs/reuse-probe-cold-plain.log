@@ -1,0 +1,63 @@
+$ /usr/bin/time -l /Users/yinsijie/CodeRepo/Atlas/target/debug/atlas --store /Users/yinsijie/CodeRepo/Atlas/local-state/bench/reuse-probe/store-plain index /Users/yinsijie/CodeRepo/Atlas/local-state/bench/reuse-probe/project --node node --worker /Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs --timeout-seconds 600 --scan-deadline-seconds 300 --index-deadline-seconds 1800
+cwd: /Users/yinsijie/CodeRepo/Atlas
+--- stdout ---
+{
+  "binary_fingerprint": "6c5a3150e755b75513a82dcfe8131e16c0f86bd4af0bf316b7920058f0a07917",
+  "call_count": 1,
+  "coverage": {
+    "catalog_entries": 4,
+    "disposition:captured": 2,
+    "disposition:directory": 2,
+    "encountered_source_files": 2,
+    "flow_complete_within_profile": 2,
+    "flow_frontier_functions": 0,
+    "flow_functions": 2,
+    "flow_partial": 0,
+    "flow_unknown_regions": 0,
+    "interproc_recursive_sccs": 0,
+    "interproc_sccs": 2,
+    "parsed_source_files": 2
+  },
+  "diagnostics": [],
+  "edge_count": 7,
+  "engine": "foundation-flow-0.2.1",
+  "file_count": 2,
+  "flow_digest": "68ad1a007ac775460019a6add46a18f35d60366180fb2fc89529e0a945211041",
+  "function_count": 2,
+  "id": "20334f18a8810cc26c882112c3f63e95204301ddfbbf024043aaeb031065a050",
+  "limitations": [
+    "Lexical declaration candidates, not a complete runtime call graph or execution trace.",
+    "Snapshot captures files over an interval; it is not an atomic filesystem transaction.",
+    "Only captured UTF-8 JS/TS inputs; external dependencies, standard library and project tsconfig are not loaded.",
+    "Ignored directories are explicit boundaries; their unvisited descendants are not counted.",
+    "Local flow facts cover declared profile js-structured-control.v1 only; other constructs are explicit unknowns. Interprocedural summaries are symbolic per function, with up to 8 scalar-argument calling contexts per callee; other calls use the symbolic fallback. Captured origins are not re-substituted and unknown callees stay top."
+  ],
+  "node_count": 6,
+  "producer": "typescript/5.9.3;worker/0.2.0",
+  "recursive_components": [],
+  "schema": "atlas.analysis.v1",
+  "snapshot_id": "635fc5583622bcff0c15a84105f07a17f5c06fbb8f075a6d766028db8f1372d6",
+  "unresolved_call_count": 0
+}
+--- stderr ---
+        0.55 real         0.40 user         0.08 sys
+           120541184  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               33682  page reclaims
+                 243  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   1  messages sent
+                   1  messages received
+                   1  signals received
+                  46  voluntary context switches
+                1475  involuntary context switches
+           119646576  instructions retired
+           148859642  cycles elapsed
+             2768896  peak memory footprint
+[exit code: 0]
+[wall seconds: 0.563566]
+[peak rss: 120541184 (measured)]

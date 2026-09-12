@@ -1,3 +1,4 @@
+use atlas_engine::exec::{Grants, RunSpec};
 use atlas_engine::store::Store;
 use axum::{
     Router,
@@ -92,6 +93,25 @@ async fn query(
                 q.cursor.as_deref(),
             )?)
             .map_err(Into::into),
+            // The same reference forms as the CLI: a symbol id, `path:name`, or
+            // a bare name, resolved under this analysis only.
+            "profile" => {
+                let reference = q.entity.as_deref().unwrap_or("");
+                let symbol = crate::runner::resolve_symbol(&app.store, id, reference)
+                    .map_err(|error| atlas_engine::invalid(&error))?;
+                serde_json::to_value(
+                    crate::runner::profile_for(&app.store, id, &symbol)
+                        .map_err(|error| atlas_engine::invalid(&error))?,
+                )
+                .map_err(Into::into)
+            }
+            "exec-records" => {
+                let reference = q.entity.as_deref().unwrap_or("");
+                let symbol = crate::runner::resolve_symbol(&app.store, id, reference)
+                    .map_err(|error| atlas_engine::invalid(&error))?;
+                serde_json::to_value(app.store.exec_records(id, &symbol, q.limit.unwrap_or(20))?)
+                    .map_err(Into::into)
+            }
             _ => Err(atlas_engine::invalid("unknown_query")),
         }
     })
@@ -139,6 +159,116 @@ endpoint!(source, "source");
 endpoint!(context, "context");
 endpoint!(flow, "flow");
 endpoint!(flows, "flows");
+endpoint!(profile, "profile");
+endpoint!(exec_records, "exec-records");
+
+/// The body a local page may send to start a controlled run.
+///
+/// Deliberately narrow: the page cannot choose the Node binary, cannot inject
+/// environment variables, and cannot grant filesystem-write, child-process or
+/// network permissions. Those are operator decisions made on the CLI, where the
+/// person making them can see the flag. A page that could widen its own
+/// sandbox would be a privilege-escalation path, not a feature.
+#[derive(Deserialize)]
+struct ExecRequest {
+    symbol: String,
+    #[serde(default)]
+    args: Vec<serde_json::Value>,
+    timeout_ms: Option<u64>,
+    allow_effects: Option<Vec<String>>,
+    #[serde(default)]
+    fixtures: bool,
+    fixture_note: Option<String>,
+    #[serde(default)]
+    plan: bool,
+}
+
+async fn exec(
+    State(app): State<App>,
+    headers: HeaderMap,
+    axum::Json(request): axum::Json<ExecRequest>,
+) -> Response {
+    if !allowed(&app, &headers) {
+        return (StatusCode::UNAUTHORIZED, "local session required").into_response();
+    }
+    let Ok(permit) = app.slots.clone().try_acquire_owned() else {
+        return (StatusCode::TOO_MANY_REQUESTS, "busy").into_response();
+    };
+    let symbol = match crate::runner::resolve_symbol(&app.store, &app.analysis, &request.symbol) {
+        Ok(symbol) => symbol,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({"error": error})),
+            )
+                .into_response();
+        }
+    };
+    let grants = Grants {
+        fs_write: false,
+        child_process: false,
+        network: false,
+        // Only the two grants that do not widen the process boundary are
+        // accepted from the page.
+        unknown_calls: request
+            .allow_effects
+            .as_ref()
+            .is_some_and(|names| names.iter().any(|name| name == "unknown_calls")),
+        globals: request
+            .allow_effects
+            .as_ref()
+            .is_some_and(|names| names.iter().any(|name| name == "globals")),
+    };
+    let plan_only = request.plan;
+    let spec = RunSpec {
+        schema: atlas_engine::exec::RUN_SPEC_SCHEMA.into(),
+        analysis_id: app.analysis.clone(),
+        symbol,
+        args: request.args.into_iter().take(64).collect(),
+        timeout_ms: request.timeout_ms.unwrap_or(5_000).min(30_000),
+        output_limit: 64 * 1024,
+        grants,
+        node: "node".into(),
+        env: std::collections::BTreeMap::new(),
+        fixtures: request.fixtures,
+        fixture_note: request.fixture_note,
+        label: Some("http".into()),
+    };
+    let store = app.store.clone();
+    let outcome = tokio::spawn(async move {
+        let _permit = permit;
+        let (_cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+        if plan_only {
+            crate::runner::plan(&store, &spec)
+        } else {
+            crate::runner::execute(&store, &spec, cancel_rx).await
+        }
+    })
+    .await;
+    match outcome {
+        Ok(Ok(value)) => match serde_json::to_vec(&value) {
+            Ok(bytes) if bytes.len() <= 2 * 1024 * 1024 => (
+                [
+                    (header::CACHE_CONTROL, "no-store"),
+                    (header::CONTENT_TYPE, "application/json"),
+                ],
+                bytes,
+            )
+                .into_response(),
+            _ => (
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "response_byte_budget_exceeded",
+            )
+                .into_response(),
+        },
+        Ok(Err(error)) => (
+            StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({"error": error})),
+        )
+            .into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "exec failed").into_response(),
+    }
+}
 
 fn asset(content: &'static str, mime: &'static str) -> Response {
     ([(header::CONTENT_TYPE,mime),(header::CACHE_CONTROL,"no-store"),(header::CONTENT_SECURITY_POLICY,"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"),(header::X_CONTENT_TYPE_OPTIONS,"nosniff")],content).into_response()
@@ -238,6 +368,9 @@ pub async fn serve(
         .route("/api/context", post(context))
         .route("/api/flow", get(flow))
         .route("/api/flows", get(flows))
+        .route("/api/profile", get(profile))
+        .route("/api/exec-records", get(exec_records))
+        .route("/api/exec", post(exec))
         .with_state(app);
     axum::serve(listener, router)
         .with_graceful_shutdown(async {

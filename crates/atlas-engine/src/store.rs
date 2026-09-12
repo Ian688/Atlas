@@ -102,7 +102,15 @@ impl Store {
             file_hashes TEXT NOT NULL,
             source_files TEXT NOT NULL,
             created_at INTEGER NOT NULL);
-          CREATE INDEX IF NOT EXISTS incremental_runs_recent ON incremental_runs(created_at);")?;
+          CREATE INDEX IF NOT EXISTS incremental_runs_recent ON incremental_runs(created_at);
+          CREATE TABLE IF NOT EXISTS exec_records(
+            id TEXT PRIMARY KEY,
+            analysis TEXT NOT NULL,
+            symbol TEXT NOT NULL,
+            spec_digest TEXT NOT NULL,
+            body TEXT NOT NULL,
+            created_at INTEGER NOT NULL);
+          CREATE INDEX IF NOT EXISTS exec_records_symbol ON exec_records(analysis,symbol,created_at);")?;
             Ok(())
         })?;
         // Additive migration. A store created before the queue existed has a
@@ -471,5 +479,108 @@ impl Store {
         Ok(
             serde_json::json!({"analysis_id":analysis,"snapshot_id":snapshot.id,"entity_id":entity,"path":node.path,"blob":hash,"start":start,"end":end,"content":content,"truncated":end<expected_end}),
         )
+    }
+
+    /// Publish one controlled-execution record.
+    ///
+    /// `identity` is the canonical *answer*: the pinned question plus the
+    /// observed outcome, with timing and absolute temporary paths left out. The
+    /// full record is stored, but the id comes from `identity`, so re-running
+    /// the same question against the same analysis and getting the same answer
+    /// addresses the same row. A run that answered differently is a different
+    /// record rather than a silent overwrite -- and timing noise can never
+    /// masquerade as a new result.
+    pub fn publish_exec_record(
+        &self,
+        record: &mut serde_json::Value,
+        identity: &str,
+    ) -> Result<String> {
+        let analysis = record
+            .get("analysis_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| invalid("exec_record_missing_analysis"))?
+            .to_string();
+        let symbol = record
+            .get("symbol")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| invalid("exec_record_missing_symbol"))?
+            .to_string();
+        let spec_digest = record
+            .get("spec_digest")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| invalid("exec_record_missing_spec_digest"))?
+            .to_string();
+        let id = digest(identity.as_bytes());
+        if let Some(object) = record.as_object_mut() {
+            object.insert("id".into(), serde_json::json!(id));
+        }
+        let body = serde_json::to_string(record)?;
+        let created_at = crate::job::now_ms();
+        let conn = self.connection()?;
+        retry_on_busy(|| {
+            let tx = rusqlite::Transaction::new_unchecked(
+                &conn,
+                rusqlite::TransactionBehavior::Immediate,
+            )?;
+            let existing: Option<String> = tx
+                .query_row("SELECT body FROM exec_records WHERE id=?1", [&id], |r| {
+                    r.get(0)
+                })
+                .optional()?;
+            match existing {
+                // The id already encodes the pinned question and the observed
+                // answer, so a second run that answered the same question the
+                // same way is the same record. Timing and absolute temporary
+                // paths legitimately differ between two observations of one
+                // answer; treating that as a conflict would make a deterministic
+                // result look unstable. The first stored body stays
+                // authoritative and is never rewritten.
+                Some(_) => tx.commit()?,
+                None => {
+                    tx.execute(
+                        "INSERT INTO exec_records VALUES(?1,?2,?3,?4,?5,?6)",
+                        params![id, analysis, symbol, spec_digest, body, created_at],
+                    )?;
+                    tx.commit()?;
+                }
+            }
+            Ok(())
+        })?;
+        Ok(id)
+    }
+
+    pub fn exec_record(&self, id: &str) -> Result<serde_json::Value> {
+        let body: Option<String> = self
+            .connection()?
+            .query_row("SELECT body FROM exec_records WHERE id=?1", [id], |r| {
+                r.get(0)
+            })
+            .optional()?;
+        serde_json::from_str(&body.ok_or_else(|| invalid("exec_record_not_found"))?)
+            .map_err(Into::into)
+    }
+
+    /// Execution records for one symbol, newest first, bounded by `limit`.
+    pub fn exec_records(
+        &self,
+        analysis: &str,
+        symbol: &str,
+        limit: usize,
+    ) -> Result<Vec<serde_json::Value>> {
+        if limit == 0 || limit > 200 {
+            return Err(invalid("invalid_exec_record_limit"));
+        }
+        let conn = self.connection()?;
+        let mut statement = conn.prepare(
+            "SELECT body FROM exec_records WHERE analysis=?1 AND symbol=?2 ORDER BY created_at DESC, id DESC LIMIT ?3",
+        )?;
+        let rows = statement.query_map(params![analysis, symbol, limit as i64], |row| {
+            row.get::<_, String>(0)
+        })?;
+        let mut records = Vec::new();
+        for row in rows {
+            records.push(serde_json::from_str(&row?)?);
+        }
+        Ok(records)
     }
 }

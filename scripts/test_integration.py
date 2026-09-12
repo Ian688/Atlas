@@ -629,6 +629,84 @@ class Integration(unittest.TestCase):
         self.assertTrue(self.cli("flows", a["id"])["items"])
         self.cli("flow", a["id"], "symbol:src/pipeline.js:0:1", ok=False)
 
+    def test_http_execution_keeps_the_process_boundary_server_side(self):
+        """W08 over HTTP: a local page can ask for a run, not redefine its sandbox.
+
+        The page is allowed to choose the symbol, the literal arguments and the
+        two grants that do not widen the process boundary. Everything that does
+        -- the Node binary, the environment, filesystem-write, child-process and
+        network -- is fixed by the server. Those fields are not merely ignored
+        here: they are absent from the request type, so a page cannot send them
+        at all, and the record proves what actually ran.
+        """
+        a = self.index()
+        proc = subprocess.Popen([str(BIN), "--store", str(self.store), "serve", a["id"]], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            with selectors.DefaultSelector() as ready:
+                ready.register(proc.stdout, selectors.EVENT_READ)
+                self.assertTrue(ready.select(15), "HTTP server readiness deadline")
+            boot = json.loads(proc.stdout.readline())
+            session = json.loads(Path(boot["session_file"]).read_text())
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            auth = {"Authorization": "Bearer " + session["token"], "Content-Type": "application/json"}
+            base = session["url"]
+
+            def get(path):
+                with opener.open(urllib.request.Request(base + path, headers=auth), timeout=20) as r:
+                    return json.load(r)
+
+            def post(body, headers=None):
+                return opener.open(urllib.request.Request(
+                    base + "api/exec", headers=headers or auth,
+                    data=json.dumps(body).encode(), method="POST"), timeout=30)
+
+            profile = get("api/profile?entity=" + urllib.parse.quote("add"))
+            self.assertEqual(profile["classification"], "pure_callable")
+            self.assertTrue(profile["runnable"])
+
+            with post({"symbol": "add", "args": [1, 2]}) as r:
+                record = json.load(r)
+            self.assertEqual(record["verdict"], "returned", record.get("thrown"))
+            self.assertEqual(record["value"], {"kind": "number", "value": 3})
+            self.assertEqual(record["analysis_id"], a["id"])
+            self.assertEqual(record["trace"]["coverage"], "not_sampled")
+
+            # A page asking to widen the boundary gets none of it: the fields do
+            # not exist in the request type, so the run uses the fixed ones.
+            with post({
+                "symbol": "add",
+                "args": [1, 2],
+                "node": "/bin/sh",
+                "env": {"EVIL": "1"},
+                "allow_effects": ["fs_write", "child_process", "network", "unknown_calls", "globals"],
+                "timeout_ms": 10 ** 9,
+            }) as r:
+                widened = json.load(r)
+            self.assertEqual(widened["isolation"]["node_binary"], "node",
+                             "the page must not be able to choose the binary")
+            flags = widened["isolation"]["effective_flags"]
+            for forbidden in ("--allow-fs-write", "--allow-child-process", "--allow-net"):
+                self.assertFalse(any(f.startswith(forbidden) for f in flags),
+                                 f"the page granted {forbidden} to itself")
+            self.assertEqual(widened["spec"]["env"], {}, "the page must not inject environment")
+            self.assertLessEqual(widened["spec"]["timeout_ms"], 30_000, "timeout must be clamped")
+
+            # A function the static profile refuses is refused over HTTP too, and
+            # refusing must not have started a process.
+            with post({"symbol": "calculate", "args": ["1", "+", "2"]}) as r:
+                refused = json.load(r)
+            self.assertEqual(refused["verdict"], "refused")
+            self.assertFalse(refused["isolation"]["started"])
+
+            # Unauthenticated runs are rejected before anything else happens.
+            with self.assertRaises(urllib.error.HTTPError) as error:
+                post({"symbol": "add", "args": [1, 2]}, headers={"Content-Type": "application/json"})
+            self.assertEqual(error.exception.code, 401)
+            error.exception.close()
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+
 
 if __name__=="__main__":
     if not BIN.exists():raise SystemExit("Run cargo build --workspace first")

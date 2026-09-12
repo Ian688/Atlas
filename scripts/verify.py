@@ -35,6 +35,10 @@ CHECKS = [
     # run would; every case here asserts that id equality, not just the hit rate.
     ("incremental", [sys.executable, "scripts/test_incremental.py"]),
     ("semantic-contracts", [sys.executable, "scripts/test_semantic_contracts.py"]),
+    # Controlled execution is only meaningful if the boundary is real: these
+    # cases require each denial to come from the operating system through Node,
+    # and check that the side effect did not happen.
+    ("execution", [sys.executable, "scripts/test_execution.py"]),
     ("calculator", ["node", "examples/calculator/demo.mjs"]),
     ("web-syntax", ["node", "--check", "web/app.js"]),
     ("city3d-syntax", ["node", "--check", "web/city3d.js"]),

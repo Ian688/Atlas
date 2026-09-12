@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w07-incremental",
+    "window": "2026-09-12/w08-execution",
     "status": "DELIVERED",
-    "note": "W07 推进到 PARTIAL：运行键/文件键/SCC 闭包/失效归因/撤回/成本记账接通，热复用 6.1×；承重断言是增量与全量的 analysis id 必须逐字节相同。实测暴露 store.put_blob 对已存在 blob 仍写盘并 fsync，修复后 scan 快 60–100×。局部改动仍需全程序重新派生，原因已实测并登记为 blocker。",
-    "evidence_dir": "evidence/daily/2026-09-12/w07-incremental",
-    "verification": "evidence/daily/2026-09-12/w07-incremental/verification.json"
+    "note": "W08 从 NOT_IMPLEMENTED 推进到 PARTIAL：静态执行画像（pure_callable/needs_context/needs_entry_driver/unsupported，每条理由带 evidence 字段）、RunSpec 固定、隔离副本、目标 Node 权限模型（强制探针验证）、源码同一性选目标、入口观测记录与 scenario 断言接通。顺带在真实 rxjs@7.8.1 上找到并修复两个 worker 缺陷（同一错误码 flow_reference_unknown_binding 的两个独立来源）。",
+    "evidence_dir": "evidence/development/2026-09-12-w08",
+    "verification": "evidence/development/2026-09-12-w08/verification.json"
   },
   "windows": [
     {
@@ -35,7 +35,7 @@
       "id": "2026-09-09/w02",
       "started_local": "2026-09-09T05:15:51+08:00",
       "started_utc": "2026-09-08T21:15:51Z",
-      "status": "RUNNING",
+      "status": "DELIVERED",
       "work_items": [
         "R1",
         "R2",
@@ -48,7 +48,9 @@
         "M2",
         "M3"
       ],
-      "report": "evidence/daily/2026-09-09/w02/final/daily-report.md"
+      "report": "evidence/daily/2026-09-09/w02/final/daily-report.md",
+      "ended_local": "2026-09-09T08:20:00+08:00",
+      "note": "独立复审 CHANGES_REQUIRED（F1-F5）；对应修复已由 w03 交付并有具名测试 (f1_typed_constants_are_machine_distinguishable / f2_wrapper_layer_heap_write_is_visible / r1_perturbation_throw_ordering_keeps_partial_state / f4_nested_reachable_objects_dissolve_on_unknown_call / f5_big_number_to_string_is_exact)。独立再复审未进行，资格继续扣留。"
     },
     {
       "id": "2026-09-09/w03",
@@ -126,10 +128,27 @@
       "note": "W07 推进到 PARTIAL。承重断言：增量与全量必须发布同一 analysis id，冷/热/编辑/删除四条路径全部相等。实测暴露 store.put_blob 对已存在 blob 仍写盘并 fsync（每次扫描每个未改动文件一次），修复后 scan 3.1–4.9s → 0.049s。局部改动仍需全程序重新派生：Rust 侧是全程序 SCC 不动点，按文件缓存派生结果在算法上不成立，已登记为 blocker。",
       "report": "evidence/daily/2026-09-12/w07-incremental/REPORT.md",
       "verification": "evidence/daily/2026-09-12/w07-incremental/verification.json"
+    },
+    {
+      "id": "2026-09-12/w08-execution",
+      "started_local": "2026-09-12T20:00:00+08:00",
+      "status": "DELIVERED",
+      "work_items": [
+        "W08-execution-profile",
+        "W08-run-spec-and-isolated-copy",
+        "W08-node-permission-enforcement",
+        "W08-source-identity-target-resolution",
+        "W08-observed-record-and-trace-honesty",
+        "W08-scenario-tests",
+        "W08-http-boundary",
+        "GE-2-worker-defect-flow-reference-unknown-binding-x2"
+      ],
+      "note": "受控执行只对静态画像允许且 spec 显式授权的函数生效；权限由 Node 权限模型强制（能力探针要求一次真实写入被 ERR_ACCESS_DENIED 拒绝），不是 Atlas 的声明。记录身份 = digest(固定问题+观测答案)，刻意排除耗时与临时路径。观测边界写进每条记录：coverage=not_sampled、unknown_paths=not_observed。",
+      "report": "evidence/development/2026-09-12-w08/REPORT.md"
     }
   ],
-  "next_work_item": "GE-2/GE-3-真实中型项目规模与成本记录",
-  "next_action": "W07 的运行键、文件键、SCC 闭包失效、归因、撤回与成本记账已接通并纳入验证门，热复用 6.1×。W07 的标题还含“真实项目规模”，而当前唯一的成本数据来自 121 文件合成样本——这不足以满足 GE-2/GE-3，也不足以判断 W04/W05 的预算参数在大项目上的表现。下一步用一个真实中型 JS/TS 项目记录冷/热/增量成本、内存峰值与 coverage 分母，并把结论回填到 W04/W05/W07 的证据里；已知两次成本假设被实测推翻（一度以为派生占 84%，实为 scan 主导），因此不再靠推断。之后是 W08 受控执行与执行画像。完整堆/闭包上下文与增量不动点仍未实现。",
+  "next_work_item": "W08 深化：上下文实例化 + Effect journal + 依赖切片",
+  "next_action": "W08 首片（静态画像 + 隔离受控运行 + 观测记录 + scenario + HTTP 边界 + Web 面板）已接通并纳入验证门。下一步按依赖顺序：先做 needs_context 的上下文实例化（captures/this/模块态的最小可用合成，仍要求显式声明），再做 Effect journal（执行期真实读写/网络/子进程清单位于权限模型之上）与依赖切片（只物化目标闭包而不是整个快照）。真实项目 GE-2/GE-3 证据待 rxjs 基准重跑完成后回填；该基准已经在第一轮就暴露了两个真实 worker 缺陷并已修复。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
@@ -178,7 +197,7 @@
       "implementation": "IMPLEMENTED",
       "automated_checks": "PASS",
       "qualification": "NOT_QUALIFIED",
-      "review_status": "CHANGES_REQUIRED",
+      "review_status": "FIXES_DELIVERED_REREVIEW_PENDING",
       "features": [
         "worker 0.2.0 输出 atlas.flow-ir.v1 / js-structured-control.v1:结构化语句/表达式树、UTF-8 锚点、Scope/Binding、参数默认值、捕获、unknown_regions",
         "声明 profile 外构造一律显式 unknown+原因(for-of/in、解构、await/yield、模板插值、逻辑赋值、rest/展开、element access、with、class、delete、JSX、正则值)",
@@ -196,7 +215,7 @@
           "R6",
           "R7"
         ],
-        "note": "Executor automated_checks PASS remains historical self-test scope; new independent counterexamples fail. Implementation exists, qualification withheld."
+        "note": "w01 independent review findings R6,R7 and w02 review findings F1-F5 are delivered with named regression tests; no independent re-review has been performed, so qualification stays withheld."
       }
     },
     {
@@ -211,7 +230,7 @@
       "implementation": "IMPLEMENTED",
       "automated_checks": "PASS",
       "qualification": "NOT_QUALIFIED",
-      "review_status": "CHANGES_REQUIRED",
+      "review_status": "FIXES_DELIVERED_REREVIEW_PENDING",
       "features": [
         "基本块 CFG:Goto/Branch/Return/Throw/共享 finally Dispatch/Sink",
         "Completion(kind,value) 驱动 finally:正常结束恢复原 completion 并保留环境修改,自身 abrupt 覆盖;finally 体自身终止时不挂 dispatch;catch 内异常不重入同一 catch",
@@ -230,7 +249,7 @@
           "R1",
           "R7"
         ],
-        "note": "Executor automated_checks PASS remains historical self-test scope; new independent counterexamples fail. Implementation exists, qualification withheld."
+        "note": "w01 independent review findings R1,R7 and w02 review findings F1-F5 are delivered with named regression tests; no independent re-review has been performed, so qualification stays withheld."
       }
     },
     {
@@ -245,7 +264,7 @@
       "implementation": "IMPLEMENTED",
       "automated_checks": "PASS",
       "qualification": "NOT_QUALIFIED",
-      "review_status": "CHANGES_REQUIRED",
+      "review_status": "FIXES_DELIVERED_REREVIEW_PENDING",
       "features": [
         "维度:可达性、绑定环境(值+初始化状态+reaching defs)、CappedSet(常量8/目标64/来源8)、平坦堆(site,field)+wildcard、效果、completion",
         "def-use 每绑定 defs/每定义 uses;TDZ 读取→may_throw+原因;来源 Parameter(i)/Constant/CallResult/Allocation/FunctionValue/External/Capture/Derived/Exception/This",
@@ -268,7 +287,7 @@
           "R3",
           "R4"
         ],
-        "note": "Executor automated_checks PASS remains historical self-test scope; new independent counterexamples fail. Implementation exists, qualification withheld."
+        "note": "w01 independent review findings R1,R2,R3,R4 and w02 review findings F1-F5 are delivered with named regression tests; no independent re-review has been performed, so qualification stays withheld."
       }
     },
     {
@@ -458,7 +477,7 @@
         "121 文件为合成样本，不满足 GE-2/GE-3 的真实项目规模要求；真实中型项目的冷/热/增量成本仍未记录",
         "incremental_runs 表只增不删，无回收策略"
       ]
-      },
+    },
     {
       "id": "W08",
       "title": "执行画像与受控函数/场景测试",
@@ -470,13 +489,50 @@
         "AL-16",
         "AL-13"
       ],
-      "implementation": "NOT_IMPLEMENTED",
-      "automated_checks": "NOT_RUN",
+      "implementation": "PARTIAL",
+      "automated_checks": "PASS",
       "qualification": "NOT_QUALIFIED",
-      "review_status": "NOT_REQUESTED",
-      "features": [],
-      "evidence": [],
-      "blockers": []
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "features": [
+        "执行画像：从已发布 flow 事实派生 pure_callable/needs_context/needs_entry_driver/unsupported；判定顺序 unsupported>driver>context>pure；每条理由含 code/detail/evidence(fact 字段路径)",
+        "保守性：status!=complete_within_profile 一律降级（frontier 就是事实缺失的块）；Capture/External/This/heap/global/unknown_call/registers_callback/escaped_value/callsite 不完整均降级；参数按声明偏移排序，排不出则 arity=null 而不是猜",
+        "决定与拒绝：needs_context 本切片不可运行；needs_entry_driver 需显式 --allow-effects unknown_calls；unsupported 即使全授权也拒绝；拒绝不启动进程并在记录里写 refused/started=false",
+        "RunSpec 固定：analysis/symbol/args/timeout/output_limit/grants/node/env(显式白名单)/fixtures；validate 拒绝非法超时、输出预算、环境键与超量实参",
+        "隔离副本：从不可变快照的每个内容寻址 blob 读入并重新哈希校验后物化到 0700 临时目录；临时根先 canonicalize（否则 Node loader 会在 /var→/private/var 触发未授权读）",
+        "目标解析按源码同一性：模块命名空间内每个函数的 toString 归一化后必须等于快照中该符号的字节切片，唯一命中才调用；改名/遮蔽/同名不误执行，导不出即 target_not_exported",
+        "权限强制：node --permission + 仅副本只读；每进程首次运行前跑能力探针，要求一次真实写入被 ERR_ACCESS_DENIED 拒绝，否则拒绝执行；fs_write/child_process/network 只在显式授权时加 flag",
+        "进程生命周期：子进程自成进程组，超时/取消按组 SIGKILL 并回收；stdin/stdout/stderr 均有预算；harness 报告带每轮唯一标记、最后写入并显式退出（目标自写 stdout 不会被误当报告）",
+        "观测记录：verdict=returned|threw|timeout|cancelled|refused|target_not_exported|target_ambiguous|module_load_failed|harness_error；抛出时把运行时栈帧映射回快照路径+行+字节偏移+行文本；trace.coverage=not_sampled、unknown_paths=not_observed",
+        "记录身份与不可变：id=digest(固定问题+观测答案)，排除耗时与绝对临时路径，同问同答即同一行，异答新增一条而不是覆盖",
+        "mock 区分：--fixtures 运行在记录里标 isolation.mocks=true，前端明确提示不得读作真实环境观测",
+        "scenario：atlas.scenario.v1 用例集，断言 returns/throws(name,message_contains,code)/denied/awaited；refused 与 failed 分开计数",
+        "HTTP 边界：/api/profile、/api/exec、/api/exec-records；页面不能选择 Node 二进制、注入环境或授予 fs_write/child_process/network（字段不在请求类型里），超时夹到 30s；未授权 401",
+        "Web：函数面板增加执行画像与受控运行；不可运行/参数未知时禁用按钮并给出原因；拒绝与观测分别渲染；观测边界始终显示"
+      ],
+      "evidence": [
+        "crates/atlas-engine/src/exec.rs（8 个单测：分类顺序/arity/参数顺序/partial 降级/dynamic 拒绝/缺授权/路径校验/栈帧映射）",
+        "crates/atlas-app/src/runner.rs",
+        "crates/atlas-app/src/main.rs（atlas profile / atlas exec，含 --plan/--scenario/--history）",
+        "scripts/test_execution.py（26 个用例：真实执行、真实拒绝、超时、场景、记录身份、pinning、mock 标签）",
+        "scripts/test_integration.py test_http_execution_keeps_the_process_boundary_server_side",
+        "web/tests/app.behavior.test.mjs（新增 7 项执行面板行为）",
+        "workers/typescript/tests/flow.test.mjs（GE-2 回归：嵌套函数不得被外层认领声明）",
+        "evidence/development/2026-09-12-w08/verification.json"
+      ],
+      "blockers": [
+        "needs_context 不可运行：本切片不合成上下文（captures/this/模块态），需要上下文实例化与依赖切片",
+        "没有行级覆盖、运行期调用图与因果链：只有入口调用的返回/抛出与运行时报告的源码位置；未知路径保持未知",
+        "effects 只有静态分类标签，没有 Effect journal：fs/net/env/子进程的实际行为由运行时权限模型强制，Atlas 不记录执行期效果清单",
+        "fixtures 只是声明标签：不注入 mock、不做依赖切片、不校验 mock 与真实依赖的区别，仅保证运行结果不会被读作真实环境观测",
+        "profile 的 external/global 判定偏保守，真实项目里大量函数会落入 needs_entry_driver（rxjs 上 add 之外基本如此），精度未做评估",
+        "子进程按组 SIGKILL 依赖 POSIX 进程组；Windows 未资格",
+        "Node 权限模型仍是实验特性（--allow-net 会打印 ExperimentalWarning）；Atlas 用探针而不是版本来判断可用性，但跨版本行为未资格"
+      ],
+      "independent_review": {
+        "id": "pending",
+        "findings": [],
+        "note": "W08 首片待独立复审。"
+      }
     },
     {
       "id": "W09",
@@ -592,6 +648,31 @@
           "review_status": "NEEDS_INDEPENDENT_REVIEW"
         }
       ]
+    },
+    {
+      "id": "2026-09-09-w02",
+      "window": "2026-09-09/w02",
+      "status": "FIXES_DELIVERED_REREVIEW_PENDING",
+      "reviewed_utc": "2026-09-09T02:0:00+00:00",
+      "report": "evidence/reviews/2026-09-09-w02/REVIEW.md",
+      "reviewed_commit": "6b4c47412e81b8fc9e9ea224b4609956ac4e976a",
+      "baseline_replay": {
+        "source_audit_manifest_count": 62,
+        "mismatches": 0
+      },
+      "semantic_probe": {
+        "assertions_failed": 5,
+        "exit_code": 1
+      },
+      "required_fixes": [
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F5"
+      ],
+      "fix_delivery": "c4aa246 (w03 delivery: review fixes F1-F5) + F2/F4/R2 regression tests in tests/flow_semantics.rs; re-verified in every verify.py run since.",
+      "scope": "Independent CLI/worker/Rust/store counterexamples on 6b4c474. Fixes are delivery claims with named tests, not an independent re-review verdict."
     }
   ],
   "d_family_coverage": {
@@ -817,5 +898,6 @@
     "index_1200fn_debug_s": 12.58,
     "flow_query_s": 0.03,
     "qualification": "debug build synthetic; not a large-project qualification"
-  }
+  },
+  "review_ledger_note": "2026-09-12: registered the previously unlogged w02 independent review and corrected the stale CHANGES_REQUIRED status on W01-W03 to FIXES_DELIVERED_REREVIEW_PENDING. Qualification is unchanged: only an independent re-review can restore it."
 }

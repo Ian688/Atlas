@@ -68,6 +68,7 @@ function makeFetch(routes, requests) {
     requests.push({ name, auth, params: Object.fromEntries(u.searchParams) });
     const route = routes[name];
     if (route === undefined) return { ok: false, status: 404, json: async () => ({ error: 'unknown_query' }) };
+    if (init.body !== undefined) requests[requests.length - 1].body = init.body;
     const out = typeof route === 'function' ? route(Object.fromEntries(u.searchParams)) : route;
     if (out && out.__status) return { ok: false, status: out.__status, json: async () => ({ error: 'x' }) };
     return { ok: true, status: 200, json: async () => out };
@@ -331,6 +332,155 @@ check('the block-by-binding state map marks each kind without inventing records'
 
   assert.match(t.el('flow-body').textContent, /绑定状态矩阵/, 'the map must name itself');
   assert.match(t.el('flow-body').textContent, /预算截断/, 'a truncated block state must be called out');
+});
+
+// --- W08: the execution panel ------------------------------------------------
+// The panel is where a reader could most easily be misled, because it can start
+// a real process. These checks pin the three ways it must refuse to overstate:
+// a profile that is not runnable must disable the button and say which fact
+// field caused it, a refused record must never be drawn as a result, and an
+// observed record must always carry its observation boundary (no coverage
+// sampling, unknown paths stay unknown).
+function profile(over = {}) {
+  return Object.assign({
+    schema: 'atlas.execution-profile.v1',
+    analysis_id: report.id,
+    symbol: FN_A.id, path: 'a.js', name: 'fnA',
+    classification: 'pure_callable', runnable: true,
+    reasons: [], params: [], arity: 0,
+    flow_status: 'complete_within_profile', flow_profile: 'js-structured-control.v1',
+    unknown_reasons: [], effects: {}, required_grants: [], notes: [],
+  }, over);
+}
+
+function record(over = {}) {
+  return Object.assign({
+    schema: 'atlas.execution-record.v1', id: 'r'.repeat(64),
+    analysis_id: report.id, snapshot_id: 's'.repeat(64), symbol: FN_A.id,
+    path: 'a.js', name: 'fnA', verdict: 'returned', refusal: null,
+    value: { kind: 'number', value: 3 }, thrown: null,
+    console: { stdout: '', stderr: '', truncated: false, harness_lines: [] },
+    duration_ms: 42, exit_code: 0,
+    isolation: { mocks: false, permission_model: 'node --permission (probe-verified: an attempted write was denied)', effective_flags: ['--permission', '--allow-fs-read=/tmp/x'] },
+    source_binding: { analysis_id: report.id, snapshot_id: 's'.repeat(64), path: 'a.js', blob: 'b'.repeat(64), bytes_verified: true },
+    trace: { kind: 'observed-entry-call', coverage: 'not_sampled', unknown_paths: 'not_observed', events: [] },
+  }, over);
+}
+
+check('a refused profile disables the run button and names the evidence', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = profile({
+    classification: 'needs_context', runnable: false,
+    reasons: [{ code: 'captured_binding', detail: '1 个值来源是 Capture', evidence: 'block_states[].bindings[].value.origins' }],
+    required_grants: [],
+  });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  assert.equal(t.el('exec-panel').hidden, false, 'the panel must appear for a classified function');
+  assert.equal(t.el('exec-run').disabled, true, 'a non-runnable profile must not offer a run');
+  const body = t.el('exec-body').textContent;
+  assert.match(body, /captured_binding/, 'the reason code must be shown');
+  assert.match(body, /block_states/, 'the fact field behind the reason must be shown');
+  assert.match(body, /不是执行结果/, 'the panel must state that a classification is not an execution');
+});
+
+check('an unknown arity disables the run instead of guessing arguments', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = profile({ arity: null, params: [] });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  assert.equal(t.el('exec-run').disabled, true, 'the page must not invent arguments');
+  assert.match(t.el('exec-run').title, /参数个数未知/, 'the reason must be on the control');
+});
+
+check('pressing run posts the pinned request and draws the observed boundary', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = profile({ required_grants: ['unknown_calls'] });
+  t.routes.exec = record();
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  assert.equal(t.el('exec-run').disabled, false, 'a pure callable must be runnable');
+
+  t.el('exec-args').value = '[1,2]';
+  await t.run('runControlled()');
+  const posted = t.requests.filter((r) => r.name === 'exec');
+  assert.equal(posted.length, 1, 'exactly one run must be requested');
+  assert.equal(posted[0].auth, 'Bearer TOKEN-1', 'the run must carry the session token');
+  const body = JSON.parse(posted[0].body);
+  assert.equal(body.symbol, FN_A.id, 'the run must be pinned to the selected symbol');
+  assert.deepEqual(body.args, [1, 2], 'the page must send the arguments it displayed');
+  assert.deepEqual(body.allow_effects, ['unknown_calls'], 'only the profile-required grants are forwarded');
+
+  const shown = t.el('exec-body').textContent;
+  assert.match(shown, /观测结果 returned/, 'the observed verdict must be shown');
+  assert.match(shown, /返回值 3/, 'the real returned value must be shown');
+  assert.match(shown, /coverage=not_sampled/, 'the observation boundary must always be stated');
+  assert.match(shown, /unknown_paths=not_observed/, 'unobserved paths must stay unknown');
+  assert.doesNotMatch(shown, /执行路线/, 'the panel must not claim an execution path');
+});
+
+check('a refused record is shown as a refusal, never as a result', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = profile({ required_grants: ['unknown_calls'] });
+  t.routes.exec = record({
+    verdict: 'refused', value: null, exit_code: null, duration_ms: 0,
+    refusal: { code: 'missing_grants', detail: '未授予：unknown_calls', evidence: 'execution_profile.required_grants' },
+  });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  await t.run('runControlled()');
+  const shown = t.el('exec-body').textContent;
+  assert.match(shown, /拒绝执行/, 'the refusal must be named');
+  assert.match(shown, /missing_grants/, 'the refusal code must be shown');
+  assert.match(shown, /没有进程被启动/, 'a refusal must not read as a failed execution');
+  assert.doesNotMatch(shown, /观测结果 returned/, 'a refusal must not borrow the success line');
+});
+
+check('a mock-labelled run says so and an observed record keeps its identity', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = profile();
+  t.routes.exec = record({
+    isolation: { mocks: true, fixture_note: 'hand-built case', permission_model: 'node --permission', effective_flags: ['--permission'] },
+    thrown: { name: 'TypeError', message: 'boom', code: null, stack: [] },
+    value: null, verdict: 'threw',
+    trace: { kind: 'observed-entry-call', coverage: 'not_sampled', unknown_paths: 'not_observed',
+      events: [{ kind: 'threw', source_location: { path: 'a.js', line: 3, column: 9, line_text: 'throw new TypeError()' } }] },
+  });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  await t.run('runControlled()');
+  const shown = t.el('exec-body').textContent;
+  assert.match(shown, /mock\/fixture/, 'a fixture run must be labelled');
+  assert.match(shown, /不得当作真实环境观测/, 'a fixture result must not read as a real observation');
+  assert.match(shown, /TypeError: boom/, 'the thrown error must be shown');
+  assert.match(shown, /a\.js:3:9/, 'the observed source location must be shown');
+});
+
+check('a profile from another symbol is refused, not rendered', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = profile({ symbol: 'symbol:OTHER:0:9', classification: 'needs_context', runnable: false });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  const shown = t.el('exec-body').textContent;
+  assert.match(shown, /已拒绝显示/, 'a mismatched profile must be refused');
+  assert.equal(t.el('exec-run').disabled, true, 'a refused profile must not be runnable');
+});
+
+check('a missing profile leaves the run button disabled and says why', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = { __status: 400 };
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  assert.equal(t.el('exec-panel').hidden, true, 'no profile means no execution panel');
+  assert.equal(t.el('exec-run').disabled, true, 'no profile means no run');
+  if (t.evalIn('state.execProfile') !== null) throw new Error('a failed profile query must clear the profile');
 });
 
 let failed = 0;

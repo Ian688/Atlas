@@ -1,0 +1,26 @@
+$ /usr/bin/time -l node --version
+cwd: /Users/yinsijie/CodeRepo/Atlas
+--- stdout ---
+v26.5.1
+--- stderr ---
+        0.24 real         0.03 user         0.00 sys
+            20242432  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+                5202  page reclaims
+                 106  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   3  voluntary context switches
+                 111  involuntary context switches
+           278820612  instructions retired
+           170978537  cycles elapsed
+             1294336  peak memory footprint
+[exit code: 0]
+[wall seconds: 0.251947]
+[peak rss: 20242432 (measured)]

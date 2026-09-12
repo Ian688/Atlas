@@ -1,0 +1,7 @@
+$ /Users/yinsijie/CodeRepo/Atlas/target/debug/atlas --store /Users/yinsijie/CodeRepo/Atlas/local-state/bench/diag/store index /Users/yinsijie/CodeRepo/Atlas/local-state/bench/diag/tree --node node --worker /Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs --timeout-seconds 600 --scan-deadline-seconds 300 --index-deadline-seconds 1800
+files=1
+subsetsample=['src/internal/Observable.ts']
+[exit code: 1]
+[wall seconds: 0.806]
+--- stderr ---
+Error: Invalid("flow_reference_unknown_binding")
