@@ -365,6 +365,20 @@ class Cli(Base):
         self.assertFalse((self.project / ".atlas-apply.lock").exists(),
                          "an error path must not keep the lock")
 
+    def test_a_lock_records_when_it_was_taken_and_the_refusal_says_since_when(self):
+        proposal = self.propose()["proposal"]
+        self.cli("patch", "verify", proposal["id"])
+        lock = self.project / ".atlas-apply.lock"
+        lock.write_text("other-run\n1700000000000\n", encoding="utf-8")
+        result = self.cli_failure("patch", "apply", proposal["id"], "--target", self.project)
+        self.assertIn("apply_lock_held", result.stderr)
+        self.assertIn("since_ms=1700000000000", result.stderr,
+                      "a held lock must say since when, not only who")
+        lock.unlink()
+        # And once this process takes the lock itself, the file carries both.
+        self.cli("patch", "apply", proposal["id"], "--target", self.project)
+        self.assertFalse(lock.exists())
+
     def test_revert_holds_the_lock_too(self):
         proposal = self.propose()["proposal"]
         self.cli("patch", "verify", proposal["id"])
@@ -385,6 +399,10 @@ class Cli(Base):
         result = self.cli("patch", "unlock", "--target", self.project)
         self.assertTrue(result["removed"])
         self.assertEqual(result["holder"], "dead-process")
+        # This lock file has no timestamp line (it was written by hand), and the
+        # answer says so instead of inventing a time.
+        self.assertIsNone(result["since_ms"])
+        self.assertEqual(result["since_unknown"], "lock_file_has_no_timestamp")
         self.assertFalse(lock.exists())
         # Clearing a lock that is not there is an error, not a silent success:
         # a typo'd directory must not look like a cleanup.

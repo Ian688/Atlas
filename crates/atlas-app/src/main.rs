@@ -1823,12 +1823,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 // The holder is reported before the lock is gone: after this the
                 // only record of who held it is this line.
-                let holder = std::fs::read_to_string(&path).unwrap_or_default();
+                let contents = std::fs::read_to_string(&path).unwrap_or_default();
+                let mut lines = contents.lines();
+                let holder = lines.next().unwrap_or("").trim().to_string();
+                let since_ms = lines
+                    .next()
+                    .and_then(|value| value.trim().parse::<i64>().ok());
                 std::fs::remove_file(&path)?;
                 print(json!({
                     "removed": true,
                     "path": path.display().to_string(),
-                    "holder": holder.trim(),
+                    "holder": holder,
+                    // Null plus a reason, never a guess: a lock written by an
+                    // older build has no timestamp in it.
+                    "since_ms": since_ms,
+                    "since_unknown": if since_ms.is_none() { Some("lock_file_has_no_timestamp") } else { None },
                     "note": "锁已被移除。它原本挡住写入是有意的：崩溃残留的锁会挡住下一次 apply 并报出持有者。",
                 }))?
             }

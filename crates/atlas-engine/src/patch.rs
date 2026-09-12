@@ -326,16 +326,32 @@ impl ApplyLock {
         {
             Ok(mut file) => {
                 use std::io::Write;
+                // The holder and the moment it took the lock. A stale lock is
+                // cleared by hand, and "who and since when" is what a person
+                // needs to decide whether it is really abandoned.
                 let _ = writeln!(file, "{holder}");
+                let _ = writeln!(file, "{}", crate::job::now_ms());
                 Ok(ApplyLock { path })
             }
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
                 let existing = fs::read_to_string(&path).unwrap_or_default();
-                Err(invalid(&format!(
-                    "apply_lock_held:{}:holder={}",
-                    path.display(),
-                    existing.trim()
-                )))
+                let mut lines = existing.lines();
+                let holder = lines.next().unwrap_or("").trim().to_string();
+                let since = lines
+                    .next()
+                    .and_then(|value| value.trim().parse::<i64>().ok());
+                Err(invalid(&match since {
+                    Some(since) => format!(
+                        "apply_lock_held:{}:holder={holder}:since_ms={since}",
+                        path.display()
+                    ),
+                    // An older lock file holds only the holder; the refusal says
+                    // so instead of inventing a time.
+                    None => format!(
+                        "apply_lock_held:{}:holder={holder}:since_ms=unknown",
+                        path.display()
+                    ),
+                }))
             }
             Err(error) => Err(invalid(&format!(
                 "apply_lock_unavailable:{}:{error}",
