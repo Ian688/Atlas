@@ -228,6 +228,16 @@
       ],
       "note": "补丁验证可排队为 patch_verify 作业；队列按 kind 分派，index 与 patch_verify 共用身份/租约/心跳/收割；无法自述的作业行判失败而不是猜参数。",
       "report": "evidence/development/2026-09-12-w09-queued-verify/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/w08-cancellation",
+      "status": "DELIVERED",
+      "work_items": [
+        "W08-sigint-cancels-controlled-run",
+        "W08-scenario-stops-on-cancel"
+      ],
+      "note": "受控运行的 SIGINT 取消接通并有测试（按进程组 kill、发布 cancelled 记录）；scenario 取消后停止并区分 attempted/declared。",
+      "report": "evidence/development/2026-09-12-w08/REPORT.md"
     }
   ],
   "next_work_item": "宿主侧 E2E 与旧入口切换（需要 Modus 检出）；或回到 W08/W09 的深化项",
@@ -598,7 +608,8 @@
         "模块级状态不需要声明：顶层函数的 Capture 来源视为模块初始化状态（模块整体被复制），只要求承认未知；嵌套函数的外层绑定标记为 unsatisfiable_context，函数不可运行",
         "拒绝可行动：refusal 带 missing_grants 与 missing_context 列表，一次列全，不让调用者改一个再试一次",
         "结果记录写明声明了什么：isolation.declared_context 与 trace 事件里的 declared_globals / receiver_declared",
-        "Effect journal（atlas.effect-journal.v1）：记录被拒绝的尝试（permission/resource/error_code）与授予集合；harness 从 ERR_ACCESS_DENIED 上带出 permission 与 resource；节点明确写明「被允许的操作没有逐条日志，空 journal 不等于没有副作用」"
+        "Effect journal（atlas.effect-journal.v1）：记录被拒绝的尝试（permission/resource/error_code）与授予集合；harness 从 ERR_ACCESS_DENIED 上带出 permission 与 resource；节点明确写明「被允许的操作没有逐条日志，空 journal 不等于没有副作用」",
+        "SIGINT 取消受控运行：按进程组 SIGKILL 回收并发布 verdict=cancelled 的记录（取消的运行同样被记录，不丢弃）；scenario 收到取消即停止，declared_cases 与 attempted_cases 分开，避免把未尝试的用例读成已尝试"
       ],
       "evidence": [
         "crates/atlas-engine/src/exec.rs（8 个单测：分类顺序/arity/参数顺序/partial 降级/dynamic 拒绝/缺授权/路径校验/栈帧映射）",
@@ -612,7 +623,8 @@
         "scripts/test_execution.py（32 个用例，新增 5 项上下文模型用例）",
         "evidence/development/2026-09-12-w08/REPORT.md（上下文模型一节）",
         "scripts/test_execution.py（35 个用例，新增 3 项 effect journal 用例）",
-        "web/tests/app.behavior.test.mjs（25 项，新增 1 项 journal 呈现）"
+        "web/tests/app.behavior.test.mjs（25 项，新增 1 项 journal 呈现）",
+        "scripts/test_execution.py（37 个用例，新增 2 项取消用例）"
       ],
       "blockers": [
         "needs_context 仍不完整：嵌套函数的闭包实例无法用数据声明，因此这类函数不可运行；worker 仍把 ES import 绑定当作 External 名称（导入绑定与真正的全局在已发布事实里无法区分），因此读取导入模块的函数会被要求承认未知——保守但不够精确",

@@ -18,8 +18,10 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import tempfile
+import time
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -371,6 +373,71 @@ class Execution(unittest.TestCase):
         # The default must not claim a mock run was the real environment.
         plain = self.exec("add", [1, 2])
         self.assertFalse(plain["isolation"]["mocks"])
+
+    # -- cancellation -----------------------------------------------------
+    def test_sigint_cancels_a_running_call_and_reports_it_as_cancelled(self):
+        # W08 acceptance lists cancellation alongside timeout. The difference
+        # matters: a timeout is a bound Atlas chose, a cancellation is an
+        # operator stopping it, and the record has to say which happened.
+        proc = subprocess.Popen(
+            [str(BIN), "--store", str(self.store), "exec", self.analysis, "spin",
+             "--args", "[1]", "--timeout-ms", "60000"],
+            cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        try:
+            time.sleep(1.5)  # let the child start and enter its loop
+            self.assertIsNone(proc.poll(), "the run must still be going before the signal")
+            proc.send_signal(signal.SIGINT)
+            stdout, stderr = proc.communicate(timeout=30)
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=10)
+        self.assertEqual(proc.returncode, 0, stderr)
+        record = json.loads(stdout)
+        self.assertEqual(record["verdict"], "cancelled")
+        self.assertLess(record["duration_ms"], 20_000, "cancellation must not wait for the loop")
+        self.assertEqual(record["trace"]["events"][-1]["kind"], "cancelled")
+        # The record is published, not discarded: a cancelled run is a fact too.
+        self.cli("exec", self.analysis, "add", "--args", "[1,2]")
+        history = self.cli("exec", self.analysis, "spin", "--history")
+        self.assertIn(record["id"], [item["id"] for item in history["records"]])
+
+    def test_a_cancelled_scenario_stops_instead_of_marching_through_the_cases(self):
+        # Five cases, the first one hangs. After cancellation the remaining
+        # cases must be reported as not attempted rather than as five cancelled
+        # runs, which would read as "we tried them all".
+        path = self.base / "scenario.json"
+        path.write_text(json.dumps({
+            "schema": "atlas.scenario.v1",
+            "name": "cancel-me",
+            "cases": [
+                {"name": "hangs", "args": [1], "expect": {"returns": 0}},
+                {"name": "never-reached", "args": [2], "expect": {"returns": 0}},
+                {"name": "never-reached-2", "args": [3], "expect": {"returns": 0}},
+            ],
+        }), encoding="utf-8")
+        proc = subprocess.Popen(
+            [str(BIN), "--store", str(self.store), "exec", self.analysis, "spin",
+             "--scenario", str(path), "--timeout-ms", "60000"],
+            cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        try:
+            time.sleep(1.5)
+            self.assertIsNone(proc.poll())
+            proc.send_signal(signal.SIGINT)
+            stdout, stderr = proc.communicate(timeout=30)
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=10)
+        self.assertEqual(proc.returncode, 0, stderr)
+        result = json.loads(stdout)
+        self.assertEqual(result["declared_cases"], 3)
+        self.assertEqual(result["stopped"], "cancelled")
+        self.assertLess(result["attempted_cases"], result["declared_cases"],
+                        "unattempted cases must not be counted as attempted")
+        self.assertEqual([case["name"] for case in result["cases"]], ["hangs"])
 
     # -- effect journal ---------------------------------------------------
     def test_a_denied_attempt_is_journalled_with_its_permission_and_target(self):

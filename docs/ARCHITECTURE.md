@@ -123,6 +123,8 @@ worker stdin ≤160 MiB、stdout ≤32 MiB、stderr ≤64 KiB，V8 old-space 为
 
 **Effect journal**：记录只包含运行时明确报告的**拒绝尝试**——Node 把 `permission` 与 `resource` 附在 `ERR_ACCESS_DENIED` 上，这是唯一可得的逐操作证据。被允许的操作没有逐条日志，因此 journal 同时记录授予集合并写明"这不等于没有效果"。空 journal 是"没有拒绝被报告"，不是"没有副作用"。
 
+**取消与超时**：超时是 Atlas 选的界限，取消是操作者做的决定，记录必须能区分（`timeout` vs `cancelled`）。`SIGINT` 触发的取消按进程组 kill 并发布记录——取消的运行同样是事实。scenario 在执行中收到取消会**停止**，剩余用例标为未尝试（`attempted_cases < declared_cases`），不会产生一排"已取消"让人以为每个用例都被试过。
+
 **观测合同**：`trace.coverage = "not_sampled"`，`trace.unknown_paths = "not_observed"`。只记录入口调用的返回/抛出、运行时报告的源码位置（映射回快照的字节偏移）、进程输出与退出状态。没有行级覆盖采样，没有运行期调用图，静态 BFS 不作为执行顺序。
 
 **记录身份**：`exec_records.id = digest(固定问题 + 观测到的答案)`，其中刻意排除耗时与绝对临时路径。因此同一问题得到同一答案就是同一行（可重复运行、可幂等查询），而答案不同会产生第二条记录——两条不同的观测结果，而不是静默覆盖。mock/fixture 运行必须在记录里标为 `isolation.mocks=true`，它的结果不得被读作真实环境观测。

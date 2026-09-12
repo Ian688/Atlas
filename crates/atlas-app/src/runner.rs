@@ -945,10 +945,12 @@ pub async fn run_scenario(
     if cases.is_empty() || cases.len() > 64 {
         return Err("scenario_case_count_out_of_range".into());
     }
+    let total = cases.len();
     let mut results = Vec::new();
     let mut passed = 0usize;
     let mut refused = 0usize;
     let mut failed = 0usize;
+    let mut stopped: Option<String> = None;
     for (index, case) in cases.iter().enumerate() {
         let case_name = case
             .get("name")
@@ -959,8 +961,24 @@ pub async fn run_scenario(
         if let Some(args) = case.get("args").and_then(|v| v.as_array()) {
             spec.args = args.clone();
         }
+        if *cancel.borrow() {
+            // A cancelled scenario must stop, not march through the remaining
+            // cases producing a row of immediately-cancelled entries that make
+            // it look like every case was attempted.
+            stopped = Some("cancelled".into());
+            break;
+        }
         let record = execute(store, &spec, cancel.clone()).await?;
         let verdict = record["verdict"].as_str().unwrap_or("failed").to_string();
+        if verdict == "cancelled" {
+            stopped = Some("cancelled".into());
+            results.push(json!({
+                "name": case_name,
+                "outcome": "cancelled",
+                "record_id": record["id"],
+            }));
+            break;
+        }
         if verdict == "refused" {
             refused += 1;
             results.push(json!({
@@ -994,11 +1012,14 @@ pub async fn run_scenario(
         "analysis_id": base.analysis_id,
         "symbol": base.symbol,
         "name": name,
+        "declared_cases": total,
+        "attempted_cases": results.len(),
+        "stopped": stopped,
         "passed": passed,
         "failed": failed,
         "refused": refused,
         "cases": results,
-        "note": "每个用例都是一次独立的固定执行；refused 表示静态画像拒绝执行，不是断言失败，也不是执行成功。",
+        "note": "每个用例都是一次独立的固定执行；refused 表示静态画像拒绝执行，不是断言失败，也不是执行成功。stopped=cancelled 表示取消后剩余用例没有被尝试，attempted_cases 会小于 declared_cases。",
     }))
 }
 

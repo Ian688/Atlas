@@ -183,3 +183,25 @@ add           denied_count 0 · granted {fs_write:false, child_process:false, ne
 ```
 
 **仍未解决**：journal 回答不了"这次运行真的写了哪些文件"。那需要系统调用级审计（或每类能力的包装层），本切片没有做。
+
+---
+
+## 十、补片（同日）：取消是取消，超时是超时
+
+W08 验收把"循环/取消"和"超时"并列，但它们是两种事实：超时是 Atlas 选的界限，取消是操作者做的决定。
+之前只有超时被测试，取消只是代码里存在。
+
+- `SIGINT` 取消一次受控运行：按进程组 `SIGKILL` 回收子进程，**发布** `verdict=cancelled` 的记录（取消的运行同样是事实，不丢弃），CLI 退出码 0。
+- 记录里 `timeout` 与 `cancelled` 是不同 verdict，`trace.events` 最后一条分别是 `timeout` / `cancelled`。
+- **scenario 收到取消即停止**：之前会继续把剩余用例一个个跑成"已取消"，看起来像每个用例都被尝试过。
+  现在 `stopped: "cancelled"`，并且 `declared_cases` 与 `attempted_cases` 分开报告，测试断言后者严格小于前者。
+
+实测（真实 SIGINT）：
+
+```
+atlas exec <id> spin --args [1] --timeout-ms 60000   → SIGINT 1.5s 后
+  verdict=cancelled · 事件 timeout? 否 / cancelled 是 · CLI 退出码 0
+  spin 的记录可通过 atlas exec <id> spin --history 取回
+scenario（3 个用例，第 1 个挂住）→ SIGINT
+  declared_cases=3 · attempted_cases=1 · stopped=cancelled · cases=["hangs"]
+```
