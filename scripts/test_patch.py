@@ -393,21 +393,33 @@ class Cli(Base):
         proposal = self.propose()["proposal"]
         self.cli("patch", "verify", proposal["id"])
         lock = self.project / ".atlas-apply.lock"
-        # A lock left by a crash, and no way to clear it -- until now, and never
-        # silently: the command reports who held it.
-        lock.write_text("dead-process\n", encoding="utf-8")
+        now_ms = int(time.time() * 1000)
+
+        # A *fresh* lock is not cleared: it may belong to a run that is still
+        # writing, and age is the only evidence there is.
+        lock.write_text(f"live-run\n{now_ms}\n", encoding="utf-8")
+        fresh = self.cli_failure("patch", "unlock", "--target", self.project)
+        self.assertIn("lock_not_stale", fresh.stderr)
+        self.assertTrue(lock.exists(), "a refused unlock must not remove the lock")
+        self.assertIn("apply_lock_held",
+                      self.cli_failure("patch", "apply", proposal["id"], "--target", self.project).stderr)
+        # The operator can insist, and then the unknown-or-young age is reported
+        # rather than assumed.
+        self.assertTrue(self.cli("patch", "unlock", "--target", self.project, "--force")["removed"])
+
+        # A lock old enough to be abandoned is cleared without an override, and
+        # the holder is reported because after the removal that line is the only
+        # record.
+        lock.write_text(f"dead-process\n{now_ms - 600_000}\n", encoding="utf-8")
         result = self.cli("patch", "unlock", "--target", self.project)
         self.assertTrue(result["removed"])
         self.assertEqual(result["holder"], "dead-process")
-        # This lock file has no timestamp line (it was written by hand), and the
-        # answer says so instead of inventing a time.
-        self.assertIsNone(result["since_ms"])
-        self.assertEqual(result["since_unknown"], "lock_file_has_no_timestamp")
         self.assertFalse(lock.exists())
-        # Clearing a lock that is not there is an error, not a silent success:
-        # a typo'd directory must not look like a cleanup.
-        missing = self.cli_failure("patch", "unlock", "--target", self.project)
-        self.assertIn("no_apply_lock", missing.stderr)
+
+        # Clearing a lock that is not there is an error, not a silent success: a
+        # typo'd directory must not look like a cleanup.
+        self.assertIn("no_apply_lock",
+                      self.cli_failure("patch", "unlock", "--target", self.project).stderr)
         # And the proposal can now be applied, so the unlock really unblocked it.
         self.assertEqual(self.cli("patch", "apply", proposal["id"], "--target", self.project)["state"],
                          "applied")

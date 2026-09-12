@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-lock-timestamp",
+    "window": "2026-09-12/w09-unlock-age-guard",
     "status": "DELIVERED",
-    "note": "锁文件记录取锁时刻：拒绝与解锁都报出 holder 与 since_ms；旧格式缺时间戳时如实报 unknown。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-lock-timestamp",
-    "verification": "evidence/development/2026-09-12-w09-lock-timestamp/verification.json"
+    "note": "patch unlock 默认只清理足够老的锁（--stale-after 默认 300s）；年轻或时间未知的锁必须 --force 才能清，避免把仍在写入的锁清掉。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-unlock-age-guard",
+    "verification": "evidence/development/2026-09-12-w09-unlock-age-guard/verification.json"
   },
   "windows": [
     {
@@ -409,10 +409,19 @@
       ],
       "note": "锁文件第二行写入取锁毫秒时间戳：apply_lock_held 拒绝消息带 since_ms，patch unlock 报出 since_ms，旧格式缺时间戳时报 since_ms=null + since_unknown=lock_file_has_no_timestamp（不猜）。patch 用例 43->44。",
       "report": "evidence/development/2026-09-12-w09-lock-timestamp/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/w09-unlock-age-guard",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09-unlock-age-guard"
+      ],
+      "note": "清锁加年龄门：patch unlock --stale-after（默认 300s）只清理达到该年龄的锁，年轻或时间未知的锁以 lock_not_stale:<path>:holder=...:age_ms=...:use --force 拒绝；--force 是唯一越过方式，并且仍然报出（可能为 unknown 的）年龄而不猜。用例：新鲜锁被拒且 apply 仍被挡 → --force 清除 → 10 分钟前的锁无需 --force 清除并报出持有者 → 无锁时报 no_apply_lock → 提案随后可 apply。",
+      "report": "evidence/development/2026-09-12-w09-unlock-age-guard/REPORT.md"
     }
   ],
   "next_work_item": "2D 画布的正式层级与空间索引，或大仓库/monorepo 的规模资格",
-  "next_action": "本轮交付锁时间戳（W09）。剩余按价值：(1) 2D 画布的正式层级与空间索引；(2) 大仓库/monorepo 的规模资格；(3) 合并与逐文件备份；(4) 行级/调用级采样（城市运行路径）;(5) Modus 宿主侧 E2E（环境性阻塞）。",
+  "next_action": "本轮交付清锁的年龄门（W09）。剩余按价值：(1) 2D 画布的正式层级与空间索引；(2) 大仓库/monorepo 的规模资格；(3) 合并与逐文件备份；(4) 行级/调用级采样；(5) Modus 宿主侧 E2E（环境性阻塞）。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
@@ -879,7 +888,8 @@
         "补丁三种形式：PatchForm=modify|create|delete，由 `--- /dev/null` / `+++ /dev/null` 声明、由 hunks 复核（create 不得含上下文/删除行、delete 不得留下行、两侧表头必须一致）；删除与「编辑成空文件」分开（PatchOutcome.files 与 deleted 分开，记录带 form 与 removed_digest）；apply/revert 按形式各自校验（create 要求路径为空、modify/delete 要求仍是钉住字节、revert create 删掉文件、revert delete 按钉住字节恢复且要求路径仍为空 target_recreated_since_delete）；同一路径在一条 diff 里出现两次被拒；git rename 具名拒绝 rename_not_expressible_in_unified_diff；新建提案的 entity 可以是不存在的路径（resolve_proposal_entity 只在 diff 真的新建它时接受），提案写 target_exists=false；隔离验证副本按 outcome 组装（新建写入、删除不写）",
         "图形化一键撤销（带显式写边界）：atlas serve --allow-writes <DIR> 才开放 POST /api/patch/apply|revert，不带则 403 http_writes_disabled 且请求无法打开；目录在启动时 canonicalize 一次，请求体没有 target/root 字段（注入不读），必须逐字回显 confirm_path 否则 400 confirmation_mismatch 且不写任何文件；revert 只撤销记录里那个目录（revert_target_is_not_this_checkout）；HTTP 与 CLI 共用 patchwork::apply_proposal/revert_proposal 同一段写入代码；记录写明 applied_by:<actor>（HTTP 用会话身份）；契约增加 writes{enabled,root,how_to_enable,scope}，页面据它显示按钮并显示将写入的目录",
         "apply/revert 全程持有检出目录锁 .atlas-apply.lock（create_new；文件内写持有者身份；apply_lock_held 拒绝；guard drop 在所有错误路径上释放），消除「两个进程都通过字节校验再都写」的窗口；撤销来源是内容寻址的钉住 blob（无额外磁盘备份），仍无合并",
-        "检出错文件里同时记持有者与取锁时刻（毫秒）：被挡住时拒绝信息给出 holder 与 since_ms，解锁命令报出 since_ms；旧格式（只有持有者）如实报 since_ms=null + since_unknown=lock_file_has_no_timestamp，不猜时间"
+        "检出错文件里同时记持有者与取锁时刻（毫秒）：被挡住时拒绝信息给出 holder 与 since_ms，解锁命令报出 since_ms；旧格式（只有持有者）如实报 since_ms=null + since_unknown=lock_file_has_no_timestamp，不猜时间",
+        "patch unlock 的年龄门：--stale-after（默认 300s）只清理达到该年龄的锁，年轻或时间未知时必须 --force；被拒绝时报 lock_not_stale 并给出 holder/age_ms（未知即 unknown）"
       ],
       "evidence": [
         "crates/atlas-engine/src/patch.rs（11 个 diff 单测 + 提案存储与状态迁移）",

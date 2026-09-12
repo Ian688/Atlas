@@ -319,6 +319,14 @@ enum PatchAction {
         /// The checkout whose lock should be removed.
         #[arg(long)]
         target: PathBuf,
+        /// Refuse unless the lock is at least this many seconds old. A lock
+        /// younger than this may belong to a run that is still writing.
+        #[arg(long, default_value_t = 300)]
+        stale_after: u64,
+        /// Clear the lock even if it is younger than `--stale-after` (or has no
+        /// recorded time). This is the only way past the age check.
+        #[arg(long)]
+        force: bool,
     },
     List {
         analysis: String,
@@ -1815,7 +1823,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let proposal = store.patch_proposal(&id)?;
                 print(patchwork::revert_proposal(&store, &proposal, "cli")?)?
             }
-            PatchAction::Unlock { target } => {
+            PatchAction::Unlock {
+                target,
+                stale_after,
+                force,
+            } => {
                 let target = target.canonicalize()?;
                 let path = target.join(patch::APPLY_LOCK_FILE);
                 if !path.exists() {
@@ -1829,6 +1841,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let since_ms = lines
                     .next()
                     .and_then(|value| value.trim().parse::<i64>().ok());
+                // Clearing a lock that belongs to a run which is still writing
+                // would put two writers back in the same checkout, which is what
+                // the lock exists to prevent. Age is the only evidence available,
+                // so a young lock -- or one whose age is unknown -- has to be
+                // overridden explicitly.
+                let age_ms = since_ms.map(|since| crate::job::now_ms() - since);
+                let stale = age_ms.is_some_and(|age| age >= (stale_after as i64) * 1000);
+                if !force && !stale {
+                    return Err(format!(
+                        "lock_not_stale:{}:holder={}:age_ms={}:stale_after_s={stale_after}:use --force to clear a lock that may still be held",
+                        path.display(),
+                        holder,
+                        age_ms.map(|age| age.to_string()).unwrap_or_else(|| "unknown".into())
+                    )
+                    .into());
+                }
                 std::fs::remove_file(&path)?;
                 print(json!({
                     "removed": true,
