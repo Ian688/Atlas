@@ -13,7 +13,7 @@
 
 ## 当前可依赖的事实
 
-- 有独立 Rust/Node/SQLite/CLI/HTTP/Web 链路。旧 Modus code-atlas 未迁移、未接入新服务。
+- 有独立 Rust/Node/SQLite/CLI/HTTP/Web 链路。旧 Modus code-atlas **未迁移、未接入新服务**：本切片只交付了宿主接缝（合同即数据 + 参考客户端 + 无存储访问检查）；切换入口需要宿主侧 E2E，而 Modus 检出不在本工作区，无法验证，因此没有切换。
 - 静态能力是函数结构与词法候选，加上 0.2 的声明 profile 内局部语义：worker Flow IR → Rust CFG（finally completion/短路/循环/switch）→ 局部抽象解释（def-use、值来源、有限常量折叠、循环不动点、显式 unknown 与预算）。CLI `flows`/`flow` 与 HTTP `/api/flows`、`/api/flow` 已接通，函数面板消费同一事实。跨过程符号摘要（调用点代回、SCC 固定点）已接通并有 D13/D14/D15/D17 反例；有界标量参数 k=1 上下文已接通（每 callee 至多 8 个调用点）；完整堆/闭包上下文、堆别名精度与真实执行仍是目标。
 - 索引全链协作取消、发布事务取消门与共享求解预算已接通；`flow.frontier`、调用点 unknown 与计数是部分结果的查询合同。
 - 有界分页/遍历、快照源码和 SelectionContext 可用；持久作业身份/幂等/租约/崩溃收割/优先级队列与增量失效已接通（W06/W07 仍 PARTIAL）。正式工具注册/MCP、回执与可控 target runner 中的**场景驱动**（业务步骤、入口动作、依赖切片）仍未实现。

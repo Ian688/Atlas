@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-ai-coding-chain",
+    "window": "2026-09-12/w10-host-seam",
     "status": "DELIVERED",
-    "note": "AI Coding 第一条完整链接通（propose→verify→apply/revert），包含图差异与 Observed 测试证据；缺 Web 审阅界面与持久作业化。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-ai-coding",
-    "verification": "evidence/development/2026-09-12-w09-ai-coding/verification.json"
+    "note": "宿主接缝：合同即数据 + 参考客户端 + 无存储访问与不泄露布局的可执行检查 + 宿主 E2E；旧 Modus 入口按可验证性理由未切换。",
+    "evidence_dir": "evidence/development/2026-09-12-w10",
+    "verification": "evidence/development/2026-09-12-w10/verification.json"
   },
   "windows": [
     {
@@ -173,10 +173,23 @@
       ],
       "note": "AI Coding 第一条完整链接通：diff 对固定快照字节校验（不匹配即带行拒绝，无模糊匹配）、隔离副本重新索引派生新 analysis、图差异按 path+name 配对、声明的 argv 测试作为 Observed 证据、apply/revert 带字节漂移校验与单向状态机。Intent/Static/Observed 分开存放。",
       "report": "evidence/development/2026-09-12-w09-ai-coding/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/w10-host-seam",
+      "status": "DELIVERED",
+      "work_items": [
+        "W10-host-contract-as-data",
+        "W10-reference-host-client",
+        "W10-no-storage-access-check",
+        "W10-host-e2e",
+        "W10-migration-and-rollback-boundary"
+      ],
+      "note": "宿主接缝接通：合同作为数据发布（GET /api/contract），参考宿主客户端只拿 {url,token}，测试断言适配器源码无任何存储访问、contract 不含 store 路径、非回环 host 被拒。Modus 旧入口未切换：宿主检出不在本工作区，无法做宿主侧 E2E，回退边界与切换前置条件已写进 docs/HOST_API.md。",
+      "report": "evidence/development/2026-09-12-w10/REPORT.md"
     }
   ],
-  "next_work_item": "W10：Modus 接缝与旧实现退役（宿主调用服务而非读数据库）",
-  "next_action": "W09 的两片（共享选区/有界桥接 + AI Coding 补丁链）都已接通并纳入验证门。下一步是 W10：给宿主一个只通过服务接口工作的接缝——CLI/HTTP 合同稳定化、宿主不读 Atlas 数据库、真实 E2E（宿主→服务→事实→回执）与迁移/回退边界写清楚。之后仍待补：patch verify 进持久作业队列、Web 审阅界面、needs_context 上下文合成、Effect journal、依赖切片、owner 认证与服务端权限验证、真实大仓库资格。",
+  "next_work_item": "宿主侧 E2E 与旧入口切换（需要 Modus 检出）；或回到 W08/W09 的深化项",
+  "next_action": "W00–W10 的每一项目前都至少有一个真实纵向切片并纳入验证门。剩下的不是'没开始'，而是三类：(1) 需要本工作区之外的宿主检出才能做的 W10 宿主侧 E2E 与旧入口切换；(2) 明确登记的能力缺口：needs_context 上下文合成、Effect journal、依赖切片、行级覆盖与运行期调用图、owner 认证与服务端权限验证、patch verify 进持久作业队列与 Web 审阅界面、LOD 与 Run 图例；(3) 资格类工作：真实大仓库/多语言/并发/Windows 基准、断电耐久、迁移与回滚方案。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
@@ -631,13 +644,40 @@
       "contract_refs": [
         "HI"
       ],
-      "implementation": "NOT_IMPLEMENTED",
-      "automated_checks": "NOT_RUN",
+      "implementation": "PARTIAL",
+      "automated_checks": "PASS",
       "qualification": "NOT_QUALIFIED",
-      "review_status": "NOT_REQUESTED",
-      "features": [],
-      "evidence": [],
-      "blockers": []
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "features": [
+        "合同即数据：GET /api/contract 返回 atlas.host-contract.v1，逐条列出接口名/方法/传输方式(http|cli)/用途/保证/限制，与实现同源",
+        "宿主规则写进合同：宿主经接口工作不读存储；写操作都在 Atlas 内部；未解析/未知/截断必须原样呈现；候选/推导/观测三类证据必须能分辨",
+        "参考宿主客户端 adapters/modus/atlas_host_client.mjs：只接受 {url,token}，无第三方依赖，只映射已发布接口",
+        "无存储访问是可检查的：测试读适配器源码断言不含 rusqlite/sqlite/atlas.db/blobs/node:fs/readFile 等访问；构造函数不接受 store 路径",
+        "令牌不外送：适配器拒绝非 http 与非回环 host；错误令牌返回 401 并抛错而不是静默返回空",
+        "真实宿主 E2E：宿主经适配器取 report/nodes/flow/source/profile、导出 context、钉选区、登记 Intent、入队并执行有界动作、计划并执行一次受控调用；断言观测边界字段可见",
+        "合同不泄露存储布局：测试断言 contract 响应里不出现 store 路径或 atlas.db",
+        "HTTP 查询引用形式与 CLI 一致：flow/source/reach/context 接受符号 id、path:name 或裸名，只在当前分析内解析，解析不到即报错",
+        "POST /api/context 同时接受查询参数与 JSON body（body 优先），并把这条规则写进合同，而不是留给实现顺序决定",
+        "迁移与回退边界文档化（docs/HOST_API.md）：旧入口未切换及其理由、增量迁移的 6 步前置条件、回退=停止调用适配器"
+      ],
+      "evidence": [
+        "crates/atlas-app/src/server.rs（CONTRACT 表与 /api/contract）",
+        "adapters/modus/atlas_host_client.mjs",
+        "scripts/test_host_adapter.py（7 个用例：无存储访问、合同覆盖、E2E、桥接、受控调用、不泄露布局、需要会话）",
+        "docs/HOST_API.md",
+        "evidence/development/2026-09-12-w10/verification.json"
+      ],
+      "blockers": [
+        "Modus 旧入口未切换：宿主检出不在本工作区，既不能构建也不能测试宿主侧，因此切换无法验证。前置条件与回退步骤已写在 docs/HOST_API.md，但宿主侧 E2E 未运行",
+        "没有宿主内嵌的适配器包、没有服务发现/自动升级、没有远程或多租户认证，也没有多版本并存协商",
+        "合同是当前接口的快照式声明：没有机器可校验的 schema（无 JSON Schema/OpenAPI），字段变化靠测试断言而非类型校验",
+        "适配器只覆盖 HTTP 面；patch 链只有 CLI 面，宿主若要用补丁链必须自己起子进程"
+      ],
+      "independent_review": {
+        "id": "pending",
+        "findings": [],
+        "note": "W10 首片待独立复审。"
+      }
     }
   ],
   "independent_reviews": [

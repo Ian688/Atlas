@@ -75,19 +75,37 @@ async fn query(
                 q.cursor.as_deref(),
             )?)
             .map_err(Into::into),
-            "reach" => serde_json::to_value(app.store.reachable(
-                id,
-                q.entity.as_deref().unwrap_or(""),
-                q.direction.as_deref().unwrap_or("out"),
-                100,
-                400,
-            )?)
-            .map_err(Into::into),
-            "source" => app
-                .store
-                .source(id, q.entity.as_deref().unwrap_or(""), 16000),
-            "context" => app.store.context(id, q.entity.as_deref().unwrap_or("")),
-            "flow" => app.store.flow_fact(id, q.entity.as_deref().unwrap_or("")),
+            // Query endpoints accept the same reference forms as the CLI -- a
+            // symbol id, `path:name` or a bare name -- resolved under this
+            // analysis only. Requiring a raw id here but not on the CLI made
+            // the HTTP surface the awkward one for no benefit.
+            "reach" => {
+                let entity = crate::runner::resolve_entity(&app.store, id, q.entity.as_deref().unwrap_or(""))
+                    .map_err(|error| atlas_engine::invalid(&error))?;
+                serde_json::to_value(app.store.reachable(
+                    id,
+                    &entity,
+                    q.direction.as_deref().unwrap_or("out"),
+                    100,
+                    400,
+                )?)
+                .map_err(Into::into)
+            }
+            "source" => {
+                let entity = crate::runner::resolve_entity(&app.store, id, q.entity.as_deref().unwrap_or(""))
+                    .map_err(|error| atlas_engine::invalid(&error))?;
+                app.store.source(id, &entity, 16000)
+            }
+            "context" => {
+                let entity = crate::runner::resolve_entity(&app.store, id, q.entity.as_deref().unwrap_or(""))
+                    .map_err(|error| atlas_engine::invalid(&error))?;
+                app.store.context(id, &entity)
+            }
+            "flow" => {
+                let entity = crate::runner::resolve_symbol(&app.store, id, q.entity.as_deref().unwrap_or(""))
+                    .map_err(|error| atlas_engine::invalid(&error))?;
+                app.store.flow_fact(id, &entity)
+            }
             "flows" => serde_json::to_value(app.store.flow_symbols(
                 id,
                 q.limit.unwrap_or(100),
@@ -186,7 +204,48 @@ endpoint!(nodes, "nodes");
 endpoint!(edges, "edges");
 endpoint!(reach, "reach");
 endpoint!(source, "source");
-endpoint!(context, "context");
+
+/// `POST /api/context` accepts the entity as a query parameter (what the local
+/// page sends) or as a JSON body (what a host client naturally sends). Both
+/// resolve the same way; the body wins when both are present, and that rule is
+/// written down here rather than left to whichever path ran first.
+#[derive(Deserialize)]
+struct ContextBody {
+    entity: Option<String>,
+}
+
+async fn context_endpoint(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Query(query): Query<Request>,
+    body: Option<axum::Json<ContextBody>>,
+) -> Response {
+    if !allowed(&app, &headers) {
+        return (StatusCode::UNAUTHORIZED, "local session required").into_response();
+    }
+    let reference = body
+        .and_then(|axum::Json(body)| body.entity)
+        .or(query.entity)
+        .unwrap_or_default();
+    let entity = match crate::runner::resolve_entity(&app.store, &app.analysis, &reference) {
+        Ok(entity) => entity,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({"error": error})),
+            )
+                .into_response();
+        }
+    };
+    match app.store.context(&app.analysis, &entity) {
+        Ok(value) => axum::Json(value).into_response(),
+        Err(_) => (
+            StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({"error": "invalid_or_unavailable_query"})),
+        )
+            .into_response(),
+    }
+}
 endpoint!(flow, "flow");
 endpoint!(flows, "flows");
 endpoint!(profile, "profile");
@@ -500,6 +559,250 @@ async fn exec(
     }
 }
 
+/// The host-facing contract, as data.
+///
+/// A host integration is only a seam if both sides can see the same list. This
+/// table is the list: every entry names its transport, what it guarantees, and
+/// what it does not. `scripts/test_host_adapter.py` reads it back and fails if
+/// the adapter uses something that is not here, so the adapter cannot quietly
+/// grow a dependency the service does not promise.
+///
+/// (name, method, transport, purpose, guarantee, limit)
+const CONTRACT: &[(&str, &str, &str, &str, &str, &str)] = &[
+    (
+        "contract",
+        "GET",
+        "http",
+        "这份接口清单本身",
+        "与实现同源，因此不会与实现漂移",
+        "只描述接口，不构成产品验收",
+    ),
+    (
+        "report",
+        "GET",
+        "http",
+        "固定分析版本的元数据",
+        "同一 analysis id 内容不可变",
+        "只反映已发布的那个版本",
+    ),
+    (
+        "nodes",
+        "GET",
+        "http",
+        "分页读取对象",
+        "快照内对象与版本绑定",
+        "单页上限 500",
+    ),
+    (
+        "edges",
+        "GET",
+        "http",
+        "分页读取调用候选",
+        "未解析目标以 target=null 保留，不丢弃",
+        "单页上限 500",
+    ),
+    (
+        "reach",
+        "GET",
+        "http",
+        "有界多跳遍历",
+        "显式 frontier 与 truncated",
+        "预算内结果，不是执行顺序",
+    ),
+    (
+        "flow",
+        "GET",
+        "http",
+        "一个函数的 CFG/值来源/未知",
+        "显式 unknown 与预算计数",
+        "声明 profile 内的静态推导",
+    ),
+    (
+        "flows",
+        "GET",
+        "http",
+        "分页列出有 flow 事实的符号",
+        "与 flow 同源",
+        "单页上限 500",
+    ),
+    (
+        "source",
+        "GET",
+        "http",
+        "读取快照源码窗口",
+        "字节来自不可变快照，读取时校验哈希",
+        "单次上限 65536 字节",
+    ),
+    (
+        "context",
+        "POST",
+        "http",
+        "固定选区上下文导出",
+        "内容寻址、可重复取回",
+        "entity 可用查询参数或 JSON body 提供，body 优先；不自动发送给任何模型",
+    ),
+    (
+        "profile",
+        "GET",
+        "http",
+        "执行充分性分类",
+        "每条理由带 evidence 字段",
+        "静态分类，不是执行结果",
+    ),
+    (
+        "exec-records",
+        "GET",
+        "http",
+        "已发布的受控执行记录",
+        "记录不可变，身份=问题+答案",
+        "不含耗时与临时路径于身份",
+    ),
+    (
+        "exec",
+        "POST",
+        "http",
+        "隔离受控执行一次固定调用",
+        "Node 权限模型强制，探针验证",
+        "页面不能放宽沙箱；超时上限 30s",
+    ),
+    (
+        "selection",
+        "GET",
+        "http",
+        "钉定选区（实体+分析版本）",
+        "版本相同是可判定的等式",
+        "跨版本由调用方拒绝，不重指",
+    ),
+    (
+        "annotations",
+        "GET",
+        "http",
+        "读取 Intent 注解",
+        "exists 恒为 false",
+        "声明，不是事实",
+    ),
+    (
+        "annotation",
+        "POST",
+        "http",
+        "登记一条 Intent",
+        "内容寻址、幂等",
+        "不写源码",
+    ),
+    (
+        "agent/requests",
+        "GET",
+        "http",
+        "读取桥接请求队列",
+        "终态与 terminal_reason 落库",
+        "单页上限 200",
+    ),
+    (
+        "agent/request",
+        "POST",
+        "http",
+        "入队一个有界请求",
+        "越界动作在入队时即被拒绝并记录",
+        "analysis 由服务端钉定",
+    ),
+    (
+        "agent/work",
+        "POST",
+        "http",
+        "执行队列中的有界动作",
+        "只做 inspect/annotate/propose_patch",
+        "单次最多 32 个",
+    ),
+    (
+        "patch propose",
+        "CLI",
+        "cli",
+        "把统一 diff 登记为提案并对固定快照校验",
+        "不匹配即带行拒绝",
+        "仅统一 diff，不支持新建/删除文件",
+    ),
+    (
+        "patch verify",
+        "CLI",
+        "cli",
+        "隔离副本重新索引 + 图差异 + 声明的 argv 测试",
+        "用户检出目录零改动",
+        "前台执行，尚未进作业队列",
+    ),
+    (
+        "patch apply",
+        "CLI",
+        "cli",
+        "把已验证字节写入检出目录",
+        "目标字节漂移即拒绝",
+        "无备份/无合并/无文件锁",
+    ),
+    (
+        "patch revert",
+        "CLI",
+        "cli",
+        "恢复固定快照字节",
+        "apply 之后被修改即拒绝",
+        "同上",
+    ),
+];
+
+fn contract(analysis: &str) -> serde_json::Value {
+    let endpoints: Vec<serde_json::Value> = CONTRACT
+        .iter()
+        .map(|(name, method, transport, purpose, guarantee, limit)| {
+            serde_json::json!({
+                "name": name, "method": method, "transport": transport,
+                "purpose": purpose, "guarantee": guarantee, "limit": limit,
+            })
+        })
+        .collect();
+    serde_json::json!({
+        "schema": "atlas.host-contract.v1",
+        "analysis_id": analysis,
+        "engine": atlas_contract::ENGINE_VERSION,
+        "transport": {
+            "http": "loopback only; Bearer session token; Host must match; Origin, when present, must match",
+            "cli": "local process; exit code is the verdict, stdout is JSON",
+        },
+        "endpoints": endpoints,
+        "host_rules": [
+            "宿主通过这个接口工作，不读取 Atlas 的存储文件；存储布局不是合同的一部分。",
+            "任何写操作都在 Atlas 内部完成，宿主不直接改 Atlas 的数据。",
+            "未解析、未知与截断必须原样呈现给最终用户，不能因为界面上不好看而丢掉。",
+            "静态候选、静态推导与执行观测是三类证据，展示时必须能分辨。",
+        ],
+        "qualification": "只描述本服务当前的接口；不构成完整 AL/ET/GE/MT/HI/DV 或成熟产品验收。",
+    })
+}
+
+#[derive(Deserialize)]
+struct ContractQuery {
+    transport: Option<String>,
+}
+
+async fn contract_endpoint(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Query(query): Query<ContractQuery>,
+) -> Response {
+    if !allowed(&app, &headers) {
+        return (StatusCode::UNAUTHORIZED, "local session required").into_response();
+    }
+    let mut value = contract(&app.analysis);
+    if let Some(transport) = query.transport.as_deref()
+        && let Some(list) = value["endpoints"].as_array()
+    {
+        let filtered: Vec<serde_json::Value> = list
+            .iter()
+            .filter(|entry| entry["transport"].as_str() == Some(transport))
+            .cloned()
+            .collect();
+        value["endpoints"] = serde_json::Value::Array(filtered);
+    }
+    axum::Json(value).into_response()
+}
+
 fn asset(content: &'static str, mime: &'static str) -> Response {
     ([(header::CONTENT_TYPE,mime),(header::CACHE_CONTROL,"no-store"),(header::CONTENT_SECURITY_POLICY,"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"),(header::X_CONTENT_TYPE_OPTIONS,"nosniff")],content).into_response()
 }
@@ -595,7 +898,7 @@ pub async fn serve(
         .route("/api/edges", get(edges))
         .route("/api/reach", get(reach))
         .route("/api/source", get(source))
-        .route("/api/context", post(context))
+        .route("/api/context", post(context_endpoint))
         .route("/api/flow", get(flow))
         .route("/api/flows", get(flows))
         .route("/api/profile", get(profile))
@@ -607,6 +910,9 @@ pub async fn serve(
         .route("/api/agent/requests", get(agent_requests))
         .route("/api/agent/request", post(agent_request))
         .route("/api/agent/work", post(agent_work))
+        // The seam, published as data so a host integration can be checked
+        // against it instead of against prose.
+        .route("/api/contract", get(contract_endpoint))
         .with_state(app);
     axum::serve(listener, router)
         .with_graceful_shutdown(async {

@@ -59,6 +59,7 @@ target/debug/atlas --store local-state serve <上一步返回的id>
 |---|---|
 | [架构与算法](docs/ARCHITECTURE.md) | 当前实现、关键不变量、算法边界、完整演进方向 |
 | [下一 Agent 任务书](docs/HANDOFF.md) | 可执行接力顺序、验收、缺口与禁止虚报的边界 |
+| [宿主接缝](docs/HOST_API.md) | 宿主如何只通过接口工作、必须原样呈现什么、迁移与回退边界 |
 | [独立工程决策](docs/adr-0001-independent-foundation.md) | 为什么新建同级仓库，如何逐步替换旧集成 |
 | [完整规格快照](docs/specs/README.md) | 原有六份完整设计与适用范围 |
 | [验证记录](evidence/foundation/verification.json) | 命令、退出码、版本、源码指纹与资格限制 |
@@ -81,6 +82,7 @@ python3 scripts/test_semantic_contracts.py
 python3 scripts/test_execution.py
 python3 scripts/test_bridge.py
 python3 scripts/test_patch.py
+python3 scripts/test_host_adapter.py
 node examples/calculator/demo.mjs
 node web/tests/app.behavior.test.mjs
 node web/tests/city3d.behavior.test.mjs

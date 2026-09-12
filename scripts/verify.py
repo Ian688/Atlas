@@ -47,6 +47,10 @@ CHECKS = [
     # an unapplicable diff, a checkout that moved after review, a test that
     # never ran being read as a pass.
     ("patch", [sys.executable, "scripts/test_patch.py"]),
+    # The host seam. The check that matters is structural: a host integration
+    # that reads Atlas' store would be coupled to a layout the contract
+    # explicitly does not promise.
+    ("host-adapter", [sys.executable, "scripts/test_host_adapter.py"]),
     ("calculator", ["node", "examples/calculator/demo.mjs"]),
     ("web-syntax", ["node", "--check", "web/app.js"]),
     ("city3d-syntax", ["node", "--check", "web/city3d.js"]),

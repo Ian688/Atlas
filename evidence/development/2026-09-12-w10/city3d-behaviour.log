@@ -1,0 +1,16 @@
+ok   loading the module performs no query and needs no GPU
+ok   districts are the top-level directories, and root files get their own
+ok   column height follows the engine count, and missing slabs are reported
+ok   an unresolved call becomes a visible stub, never a dropped edge
+ok   calls are aggregated per file pair, and self-calls are not drawn
+ok   every cap is reported instead of quietly shrinking the picture
+ok   the layout is deterministic and columns never overlap
+ok   a file that was never analysed is not drawn as an analysed one
+ok   an empty analysis produces an empty city, not a broken one
+ok   picking agrees with the camera the city was drawn with
+ok   without WebGL2 it says so rather than showing an empty stage
+ok   a shared selection resolves to the column that really holds that entity
+ok   a selection from another analysis is refused with its version named
+ok   a selection for an entity this projection does not have is refused, not approximated
+
+all 14 city3d checks passed

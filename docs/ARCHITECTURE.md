@@ -143,6 +143,19 @@ worker stdin ≤160 MiB、stdout ≤32 MiB、stderr ≤64 KiB，V8 old-space 为
 
 **仍未实现**：把 verify 放进持久作业队列（目前是前台 CLI）、Web 侧的提案审阅界面、以及除统一 diff 之外的建议形式（新建/删除文件、重命名）。
 
+### 7.4 宿主接缝（W10 首片）
+
+合同有**可执行版本**：`GET /api/contract` 返回 `atlas.host-contract.v1`，逐条列出接口名、传输方式（`http`/`cli`）、
+用途、保证与限制，以及四条宿主规则。`adapters/modus/atlas_host_client.mjs` 是参考宿主客户端，只接受 `{url, token}`。
+
+**宿主不读 Atlas 存储**这条规则有可执行检查，不是文档约定：测试读适配器源码断言其中没有任何存储访问
+（`rusqlite`/`sqlite`/`atlas.db`/`blobs/`/`node:fs`/`readFile`），断言 contract 响应里不出现 store 路径或 `atlas.db`，
+并在 E2E 中只把 URL 与令牌交给适配器。适配器还会拒绝非回环 host——本地会话令牌不该被送到别的机器。
+
+`docs/HOST_API.md` 写明迁移与回退边界：**本切片没有切换 Modus 旧入口**，因为 Modus 检出不在本工作区，
+在这里既不能构建也不能测试宿主侧；切换一个无法验证的入口等于把声明当成结果。迁移是增量的，
+回退等于"停止调用适配器"，因为适配器从不写宿主的数据、也不要求宿主迁移任何东西。
+
 ## 8. 接下来构建的实际子系统
 
 以下为设计要求。"语言中立流 IR"与"本地数据流"在 0.2 已有 JS/TS 声明 profile 内的首个纵向切片（见第 5 节），其余能力与下表完整方向仍是目标，不添加空方法冒充可调用能力。
@@ -154,8 +167,9 @@ worker stdin ≤160 MiB、stdout ≤32 MiB、stderr ≤64 KiB，V8 old-space 为
 | 跨过程 | SCC 调度摘要固定点、参数→返回/副作用、递归稳定条件、上下文敏感预算 | 不复用“多跳 BFS 完成”冒充摘要求解 |
 | 执行画像与测试（0.2/W08：静态分类 + 隔离受控调用已接通；fixtures 只是声明标签） | pure/contextual/entry-only/unsupported 分类、fixtures、依赖切片、mock 和真依赖来源、RunSpec、Effect journal | 只在新的受控 Runner 中执行，经权限与执行环境合同；上下文合成、Effect journal 与依赖切片仍未实现 |
 | 场景与真实 Trace（0.2/W08：RunSpec + scenario 断言 + 入口观测已接通） | 用户业务步骤→入口/动作/断言；执行、source map、事件排序/因果链；未覆盖支路与丢失事件显式 | Observation 与 Static/Intent 分库或强类型隔离，不能凭颜色等价；行级覆盖与因果链仍未实现 |
-| 选区与 Agent Bridge | 稳定选区/标注、版本、最小披露、请求队列、租约/ACK、可恢复状态、宿主能力协商 | 当前导出 Context 是前置材料，不是双向对话集成 |
-| AI Coding | 意图占位→提议→补丁→隔离工作区验证→重新解析→图 diff→应用/撤销；冲突和旧版本拒绝 | 模型输出无法直接写事实；先更新源码再派生 Actual |
+| 选区与 Agent Bridge（0.2/W09：共享选区带版本、跨版本拒绝、有界桥接已接通） | 稳定选区/标注、版本、最小披露、请求队列、租约/ACK、可恢复状态、宿主能力协商 | 选区只在同一 analysis 内互通；跨版本是拒绝而非重定位；owner 未认证；最小披露裁剪未做 |
+| AI Coding（0.2/W09：propose→隔离 verify→图 diff→apply/revert 已接通） | 意图占位→提议→补丁→隔离工作区验证→重新解析→图 diff→应用/撤销；冲突和旧版本拒绝 | 只支持统一 diff；verify 未进持久作业队列；无 Web 审阅界面；apply 无备份/合并/文件锁 |
+| 宿主接缝（0.2/W10：合同即数据 + 参考客户端 + 无存储访问检查已接通） | 宿主调用服务、不读数据库；能力协商与版本协商 | 旧 Modus 入口未切换（宿主检出不在本工作区，无法验证）；无远程/多租户认证与版本协商 |
 | 长期作业与大项目 | owner/项目/版本隔离、取消/截止/终态、增量失效、并发 worker、预算调度、磁盘事实/索引 | 新建正式服务作业 API；当前单次 CLI 非持久作业系统 |
 | 生产诊断（候选） | 只读遥测导入、部署/source version、trace/log/metric 关联、缺失证据与归因置信范围 | 先开发/测试资格，不能默认获得生产执行或写数据库权限 |
 

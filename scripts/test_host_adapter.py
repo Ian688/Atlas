@@ -1,0 +1,243 @@
+#!/usr/bin/env python3
+"""W10: the host seam -- a host integration that talks only over the service.
+
+The invariant under test is structural, not stylistic: the adapter has no
+storage access at all. It is constructed with a URL and a token and nothing
+else, and the test also reads the adapter's source to assert it contains no
+database or store access. A host that read Atlas' SQLite file would be coupled
+to a layout the contract explicitly does not promise.
+
+The second half is the contract itself: the adapter may only use endpoints the
+service publishes, with the transport it publishes them under. If the adapter
+grows a call the contract does not describe, this test fails.
+
+Standard-library only.
+"""
+import json
+from pathlib import Path
+import re
+import selectors
+import subprocess
+import tempfile
+import unittest
+import urllib.error
+import urllib.request
+
+ROOT = Path(__file__).resolve().parents[1]
+BIN = ROOT / "target/debug/atlas"
+ADAPTER = ROOT / "adapters" / "modus" / "atlas_host_client.mjs"
+
+DRIVER = r"""
+import { AtlasHostClient, AtlasHostError } from %(adapter)s;
+
+const [url, token] = process.argv.slice(2);
+const out = { steps: [], errors: [] };
+const record = (name, value) => out.steps.push({ name, value });
+
+const client = new AtlasHostClient({ url, token });
+
+// A remote host must be refused before any request is made: a local session
+// token sent off the machine is a leak, not a feature.
+try {
+  new AtlasHostClient({ url: 'http://example.com:8080/', token: 'x' });
+  record('remote_refused', false);
+} catch (error) {
+  record('remote_refused', error.name === 'AtlasHostError');
+}
+
+const contract = await client.contract();
+record('contract_schema', contract.schema);
+record('contract_endpoints', contract.endpoints.map(e => `${e.name}|${e.transport}`));
+record('contract_host_rules', contract.host_rules.length);
+
+const report = await client.report();
+record('report_id', report.id);
+record('report_functions', report.function_count);
+
+const nodes = await client.nodes({ kind: 'function', limit: 50 });
+record('node_count', nodes.items.length);
+
+const flow = await client.flow({ entity: 'double' });
+record('flow_status', flow.status);
+record('flow_return_origins', flow.returns.origins);
+record('flow_known_returns', flow.returns.constants);
+
+const source = await client.source({ entity: 'double' });
+record('source_contains', source.content.includes('value * 2'));
+
+const profile = await client.profile({ entity: 'double' });
+record('profile_classification', profile.classification);
+
+const context = await client.context({ entity: 'double' });
+record('context_selection', context.selection_id);
+record('context_analysis', context.context.analysis_id);
+
+const selection = await client.selection({ entity: 'double' });
+record('selection_version', selection.version === report.id);
+
+const annotation = await client.annotate({ entity: 'double', body: 'host: keep it exact' });
+record('annotation_exists', annotation.annotation.exists);
+record('annotation_author', annotation.annotation.proposed_by);
+
+const listed = await client.annotations({ entity: 'double' });
+record('annotation_count', listed.annotations.length);
+
+const queued = await client.agentRequest({ owner: 'host', requestKey: 'e2e', kind: 'inspect', entity: 'double' });
+record('agent_state', queued.request.state);
+const worked = await client.agentWork({ max: 2 });
+record('agent_ran', worked.ran);
+record('agent_observed', worked.outcomes[0].result.observed);
+
+const plan = await client.exec({ symbol: 'double', args: [21], plan: true });
+record('plan_starts_process', plan.will_start_process);
+const run = await client.exec({ symbol: 'double', args: [21] });
+record('run_verdict', run.verdict);
+record('run_value', run.value);
+record('run_trace_coverage', run.trace.coverage);
+
+// A bad token must fail loudly rather than silently returning nothing.
+try {
+  const bad = new AtlasHostClient({ url, token: 'not-the-token' });
+  await bad.report();
+  record('bad_token_rejected', false);
+} catch (error) {
+  record('bad_token_rejected', error instanceof AtlasHostError && error.status === 401);
+}
+
+record('required_endpoints', AtlasHostClient.requiredEndpoints());
+process.stdout.write(JSON.stringify(out));
+"""
+
+
+class HostSeam(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="atlas-host-")
+        self.addCleanup(self.tmp.cleanup)
+        self.base = Path(self.tmp.name)
+        self.project = self.base / "project"
+        (self.project / "src").mkdir(parents=True)
+        (self.project / "package.json").write_text('{"name":"host-lab","type":"module"}\n', encoding="utf-8")
+        (self.project / "src" / "lib.js").write_text(
+            "export function double(value) { return value * 2; }\n", encoding="utf-8"
+        )
+        self.store = self.base / "store"
+        indexed = subprocess.run(
+            [str(BIN), "--store", str(self.store), "index", str(self.project)],
+            cwd=ROOT, capture_output=True, text=True, timeout=180,
+        )
+        self.assertEqual(indexed.returncode, 0, indexed.stderr)
+        self.analysis = json.loads(indexed.stdout)["id"]
+
+        self.proc = subprocess.Popen(
+            [str(BIN), "--store", str(self.store), "serve", self.analysis],
+            cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        self.addCleanup(self.stop)
+        with selectors.DefaultSelector() as ready:
+            ready.register(self.proc.stdout, selectors.EVENT_READ)
+            self.assertTrue(ready.select(15), "HTTP server readiness deadline")
+        boot = json.loads(self.proc.stdout.readline())
+        session = json.loads(Path(boot["session_file"]).read_text())
+        self.url, self.token = session["url"], session["token"]
+
+    def stop(self):
+        if self.proc.poll() is None:
+            self.proc.kill()
+            self.proc.wait(timeout=10)
+
+    def drive(self):
+        """Run the adapter as a host would: a URL and a token, nothing else."""
+        driver = self.base / "driver.mjs"
+        driver.write_text(DRIVER % {"adapter": json.dumps(ADAPTER.as_uri())}, encoding="utf-8")
+        result = subprocess.run(
+            ["node", str(driver), self.url, self.token],
+            cwd=self.base, capture_output=True, text=True, timeout=300,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        return {step["name"]: step["value"] for step in report["steps"]}
+
+    # -- the invariants ---------------------------------------------------
+    def test_the_adapter_has_no_storage_access(self):
+        source = ADAPTER.read_text(encoding="utf-8")
+        forbidden = [
+            r"rusqlite", r"sqlite", r"atlas\.db", r"\.db\b", r"blobs/",
+            r"require\(['\"]node:fs", r"from ['\"]node:fs", r"readFile", r"openSync",
+        ]
+        for pattern in forbidden:
+            self.assertIsNone(
+                re.search(pattern, source),
+                f"the host adapter must not touch storage; it matched /{pattern}/",
+            )
+        # And it must not accept a store path in the first place.
+        self.assertNotIn("store", re.findall(r"constructor\(\{([^}]*)\}", source)[0])
+
+    def test_the_adapter_only_uses_published_endpoints(self):
+        report = self.drive()
+        published = {entry.split("|")[0]: entry.split("|")[1] for entry in report["contract_endpoints"]}
+        for name in report["required_endpoints"]:
+            self.assertIn(name, published, f"the adapter uses {name}, which the contract does not publish")
+            self.assertEqual(published[name], "http", f"{name} is published over {published[name]}")
+        self.assertEqual(report["contract_schema"], "atlas.host-contract.v1")
+        self.assertGreaterEqual(report["contract_host_rules"], 3)
+
+    def test_a_host_can_work_end_to_end_over_the_service(self):
+        report = self.drive()
+        self.assertTrue(report["remote_refused"], "a non-loopback URL must be refused")
+        self.assertEqual(report["report_id"], self.analysis)
+        self.assertGreaterEqual(report["node_count"], 1)
+        self.assertEqual(report["flow_status"], "complete_within_profile")
+        # `double` returns its parameter, so the honest derived fact is a
+        # parameter origin, not a folded constant.
+        self.assertIn("Parameter(0)", report["flow_return_origins"],
+                      "flow facts must be the real derived ones")
+        self.assertEqual(report["flow_known_returns"], [])
+        self.assertTrue(report["source_contains"])
+        self.assertEqual(report["profile_classification"], "pure_callable")
+        self.assertEqual(report["context_analysis"], self.analysis)
+        self.assertTrue(report["selection_version"], "a selection is pinned to the served version")
+        self.assertFalse(report["annotation_exists"], "an Intent is not existing code")
+        self.assertEqual(report["annotation_author"], "host")
+        self.assertGreaterEqual(report["annotation_count"], 1)
+
+    def test_the_bounded_bridge_is_reachable_from_a_host(self):
+        report = self.drive()
+        self.assertEqual(report["agent_state"], "queued")
+        self.assertEqual(report["agent_ran"], 1)
+        self.assertFalse(report["agent_observed"], "a bridge action is not an execution observation")
+
+    def test_a_host_can_plan_and_then_run_a_controlled_call(self):
+        report = self.drive()
+        self.assertTrue(report["plan_starts_process"])
+        self.assertEqual(report["run_verdict"], "returned")
+        self.assertEqual(report["run_value"], {"kind": "number", "value": 42})
+        self.assertEqual(report["run_trace_coverage"], "not_sampled",
+                         "a host must be able to see that no coverage was sampled")
+        self.assertTrue(report["bad_token_rejected"])
+
+    # -- the seam itself --------------------------------------------------
+    def test_the_contract_does_not_leak_the_store_layout(self):
+        request = urllib.request.Request(
+            self.url + "api/contract",
+            headers={"Authorization": "Bearer " + self.token},
+        )
+        with urllib.request.urlopen(request, timeout=20) as response:
+            body = response.read().decode()
+        self.assertNotIn(str(self.store), body, "the contract must not name the store path")
+        self.assertNotIn("atlas.db", body)
+        contract = json.loads(body)
+        names = {entry["name"] for entry in contract["endpoints"]}
+        for promised in ["report", "nodes", "edges", "flow", "source", "context", "profile", "exec"]:
+            self.assertIn(promised, names)
+
+    def test_the_contract_requires_the_session_like_every_other_query(self):
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(self.url + "api/contract", timeout=20)
+        self.assertEqual(error.exception.code, 401)
+        error.exception.close()
+
+
+if __name__ == "__main__":
+    if not BIN.exists():
+        raise SystemExit("Run cargo build --workspace first")
+    unittest.main(verbosity=2)
