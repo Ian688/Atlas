@@ -1,4 +1,4 @@
-use crate::{Result, digest, facts, flow, invalid, store::Store};
+use crate::{Result, control::ExecutionControl, digest, facts, flow, invalid, store::Store};
 use atlas_contract::*;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -19,9 +19,19 @@ fn valid_span(source: &str, start: usize, end: usize) -> bool {
 pub fn analyze(
     store: &Store,
     snapshot: &Snapshot,
-    mut facts: LanguageFacts,
+    facts: LanguageFacts,
     deadline: Option<std::time::Instant>,
 ) -> Result<Analysis> {
+    analyze_controlled(store, snapshot, facts, &ExecutionControl::new(deadline))
+}
+
+pub fn analyze_controlled(
+    store: &Store,
+    snapshot: &Snapshot,
+    mut facts: LanguageFacts,
+    control: &ExecutionControl,
+) -> Result<Analysis> {
+    control.checkpoint()?;
     let producer_matches = facts.producer == "typescript/5.9.3;worker/0.1.0"
         || facts.producer == "typescript/5.9.3;worker/0.2.0";
     if facts.schema != FACTS_SCHEMA
@@ -32,7 +42,7 @@ pub fn analyze(
         return Err(invalid("language_contract_mismatch"));
     }
     let sources: HashMap<_, _> = store
-        .sources(snapshot)?
+        .sources_controlled(snapshot, control)?
         .into_iter()
         .map(|f| (f.path, f.content))
         .collect();
@@ -58,6 +68,7 @@ pub fn analyze(
         ("parsed_source_files".into(), expected.len()),
     ]);
     for entry in &snapshot.entries {
+        control.checkpoint()?;
         *coverage
             .entry(format!("disposition:{}", entry.disposition))
             .or_default() += 1;
@@ -81,6 +92,7 @@ pub fn analyze(
         return Err(invalid("duplicate_symbol"));
     }
     for symbol in &facts.symbols {
+        control.checkpoint()?;
         let source = sources
             .get(&symbol.path)
             .ok_or_else(|| invalid("symbol_source_outside_snapshot"))?;
@@ -108,6 +120,7 @@ pub fn analyze(
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
     for entry in &snapshot.entries {
+        control.checkpoint()?;
         let kind = if entry.kind == "directory" {
             "directory"
         } else {
@@ -150,6 +163,7 @@ pub fn analyze(
         });
     }
     for symbol in &facts.symbols {
+        control.checkpoint()?;
         ids.insert(symbol.id.clone());
         edges.push(Edge {
             id: format!("contains:{}", symbol.id),
@@ -186,6 +200,7 @@ pub fn analyze(
         .chain(facts.dynamic_files.iter().map(String::as_str))
         .collect();
     for call in &facts.calls {
+        control.checkpoint()?;
         let source = sources
             .get(&call.path)
             .ok_or_else(|| invalid("call_source_outside_snapshot"))?;
@@ -238,6 +253,7 @@ pub fn analyze(
         });
     }
     for import in &facts.imports {
+        control.checkpoint()?;
         if !sources.contains_key(&import.path) {
             return Err(invalid("import_source_outside_snapshot"));
         }
@@ -302,15 +318,22 @@ pub fn analyze(
                         binding
                             .function_symbol
                             .as_ref()
+                            // A captured binding that can be reassigned must
+                            // not resolve to its declaration's original value.
+                            // Local writes are handled by the local environment;
+                            // closure environments are not re-instantiated yet.
+                            .filter(|symbol| {
+                                symbols.get(symbol.as_str()).is_some_and(|s| !s.mutated)
+                            })
                             .map(|symbol| (binding.id.clone(), symbol.clone()))
                     })
                 })
                 .collect();
-            if deadline.is_some_and(|deadline| std::time::Instant::now() >= deadline) {
-                return Err(invalid("analysis_deadline_exceeded_no_analysis_published"));
-            }
-            let inter = crate::inter::analyze_interprocedural(flow, &directory, deadline)?;
+            control.checkpoint()?;
+            let inter =
+                crate::inter::analyze_interprocedural_controlled(flow, &directory, control)?;
             for function in &flow.functions {
+                control.checkpoint()?;
                 let solved = inter
                     .functions
                     .get(function.symbol.as_str())
@@ -333,11 +356,16 @@ pub fn analyze(
             coverage.insert("flow_partial".into(), partial);
             coverage.insert("interproc_sccs".into(), inter.scc_count);
             coverage.insert("interproc_recursive_sccs".into(), inter.recursive_sccs);
+            coverage.insert(
+                "flow_frontier_functions".into(),
+                inter.frontier_symbols.len(),
+            );
             coverage.insert("flow_unknown_regions".into(), flow.diagnostics.len());
             // Flow unknowns surface through the standard diagnostics channel.
             facts.diagnostics.extend(flow.diagnostics.iter().cloned());
             limitations.push(format!(
-                "Local flow facts cover declared profile {FLOW_PROFILE} only; other constructs are explicit unknowns. Interprocedural summaries are symbolic per function (Parameter origins re-based per callsite); captured origins are not re-substituted and unknown callees stay top."
+                "Local flow facts cover declared profile {FLOW_PROFILE} only; other constructs are explicit unknowns. Interprocedural summaries are symbolic per function, with up to {} scalar-argument calling contexts per callee; other calls use the symbolic fallback. Captured origins are not re-substituted and unknown callees stay top.",
+                crate::inter::MAX_CONTEXTS_PER_FUNCTION,
             ));
             records
         }
@@ -363,14 +391,13 @@ pub fn analyze(
     };
     // Final gate: a successful Analysis is only published when the whole
     // derivation finished inside the pipeline deadline (R5).
-    if deadline.is_some_and(|deadline| std::time::Instant::now() >= deadline) {
-        return Err(invalid("analysis_deadline_exceeded_no_analysis_published"));
-    }
+    control.checkpoint()?;
     analysis.id = digest(&serde_json::to_vec(&analysis)?);
     for record in &mut flow_records {
+        control.checkpoint()?;
         record.analysis_id = analysis.id.clone();
     }
-    store.publish_analysis_with_flow(&analysis, &flow_records)?;
+    store.publish_analysis_with_flow_controlled(&analysis, &flow_records, control)?;
     Ok(analysis)
 }
 

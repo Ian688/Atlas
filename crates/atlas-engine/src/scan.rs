@@ -1,4 +1,4 @@
-use crate::{Result, digest, invalid, store::Store};
+use crate::{Result, control::ExecutionControl, digest, invalid, store::Store};
 use atlas_contract::{CatalogEntry, SNAPSHOT_SCHEMA, ScanLimits, Snapshot};
 use cap_std::{ambient_authority, fs::Dir};
 use ignore::{
@@ -71,11 +71,31 @@ pub fn scan(
     limits: ScanLimits,
     deadline: Option<Duration>,
 ) -> Result<Snapshot> {
+    scan_controlled(root, store, limits, deadline, &ExecutionControl::new(None))
+}
+
+pub fn scan_controlled(
+    root: &Path,
+    store: &Store,
+    limits: ScanLimits,
+    deadline: Option<Duration>,
+    control: &ExecutionControl,
+) -> Result<Snapshot> {
+    let started = std::time::Instant::now();
+    let stage_control = match deadline {
+        Some(duration) => control.with_stage_deadline(
+            started + duration,
+            "scan_deadline_exceeded_no_snapshot_published",
+        ),
+        None => control.clone(),
+    };
+    let control = &stage_control;
+    control.checkpoint()?;
     if limits.max_entries == 0 || limits.max_file_bytes == 0 || limits.max_total_bytes == 0 {
         return Err(invalid("invalid_scan_limits"));
     }
-    let started = std::time::Instant::now();
     let check_deadline = |elapsed: Duration| -> Result<()> {
+        control.checkpoint()?;
         if deadline.is_some_and(|limit| elapsed >= limit) {
             return Err(invalid("scan_deadline_exceeded_no_snapshot_published"));
         }
@@ -137,6 +157,7 @@ pub fn scan(
         };
         let mut children = Vec::new();
         for item in read {
+            check_deadline(started.elapsed())?;
             children.push(item?);
             if children.len() + entries.len() > limits.max_entries {
                 return Err(invalid("entry_budget_exceeded_no_snapshot_published"));
@@ -252,7 +273,8 @@ pub fn scan(
         entries,
     };
     snapshot.id = digest(&serde_json::to_vec(&snapshot)?);
-    store.publish_snapshot(&snapshot)?;
+    check_deadline(started.elapsed())?;
+    store.publish_snapshot_controlled(&snapshot, control)?;
     Ok(snapshot)
 }
 

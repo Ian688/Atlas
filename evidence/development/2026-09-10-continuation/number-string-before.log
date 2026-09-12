@@ -1,0 +1,116 @@
+test_number_to_string_matches_node_at_rounding_and_exponent_boundaries (__main__.SemanticContracts.test_number_to_string_matches_node_at_rounding_and_exponent_boundaries) ... 
+  test_number_to_string_matches_node_at_rounding_and_exponent_boundaries (__main__.SemanticContracts.test_number_to_string_matches_node_at_rounding_and_exponent_boundaries) (name='number0', value='9223372036854776000') ... FAIL
+  test_number_to_string_matches_node_at_rounding_and_exponent_boundaries (__main__.SemanticContracts.test_number_to_string_matches_node_at_rounding_and_exponent_boundaries) (name='number1', value='1000000000000000100') ... FAIL
+  test_number_to_string_matches_node_at_rounding_and_exponent_boundaries (__main__.SemanticContracts.test_number_to_string_matches_node_at_rounding_and_exponent_boundaries) (name='number10', value='-Infinity') ... FAIL
+  test_number_to_string_matches_node_at_rounding_and_exponent_boundaries (__main__.SemanticContracts.test_number_to_string_matches_node_at_rounding_and_exponent_boundaries) (name='number4', value='1e+21') ... FAIL
+  test_number_to_string_matches_node_at_rounding_and_exponent_boundaries (__main__.SemanticContracts.test_number_to_string_matches_node_at_rounding_and_exponent_boundaries) (name='number6', value='1e-7') ... FAIL
+  test_number_to_string_matches_node_at_rounding_and_exponent_boundaries (__main__.SemanticContracts.test_number_to_string_matches_node_at_rounding_and_exponent_boundaries) (name='number9', value='Infinity') ... FAIL
+
+======================================================================
+FAIL: test_number_to_string_matches_node_at_rounding_and_exponent_boundaries (__main__.SemanticContracts.test_number_to_string_matches_node_at_rounding_and_exponent_boundaries) (name='number0', value='9223372036854776000')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_semantic_contracts.py", line 100, in test_number_to_string_matches_node_at_rounding_and_exponent_boundaries
+    self.assertEqual(facts[name]['returns']['constants'], [value])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: ['9223372036854775808'] != ['9223372036854776000']
+
+First differing element 0:
+'9223372036854775808'
+'9223372036854776000'
+
+- ['9223372036854775808']
+?                  ^^ ^
+
++ ['9223372036854776000']
+?                  ^ ^^
+
+
+======================================================================
+FAIL: test_number_to_string_matches_node_at_rounding_and_exponent_boundaries (__main__.SemanticContracts.test_number_to_string_matches_node_at_rounding_and_exponent_boundaries) (name='number1', value='1000000000000000100')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_semantic_contracts.py", line 100, in test_number_to_string_matches_node_at_rounding_and_exponent_boundaries
+    self.assertEqual(facts[name]['returns']['constants'], [value])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: ['1000000000000000128'] != ['1000000000000000100']
+
+First differing element 0:
+'1000000000000000128'
+'1000000000000000100'
+
+- ['1000000000000000128']
+?                    ^^
+
++ ['1000000000000000100']
+?                    ^^
+
+
+======================================================================
+FAIL: test_number_to_string_matches_node_at_rounding_and_exponent_boundaries (__main__.SemanticContracts.test_number_to_string_matches_node_at_rounding_and_exponent_boundaries) (name='number10', value='-Infinity')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_semantic_contracts.py", line 100, in test_number_to_string_matches_node_at_rounding_and_exponent_boundaries
+    self.assertEqual(facts[name]['returns']['constants'], [value])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: [] != ['-Infinity']
+
+Second list contains 1 additional elements.
+First extra element 0:
+'-Infinity'
+
+- []
++ ['-Infinity']
+
+======================================================================
+FAIL: test_number_to_string_matches_node_at_rounding_and_exponent_boundaries (__main__.SemanticContracts.test_number_to_string_matches_node_at_rounding_and_exponent_boundaries) (name='number4', value='1e+21')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_semantic_contracts.py", line 100, in test_number_to_string_matches_node_at_rounding_and_exponent_boundaries
+    self.assertEqual(facts[name]['returns']['constants'], [value])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: [] != ['1e+21']
+
+Second list contains 1 additional elements.
+First extra element 0:
+'1e+21'
+
+- []
++ ['1e+21']
+
+======================================================================
+FAIL: test_number_to_string_matches_node_at_rounding_and_exponent_boundaries (__main__.SemanticContracts.test_number_to_string_matches_node_at_rounding_and_exponent_boundaries) (name='number6', value='1e-7')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_semantic_contracts.py", line 100, in test_number_to_string_matches_node_at_rounding_and_exponent_boundaries
+    self.assertEqual(facts[name]['returns']['constants'], [value])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: [] != ['1e-7']
+
+Second list contains 1 additional elements.
+First extra element 0:
+'1e-7'
+
+- []
++ ['1e-7']
+
+======================================================================
+FAIL: test_number_to_string_matches_node_at_rounding_and_exponent_boundaries (__main__.SemanticContracts.test_number_to_string_matches_node_at_rounding_and_exponent_boundaries) (name='number9', value='Infinity')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_semantic_contracts.py", line 100, in test_number_to_string_matches_node_at_rounding_and_exponent_boundaries
+    self.assertEqual(facts[name]['returns']['constants'], [value])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: [] != ['Infinity']
+
+Second list contains 1 additional elements.
+First extra element 0:
+'Infinity'
+
+- []
++ ['Infinity']
+
+----------------------------------------------------------------------
+Ran 1 test in 0.934s
+
+FAILED (failures=6)

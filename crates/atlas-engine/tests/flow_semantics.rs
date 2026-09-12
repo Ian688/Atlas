@@ -93,7 +93,7 @@ fn solve_one(
     directory: &BTreeMap<String, String>,
 ) -> atlas_engine::solve::SolveOutput {
     let lowered = atlas_engine::flow::build_cfg(function).expect("cfg");
-    atlas_engine::solve::solve(&lowered, function, directory, &BTreeMap::new(), None)
+    atlas_engine::solve::solve(&lowered, function, directory, &BTreeMap::new(), None, None)
 }
 
 fn param(function: &FlowFunction, name: &str) -> String {
@@ -434,7 +434,8 @@ fn d05_loop_fixpoint_and_carried_update() {
         !lowered.cfg.looping_blocks.is_empty(),
         "while loop must produce looping blocks"
     );
-    let output = atlas_engine::solve::solve(&lowered, &f, &BTreeMap::new(), &BTreeMap::new(), None);
+    let output =
+        atlas_engine::solve::solve(&lowered, &f, &BTreeMap::new(), &BTreeMap::new(), None, None);
     assert_eq!(
         output.status, "complete_within_profile",
         "bounded loop lattice must converge"
@@ -1987,8 +1988,8 @@ fn f1_typed_constants_are_machine_distinguishable() {
     assert_ne!(json.typed[3].kind, json.typed[6].kind);
 }
 
-/// F5: integral JS numbers render as exact plain digits below the 1e21
-/// exponential threshold, including magnitudes beyond i64.
+/// F5: JS number text uses shortest round-tripping decimals, including
+/// magnitudes beyond i64 and the exponent threshold.
 #[test]
 fn f5_big_number_to_string_is_exact() {
     let big = ConstValue::Num { value: 1e20 };
@@ -2001,18 +2002,17 @@ fn f5_big_number_to_string_is_exact() {
     };
     assert_eq!(
         atlas_engine::solve::js_string(&i64_boundary).as_deref(),
-        Some("9223372036854775808")
+        Some("9223372036854776000")
     );
     let negative_big = ConstValue::Num { value: -1e20 };
     assert_eq!(
         atlas_engine::solve::js_string(&negative_big).as_deref(),
         Some("-100000000000000000000")
     );
-    // At and above 1e21 JS switches to exponential notation; we stay unknown
-    // instead of guessing the format.
+    // At and above 1e21 JS switches to exponential notation.
     assert_eq!(
-        atlas_engine::solve::js_string(&ConstValue::Num { value: 1e21 }),
-        None
+        atlas_engine::solve::js_string(&ConstValue::Num { value: 1e21 }).as_deref(),
+        Some("1e+21")
     );
     // Concatenation folds the exact digits.
     let folded = atlas_engine::solve::fold_constants(
@@ -2238,5 +2238,129 @@ fn f4_nested_reachable_objects_dissolve_on_unknown_call() {
     assert!(
         !output.returns.constants.contains(&json!(1.0)) || output.returns.unknown,
         "old value must not be reported as the certain result"
+    );
+}
+
+/// k=1: `pick(5)` folds the callee's parameter-value branch per calling
+/// context — [1] for one caller and [2] for the other, instead of the merged
+/// {1,2}.
+#[test]
+fn k1_context_sensitive_branch_folding() {
+    let pick = simple_function(
+        "pick",
+        &["x"],
+        vec![stmt(
+            0,
+            10,
+            StmtKind::If {
+                cond: expr(
+                    0,
+                    10,
+                    ExprKind::Binary {
+                        op: "===".into(),
+                        left: Box::new(local("b:f.ts:p0:x")),
+                        right: Box::new(expr(
+                            0,
+                            10,
+                            ExprKind::Const {
+                                value: ConstValue::Num { value: 5.0 },
+                            },
+                        )),
+                    },
+                ),
+                then_body: vec![stmt(
+                    0,
+                    10,
+                    StmtKind::Return {
+                        value: Some(expr(
+                            0,
+                            10,
+                            ExprKind::Const {
+                                value: ConstValue::Num { value: 1.0 },
+                            },
+                        )),
+                    },
+                )],
+                else_body: vec![stmt(
+                    0,
+                    10,
+                    StmtKind::Return {
+                        value: Some(expr(
+                            0,
+                            10,
+                            ExprKind::Const {
+                                value: ConstValue::Num { value: 2.0 },
+                            },
+                        )),
+                    },
+                )],
+            },
+        )],
+    );
+    let caller_a = simple_function(
+        "callA",
+        &[],
+        vec![stmt(
+            0,
+            30,
+            StmtKind::Return {
+                value: Some(call_args(
+                    local("b:f.ts:0:pick"),
+                    vec![expr(
+                        0,
+                        10,
+                        ExprKind::Const {
+                            value: ConstValue::Num { value: 5.0 },
+                        },
+                    )],
+                )),
+            },
+        )],
+    );
+    let caller_b = simple_function(
+        "callB",
+        &[],
+        vec![stmt(
+            0,
+            30,
+            StmtKind::Return {
+                value: Some(call_args(
+                    local("b:f.ts:0:pick"),
+                    vec![expr(
+                        0,
+                        10,
+                        ExprKind::Const {
+                            value: ConstValue::Num { value: 6.0 },
+                        },
+                    )],
+                )),
+            },
+        )],
+    );
+    let directory = BTreeMap::from([(
+        "b:f.ts:0:pick".to_string(),
+        "symbol:f.ts:0:99:pick".to_string(),
+    )]);
+    let flow = FlowFacts {
+        schema: FLOW_SCHEMA.into(),
+        snapshot_id: "t".into(),
+        producer: "typescript/5.9.3;worker/0.2.0".into(),
+        profile: FLOW_PROFILE.into(),
+        functions: vec![pick, caller_a, caller_b],
+        diagnostics: vec![],
+    };
+    let result =
+        atlas_engine::inter::analyze_interprocedural(&flow, &directory, None).expect("interproc");
+    let a = &result.functions["symbol:f.ts:0:99:callA"].output.returns;
+    let b = &result.functions["symbol:f.ts:0:99:callB"].output.returns;
+    assert_eq!(
+        a.constants,
+        vec![json!(1.0)],
+        "pick(5) must fold to 1: {a:?}"
+    );
+    assert_eq!(
+        b.constants,
+        vec![json!(2.0)],
+        "pick(6) must fold to 2: {b:?}"
     );
 }

@@ -83,10 +83,30 @@ function render(){renderTree();renderGraph();}
 // Byte offsets from the engine are UTF-8; the loaded source is a JS string.
 function byteLineMap(source){const encoder=new TextEncoder();const lines=[1];let bytes=0;for(const ch of source){bytes+=encoder.encode(ch).length;if(ch==='\n')lines.push(bytes+1);}return lines;}
 function lineOf(map,byte){let line=1;for(let i=0;i<map.length;i++){if(map[i]<=byte)line=i+1;else break;}return line;}
+// `constants` is plain JSON, which has no token for undefined, NaN or Infinity:
+// the value undefined and the string "undefined" both arrive as "undefined".
+// Render the tagged view instead, so the panel never displays a value the
+// engine did not claim. Analyses published before the tagged field existed
+// remain readable through the fallback.
+function constantLabel(c){
+  switch(c.kind){
+    case 'number':return String(c.value);
+    case 'string':return JSON.stringify(c.value);
+    case 'boolean':return String(c.value);
+    case 'null':return 'null';
+    case 'undefined':return 'undefined';
+    case 'nan':return 'NaN';
+    case 'infinity':return 'Infinity';
+    case 'negative_infinity':return '-Infinity';
+    default:return c.kind;
+  }
+}
 function flowValueSummary(value){
   if(!value)return '';
   const parts=[];
-  if(value.constants.length)parts.push(`常量 ${value.constants.map(c=>JSON.stringify(c)).join(' | ')}`);
+  const typed=value.typed_constants||[];
+  if(typed.length)parts.push(`常量 ${typed.map(constantLabel).join(' | ')}`);
+  else if(value.constants.length)parts.push(`常量 ${value.constants.map(c=>JSON.stringify(c)).join(' | ')}`);
   if(value.targets.length)parts.push(`函数目标 ${value.targets.length} 个`);
   if(value.origins.length)parts.push(`来源 ${value.origins.slice(0,4).join(', ')}${value.origins.length>4?' …':''}`);
   if(value.unknown&&value.reasons.length)parts.push(`未知: ${value.reasons.slice(0,3).join('; ')}${value.reasons.length>3?' …':''}`);

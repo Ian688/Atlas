@@ -98,3 +98,46 @@ test('alpha-renaming preserves flow structure modulo identity (D21)', () => {
   assert.equal(strip(a.flow.functions[0]), strip(b.flow.functions[0]),
     'alpha-renamed functions must lower to the same flow structure');
 });
+
+// The worker folds some global names to constants by text. That fold is only
+// valid while no binding shadows the name, so every folded name needs a
+// shadowing case here; adding a fold without adding a case is the regression
+// these tests exist to catch.
+test('a folded global name loses to a shadowing binding (V-08b)', () => {
+  const reads = {
+    param: () => flowOf(facts({'a.js': 'function f(undefined) { return undefined; }'}), 'f').body[0].value,
+    let: () => flowOf(facts({'a.js': 'function f() { let undefined = 1; return undefined; }'}), 'f').body[1].value,
+    var: () => flowOf(facts({'a.js': 'function f() { var undefined = 1; return undefined; }'}), 'f').body[1].value,
+    nested: () => flowOf(facts({'a.js': 'function f() { function g(undefined) { return undefined; } return g; }'}), 'g').body[0].value,
+    catch: () => flowOf(facts({'a.js': 'function f() { try { risky(); } catch (undefined) { return undefined; } }'}), 'f').body[0].catch_body[0].value,
+  };
+  for (const [kind, read] of Object.entries(reads)) {
+    const value = read();
+    assert.equal(value.expr, 'local', `${kind}: a shadowing binding must be read, not folded: ${JSON.stringify(value)}`);
+    assert.ok(value.binding.startsWith('b:'), `${kind}: the read must point at a real binding: ${JSON.stringify(value)}`);
+  }
+});
+
+test('the unshadowed global undefined still folds to a constant (V-08b)', () => {
+  const value = flowOf(facts({'a.js': 'function f() { return undefined; }'}), 'f').body[0].value;
+  assert.equal(value.expr, 'const');
+  assert.equal(value.value.const, 'undefined');
+});
+
+test('non-finite numeric literals are explicit unknowns, not unwireable constants', () => {
+  const fn = flowOf(facts({'a.js': 'function f() { return 1e999; }'}), 'f');
+  const value = fn.body[0].value;
+  assert.equal(value.expr, 'unknown');
+  assert.equal(value.reason, 'non_finite_numeric_literal');
+  // The whole response must survive JSON, because Infinity becomes null there
+  // and the engine rejects a null number for every file, not just this one.
+  assert.equal(JSON.stringify(fn).includes('"num"'), false, 'a non-finite literal must not be emitted as a num constant');
+  assert.equal(JSON.parse(JSON.stringify(fn)).body[0].value.reason, 'non_finite_numeric_literal');
+});
+
+test('finite numeric literals are unaffected by the non-finite guard', () => {
+  const value = flowOf(facts({'a.js': 'function f() { return 1e308; }'}), 'f').body[0].value;
+  assert.equal(value.expr, 'const');
+  assert.equal(value.value.const, 'num');
+  assert.equal(value.value.value, 1e308);
+});

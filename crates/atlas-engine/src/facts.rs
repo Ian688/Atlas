@@ -18,6 +18,8 @@ pub struct FunctionFlowFact {
     pub profile: String,
     pub algorithm: AlgorithmRef,
     pub status: String,
+    /// Blocks whose results remain incomplete; never an execution trace.
+    pub frontier: Vec<u32>,
     pub ops: Vec<OpOut>,
     pub blocks: Vec<BlockOut>,
     pub entry: u32,
@@ -400,6 +402,7 @@ pub fn assemble_flow_fact(
             version: solve::ALGORITHM_VERSION.into(),
         },
         status: output.status.into(),
+        frontier: output.frontier.clone(),
         ops,
         blocks,
         entry: lowered.cfg.entry,

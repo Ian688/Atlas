@@ -1,16 +1,17 @@
 {
   "schema": "atlas.daily-development-progress.v1",
-  "work_order_version": "1.0",
+  "work_order_version": "1.1",
   "prepared_on": "2026-09-09",
   "timezone": "Asia/Shanghai",
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
-  "mode": "external_agent_daily_window",
-  "window_limit_hours": 10,
+  "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-09/w03",
-    "started_local": "2026-09-09T08:27:00+08:00",
-    "status": "RUNNING",
-    "note": "修复第二轮复审 CHANGES_REQUIRED(evidence/reviews/2026-09-09-w02/REVIEW.md):F1-F5 全部完成并通过 probe_adjacent(退出码 0)。"
+    "window": "2026-09-10/continuation",
+    "status": "DELIVERED",
+    "started_utc": "2026-09-09T17:36:50.761152+00:00",
+    "note": "本轮11/11验证通过、退出码0，完成标量context接续/预算frontier/全链取消及数值与捕获绑定修复；仍需独立复审，不声明完整Atlas验收。",
+    "evidence_dir": "evidence/development/2026-09-10-continuation",
+    "verification": "evidence/development/2026-09-10-continuation/verified/verification.json"
   },
   "windows": [
     {
@@ -53,7 +54,7 @@
     {
       "id": "2026-09-09/w03",
       "started_local": "2026-09-09T08:27:00+08:00",
-      "status": "RUNNING",
+      "status": "DELIVERED",
       "work_items": [
         "F1",
         "F2",
@@ -62,10 +63,21 @@
         "F5"
       ],
       "report": "evidence/daily/2026-09-09/w03/final/daily-report.md"
+    },
+    {
+      "id": "2026-09-10/continuation",
+      "status": "DELIVERED",
+      "work_items": [
+        "W04-scalar-contexts",
+        "D19-shared-budget-and-frontier",
+        "W06-cooperative-cancellation"
+      ],
+      "report": "evidence/development/2026-09-10-continuation/REPORT.md",
+      "verification": "evidence/development/2026-09-10-continuation/verified/verification.json"
     }
   ],
-  "next_work_item": "W06-剩余",
-  "next_action": "W06 剩余(取消信号/作业队列租约)、W07 增量失效、M1 的 k=1 上下文敏感;先处理下一轮复审反馈。",
+  "next_work_item": "W06-持久作业所有权与租约",
+  "next_action": "在本轮全链取消与预算合同验证后，实现持久 owner/project/request 身份、幂等提交、租约与崩溃恢复，接入真实索引发布；然后推进 W07 增量。完整堆/闭包上下文仍未实现。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
@@ -188,11 +200,12 @@
         "堆:唯一具体对象(非循环分配点)强更新,其余弱更新+wildcard 合并;循环分配点强制弱更新",
         "JS 常量折叠规则显式声明(f64 算术含 NaN/±0/除零、整数值字符串拼接、===/!==、同型比较、&&/||/??、typeof/!/void);位运算等不折叠→Top 带原因",
         "worklist:BTreeSet 确定性、块访问上限+300k transfer 预算→partial_budget+frontier;常量条件剪枝记录 pruned_edges;cap 超限→Top+cap_exceeded 原因",
-        "跨函数绑定经 function directory 解析(捕获的模块函数→目标集合);callee 摘要一律 callee_summary_pending_interprocedural,不假装跨过程"
+        "跨函数绑定经 function directory 解析(捕获的模块函数→目标集合);跨过程摘要与有界标量context由 inter.rs 驱动；pending/未收敛保持未知"
       ],
       "evidence": [
         "crates/atlas-engine/tests/flow_semantics.rs D01/D07/D08/D09/D10/D12",
-        "examples/flow-lab"
+        "examples/flow-lab",
+        "evidence/development/2026-09-10-continuation/verified/verification.json"
       ],
       "blockers": [],
       "independent_review": {
@@ -221,7 +234,7 @@
       "implementation": "IMPLEMENTED",
       "automated_checks": "PASS",
       "qualification": "NOT_QUALIFIED",
-      "review_status": "CHANGES_REQUIRED",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
       "features": [
         "符号化函数摘要(returns/throws/effects,来源含 Parameter(i))",
         "调用点代回:Parameter origin 按实参重代入,不同 caller 实参/返回不串线(D13)",
@@ -229,12 +242,18 @@
         "pending 摘要永不充当 no-return/no-throw 证明;未知 callee 保持 Top",
         "五层调用链 origin 存活(D14);call 边与 forwarded 数据边分开记录(D17)",
         "FunctionFlowFact.interprocedural(status/summary/callsites(targets_complete/unknown_component/args/result))",
-        "coverage: interproc_sccs/interproc_recursive_sccs"
+        "coverage: interproc_sccs/interproc_recursive_sccs",
+        "每 callee 至多8个完整标量实参调用点context；键绑定caller/op/规范化实参，实参变化重调度，超限/对象/符号参数回退符号摘要",
+        "参数换位不将caller Parameter重解释成callee Parameter；跨函数Allocation堆未导入时显式unknown；NaN context稳定判等",
+        "捕获的可写函数绑定不按原声明解析成唯一目标，显式unknown；完整closure环境实例化仍未实现"
       ],
       "evidence": [
         "crates/atlas-engine/src/inter.rs",
         "crates/atlas-engine/tests/flow_semantics.rs d13/d14/d15/d17",
-        "examples/flow-lab indirect + test_flow_facts_through_real_worker_store_cli_and_http"
+        "examples/flow-lab indirect + test_flow_facts_through_real_worker_store_cli_and_http",
+        "crates/atlas-engine/tests/interproc_context.rs",
+        "scripts/test_semantic_contracts.py",
+        "evidence/development/2026-09-10-continuation/verified/verification.json"
       ],
       "blockers": [],
       "independent_review": {
@@ -259,16 +278,19 @@
       "implementation": "IMPLEMENTED",
       "automated_checks": "PASS",
       "qualification": "NOT_QUALIFIED",
-      "review_status": "CHANGES_REQUIRED",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
       "features": [
         "facts 表 (analysis,symbol,kind='flow') 与 Analysis 同事务原子发布;flow_digest 绑定派生事实内容到 analysis 身份",
         "CLI flows/flow;HTTP /api/flows、/api/flow(沿用会话鉴权/Host/Origin);错误语义与既有一致(invalid_or_unavailable_query)",
         "函数面板显示:算法/状态/预算、返回/抛出值摘要、效果、unknown 原因、块级绑定状态(有界截断);真实浏览器验证+截图",
-        "旧分析 flow facts 在重索引后可读(有测试);伪造 symbol 查询被拒绝(有测试)"
+        "旧分析 flow facts 在重索引后可读(有测试);伪造 symbol 查询被拒绝(有测试)",
+        "flow查询暴露frontier；partial结果同步调用点、返回、抛出与绑定unknown，保留原完整函数分母和job_total_transfers/job_max_transfers"
       ],
       "evidence": [
         "scripts/test_integration.py test_flow_facts_through_real_worker_store_cli_and_http",
-        "evidence/daily/2026-09-09/w01/final/artifacts/flow-panel-branchpick.png"
+        "evidence/daily/2026-09-09/w01/final/artifacts/flow-panel-branchpick.png",
+        "scripts/test_semantic_contracts.py",
+        "evidence/development/2026-09-10-continuation/verified/verification.json"
       ],
       "blockers": [],
       "independent_review": {
@@ -295,22 +317,29 @@
       "implementation": "PARTIAL",
       "automated_checks": "PASS",
       "qualification": "NOT_QUALIFIED",
-      "review_status": "CHANGES_REQUIRED",
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
       "features": [
         "扫描阶段整体 deadline(--scan-deadline-seconds,默认 300/上限 3600;超限零发布,Rust 单测覆盖)",
         "多项目同库隔离与跨 analysis 查询拒绝(test_multi_project_store_isolation)",
         "索引管线级 deadline(--index-deadline-seconds,默认 600/上限 3600;剩余预算分配给 scan/worker 各阶段)",
         "并发重复 index 幂等同终态(并发两进程同 id)",
         "worker 阶段既有 1–600s 期限/输出上限/kill_on_drop 沿用",
-        "worker 崩溃矩阵集成测试:非零退出→零新增 Analysis,旧分析(含 flow facts)完整可读"
+        "worker 崩溃矩阵集成测试:非零退出→零新增 Analysis,旧分析(含 flow facts)完整可读",
+        "ExecutionControl贯穿scan/worker/Rust/事务：SIGINT/SIGTERM协作取消，无硬process exit；listener保留至全链结束",
+        "扫描与整体deadline覆盖SQLite writer等待；25ms轮询检查取消；commit与取消接受串行化，先commit终态不反标取消",
+        "worker初始取消不spawn；false sender关闭不误取消；所有失败kill+wait回收直接子进程"
       ],
       "evidence": [
         "crates/atlas-engine/src/scan.rs deadline + tests",
         "scripts/test_integration.py test_multi_project_store_isolation",
-        "scripts/test_integration.py test_worker_crash_leaves_store_intact_and_old_analyses_readable"
+        "scripts/test_integration.py test_worker_crash_leaves_store_intact_and_old_analyses_readable",
+        "crates/atlas-engine/tests/cancellation.rs",
+        "scripts/test_cancellation.py",
+        "evidence/development/2026-09-10-continuation/verified/verification.json"
       ],
       "blockers": [
-        "取消信号、作业队列/租约、崩溃恢复矩阵、断电耐久仍未实现"
+        "持久owner/project/request作业身份、队列/租约和进程崩溃重启恢复仍未实现；断电耐久未资格验证",
+        "协作取消不承诺中断进行中的单次OS I/O或磁盘commit；POSIX信号测试不替代Windows资格"
       ],
       "independent_review": {
         "id": "2026-09-09-w01-independent",
@@ -624,15 +653,18 @@
         ]
       },
       "D19": {
-        "status": "IMPLEMENTED",
+        "status": "PARTIAL",
         "tested_by": [
           "flow_semantics d10 (cap)",
           "test_nested_finally... (20层finally CFG线性+60分支预算内)",
           "scan_deadline 单测",
-          "flow_semantics 全套件 + ATLAS_MAX_TRANSFERS/ATLAS_MAX_TOTAL_TRANSFERS 测试钩子触发 partial_budget(发布部分结果+frontier,与 deadline 拒绝区分)"
+          "flow_semantics 全套件 + ATLAS_MAX_TRANSFERS/ATLAS_MAX_TOTAL_TRANSFERS 测试钩子触发 partial_budget(发布部分结果+frontier,与 deadline 拒绝区分)",
+          "inter::budget_tests::total_budget_includes_first_and_context_passes",
+          "scripts/test_semantic_contracts.py budget=0/1/15 的全链发布合同；frontier/unknown/计数及旧版本不变",
+          "scripts/test_cancellation.py SIGINT/SIGTERM/发布锁deadline；tests/cancellation.rs扫描deadline与终态"
         ],
         "gaps": [
-          "高扇出/超深链的自然规模触发未做(预算钩子已可覆盖)"
+          "真实大项目规模与自然高扇出资格仍待验证；总transfer预算不等于总内存或OS工作量上限"
         ]
       },
       "D20": {
@@ -682,8 +714,8 @@
       "F5-大数转字符串": {
         "status": "IMPLEMENTED",
         "tested_by": [
-          "flow_semantics f5_big_number_to_string_is_exact(±1e20/i64边界/1e21 阈值/拼接)",
-          "probe_adjacent hugeString"
+          "flow_semantics::f5_big_number_to_string_is_exact（已纠正i64边界JS期望）",
+          "scripts/test_semantic_contracts.py::test_number_to_string_matches_node_at_rounding_and_exponent_boundaries（12个Node oracle边界）"
         ],
         "gaps": []
       }

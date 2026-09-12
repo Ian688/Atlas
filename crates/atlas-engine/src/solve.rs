@@ -7,13 +7,14 @@
 //! budget exits are reported as `partial_budget` with a frontier, never as
 //! negative proofs. JS operator semantics (NaN, `+` concatenation, division by
 //! zero) follow the declared folding rules below.
+use crate::control::ExecutionControl;
 use crate::flow::{BlockId, CompletionKind, LoweredFunction, MAX_OPS_PER_FUNCTION, OpKind, Term};
 use atlas_contract::{ConstValue, FlowFunction};
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const ALGORITHM_ID: &str = "atlas-local-absint";
-pub const ALGORITHM_VERSION: &str = "0.1.0";
+pub const ALGORITHM_VERSION: &str = "0.2.1";
 pub const CAP_CONSTANTS: usize = 8;
 pub const CAP_TARGETS: usize = 64;
 pub const CAP_ORIGINS: usize = 8;
@@ -385,10 +386,14 @@ struct Solver<'a> {
     function_directory: &'a BTreeMap<String, String>,
     /// Pipeline deadline; a breach stops this function's work early and is
     /// reported through `budget_exhausted` (R5).
-    deadline: Option<std::time::Instant>,
+    control: &'a ExecutionControl,
+    transfer_limit: usize,
     /// Ops whose values later blocks read (short-circuit temps, switch
     /// discriminants): the only op values retained across block boundaries.
     cross_block_operands: &'a BTreeSet<u32>,
+    /// k=1 context seeds: concrete actual-argument values for this calling
+    /// context (binding id -> value), or None for the symbolic entry.
+    param_seeds: Option<&'a [(String, Value)]>,
     has_return: bool,
     has_throw: bool,
     /// Last observed value per exit block; joined once at finish (not across
@@ -404,6 +409,20 @@ struct Solver<'a> {
     unknown_ops: usize,
     /// Callee summaries from the interprocedural fixpoint (empty = disabled).
     summaries: &'a BTreeMap<String, Summary>,
+    /// Candidates that had no summary at the time: negative dependencies.
+    /// See the collection site for why all three absent-target cases are
+    /// recorded together instead of being filtered.
+    probed_absent: BTreeSet<String>,
+    /// Symbol-level read set: callee summaries (and module bindings) whose
+    /// values this function's result actually consumed.
+    ///
+    /// Symbol granularity is deliberate, not a compromise: the published fact
+    /// unit is already `(analysis, symbol, kind)`, so finer dependencies
+    /// (per-op, per heap slot) have no consumer -- a source edit re-solves the
+    /// whole function anyway. What symbol granularity *does* buy is capturing
+    /// non-call data dependencies (closures, module peers, re-exports) that the
+    /// call graph alone cannot express.
+    read: BTreeSet<String>,
     /// Ops that allocate object literals: their field sets are known, so a
     /// missing key read is a known undefined instead of an unknown shape.
     object_literal_sites: BTreeSet<u32>,
@@ -427,6 +446,94 @@ pub struct SolveOutput {
     pub internal: SolveInternal,
 }
 
+impl SolveOutput {
+    /// Test hook: reinstates the unconditional entry-block backfill this used to
+    /// perform, so a reviewer can prove the frontier assertions elsewhere are
+    /// not vacuous without editing source. Running
+    ///
+    /// ```text
+    /// ATLAS_FORCE_ENTRY_BACKFILL=1 python3 scripts/test_semantic_contracts.py
+    /// ```
+    ///
+    /// must fail. Deliberately environment-only: the flag is process-global, so
+    /// an in-process setter would leak into concurrently running tests.
+    fn force_entry_backfill() -> bool {
+        static FORCE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        *FORCE.get_or_init(|| {
+            // Debug-only, like `max_transfers_budget`: a release binary must not
+            // be steerable into a known-wrong behaviour from the environment.
+            // Parsed rather than `is_some()`, so `...=0` means off.
+            if cfg!(debug_assertions)
+                && let Ok(value) = std::env::var("ATLAS_FORCE_ENTRY_BACKFILL")
+                && let Ok(parsed) = value.parse::<usize>()
+            {
+                return parsed != 0;
+            }
+            false
+        })
+    }
+
+    /// Marks this output as incomplete.
+    ///
+    /// `claim_unprocessed_block` decides whether an empty frontier may be
+    /// backfilled with `entry`. That is only honest when this function's own
+    /// solving was cut short -- the real frontier is the leftover worklist
+    /// (see `budget_exhausted` at the end of the solve). Backfilling on behalf
+    /// of a job-level interruption claims an unprocessed block for a function
+    /// that already converged, which is false (V-09).
+    pub(crate) fn mark_incomplete(
+        &mut self,
+        status: &'static str,
+        reason: &str,
+        entry: BlockId,
+        claim_unprocessed_block: bool,
+    ) {
+        self.status = status;
+        self.unknown_reasons.insert(reason.into());
+        if (claim_unprocessed_block || Self::force_entry_backfill()) && self.frontier.is_empty() {
+            self.frontier.push(entry);
+        }
+        self.internal.returns = self.internal.returns.merge(&Value::top(reason));
+        self.internal.throws = self.internal.throws.merge(&Value::top(reason));
+        for observation in self.internal.callsites.values_mut() {
+            observation.unknown_component = true;
+            observation.result = Some(
+                observation
+                    .result
+                    .as_ref()
+                    .map(|value| value.merge(&Value::top(reason)))
+                    .unwrap_or_else(|| Value::top(reason)),
+            );
+        }
+        for state in self.block_states.values_mut() {
+            state.truncated = true;
+            for (_, slot) in &mut state.bindings {
+                slot.value = slot.value.merge(&Value::top(reason));
+                slot.init = Init::MaybeInitialized;
+            }
+        }
+        // Earlier pruning may depend on a summary that did not reach its
+        // fixed point. Retain observations, but publish no negative proof.
+        self.pruned_edges.clear();
+        self.internal.effects.unknown_call = true;
+        self.internal.effects.may_throw = true;
+        self.internal.effects.may_write_heap = true;
+        self.internal.effects.may_read_heap = true;
+        self.internal.effects.may_access_global = true;
+        self.internal.effects.registers_callback = true;
+        self.internal.effects.escaped_local_value = true;
+        self.returns = value_to_json(&self.internal.returns);
+        self.throws = value_to_json(&self.internal.throws);
+        self.effects.unknown_call = true;
+        self.effects.may_throw = true;
+        self.effects.may_write_heap = true;
+        self.effects.may_read_heap = true;
+        self.effects.may_access_global = true;
+        self.effects.registers_callback = true;
+        self.effects.escaped_local_value = true;
+    }
+}
+
 /// Non-serialized payloads the interprocedural driver consumes.
 #[derive(Clone)]
 pub struct SolveInternal {
@@ -435,6 +542,27 @@ pub struct SolveInternal {
     pub effects: Effects,
     pub written: BTreeMap<(String, String), Value>,
     pub callsites: BTreeMap<u32, CallSiteObs>,
+    /// Which callee summaries / module bindings this result consumed.
+    pub read: BTreeSet<String>,
+    /// Candidates that existed but had no summary at solve time. A negative
+    /// dependency: the target may *gain* a summary when its file is fixed or
+    /// its budget is raised, and this function must then be invalidated. Missing
+    /// this is under-invalidation, which leaves stale facts alive.
+    ///
+    /// The set is deliberately not filtered to in-repo names only: an
+    /// external/unresolved name merely costs a cheap over-invalidation, whereas
+    /// filtering them out would require threading the whole-repo symbol set into
+    /// the solver and would risk dropping a case that does matter.
+    pub probed_absent: BTreeSet<String>,
+    /// Set when the solve was cut, so `read` is incomplete. A truncated read set
+    /// must be over-approximated on invalidation ("may have read anything
+    /// reachable here"), never treated as complete -- otherwise incremental
+    /// updates under-invalidate and stale facts survive, which is the same class
+    /// of silent wrong value V-09 removed.
+    ///
+    /// This flag describes *this* function's solve only. A callee whose own
+    /// solve was cut is not visible here -- that is what `probed_absent` carries.
+    pub read_truncated: bool,
 }
 
 pub struct BlockStateOut {
@@ -495,34 +623,59 @@ fn states_equal(a: &State, b: &State) -> bool {
 }
 
 fn value_fingerprint(value: &Value) -> String {
-    let mut text = String::new();
-    for constant in &value.constants {
-        match constant {
-            ConstValue::Num { value: n } => text.push_str(&format!("n{}", n.to_bits())),
-            ConstValue::Str { value: s } => text.push_str(&format!("s{s}")),
-            ConstValue::Bool { value: b } => text.push_str(&format!("b{b}")),
-            ConstValue::Null => text.push('0'),
-            ConstValue::Undefined => text.push('u'),
-        }
-    }
-    text.push('|');
-    for target in &value.targets {
-        text.push_str(target);
-        text.push(',');
-    }
-    text.push('|');
-    for origin in &value.origins {
-        text.push_str(&format!("{origin:?}"));
-        text.push(',');
-    }
-    if value.unknown {
-        text.push_str("|unknown:");
-        for reason in &value.reasons {
-            text.push_str(reason);
-            text.push(',');
-        }
-    }
-    text
+    // Debug quotes strings and keeps collection boundaries; concatenating raw
+    // strings allowed different constant sets to share a convergence key.
+    format!("{value:?}")
+}
+
+/// Only complete scalar values can cross this first context boundary. Heap,
+/// capture and symbolic parameter origins belong to the caller's namespace;
+/// treating them as callee-local sites/parameters is unsound.
+pub(crate) fn context_arguments(args: &[Value]) -> Option<Vec<Value>> {
+    args.iter()
+        .map(|value| {
+            if value.unknown
+                || value.constants.is_empty()
+                || !value.targets.is_empty()
+                || value.origins.iter().any(|origin| {
+                    matches!(
+                        origin,
+                        Origin::Parameter(_)
+                            | Origin::Allocation(_)
+                            | Origin::Capture(_)
+                            | Origin::External(_)
+                            | Origin::This
+                    )
+                })
+            {
+                return None;
+            }
+            Some(Value {
+                constants: value.constants.clone(),
+                targets: Vec::new(),
+                origins: vec![Origin::Constant],
+                unknown: false,
+                reasons: value.reasons.clone(),
+            })
+        })
+        .collect()
+}
+
+pub(crate) fn context_key(callee: &str, caller: &str, op: u32, args: &[Value]) -> Option<String> {
+    let args = context_arguments(args)?;
+    Some(format!(
+        "context:{:?}",
+        (
+            callee,
+            caller,
+            op,
+            args.iter().map(value_fingerprint).collect::<Vec<_>>()
+        )
+    ))
+}
+
+pub(crate) fn undefined_value() -> Value {
+    Value::constant(ConstValue::Undefined)
 }
 
 pub fn solve(
@@ -531,6 +684,30 @@ pub fn solve(
     function_directory: &BTreeMap<String, String>,
     summaries: &BTreeMap<String, Summary>,
     deadline: Option<std::time::Instant>,
+    param_seeds: Option<&[(String, Value)]>,
+) -> SolveOutput {
+    let control = ExecutionControl::new(deadline);
+    solve_controlled(
+        lowered,
+        function,
+        function_directory,
+        summaries,
+        &control,
+        param_seeds,
+        max_transfers_budget(),
+    )
+}
+
+/// Internal entry with a shared execution control and the remaining job work
+/// allowance. Every operation consumes at most one unit of that allowance.
+pub fn solve_controlled(
+    lowered: &LoweredFunction,
+    function: &FlowFunction,
+    function_directory: &BTreeMap<String, String>,
+    summaries: &BTreeMap<String, Summary>,
+    control: &ExecutionControl,
+    param_seeds: Option<&[(String, Value)]>,
+    transfer_limit: usize,
 ) -> SolveOutput {
     let block_of_op: Vec<BlockId> = {
         let mut map = vec![0u32; lowered.ops.len()];
@@ -627,11 +804,15 @@ pub fn solve(
         pruned_edges: Vec::new(),
         function_directory,
         cross_block_operands: &cross_block_operands,
-        deadline,
+        control,
+        transfer_limit: transfer_limit.min(max_transfers_budget()),
+        param_seeds,
         unknown_reasons: BTreeSet::new(),
         supported_ops: 0,
         unknown_ops: 0,
         summaries,
+        read: BTreeSet::new(),
+        probed_absent: BTreeSet::new(),
         object_literal_sites: lowered
             .ops
             .iter()
@@ -697,6 +878,21 @@ impl<'a> Solver<'a> {
             }
         }
         let entry = self.lowered.cfg.entry;
+        // k=1 context: concrete actual-argument values replace the symbolic
+        // parameter entry for this calling context.
+        if let Some(seeds) = self.param_seeds {
+            for (binding, value) in seeds {
+                let seeded = value.clone();
+                env.insert(
+                    binding.clone(),
+                    Slot {
+                        value: seeded,
+                        init: Init::Initialized,
+                        defs: BTreeSet::new(),
+                    },
+                );
+            }
+        }
         self.states.insert(
             entry,
             Some(State {
@@ -714,15 +910,13 @@ impl<'a> Solver<'a> {
 
     fn run(&mut self) {
         while let Some(block) = self.queue.iter().next().copied() {
-            self.queue.remove(&block);
-            if self.transfers >= MAX_TRANSFERS
-                || self
-                    .deadline
-                    .is_some_and(|deadline| std::time::Instant::now() >= deadline)
-            {
+            // Keep the interrupted block in the frontier and never propagate
+            // its partially transferred state to normal or exception exits.
+            if self.transfers >= self.transfer_limit || self.control.checkpoint().is_err() {
                 self.budget_exhausted = true;
                 break;
             }
+            self.queue.remove(&block);
             let Some(Some(input)) = self.states.get(&block).cloned() else {
                 continue;
             };
@@ -731,6 +925,10 @@ impl<'a> Solver<'a> {
             let widen = *visits > MAX_BLOCK_VISITS;
             let (out, at_throw) =
                 self.transfer_block(block, &input, widen, self.cross_block_operands);
+            if self.budget_exhausted {
+                self.queue.insert(block);
+                break;
+            }
             self.block_effects.insert(block, out.effects.clone());
             self.block_written.insert(block, out.written.clone());
             self.propagate(block, &out, &at_throw);
@@ -773,9 +971,14 @@ impl<'a> Solver<'a> {
     }
 
     /// Returns the block output plus, for every may-throw op, the state as of
-    /// just before that op executed. Exception successors must observe this
-    /// pre-state: assignments after the throwing operation have not happened
-    /// on the exceptional path, and side effects before it have.
+    /// just AFTER that op executed. Exception successors must observe this
+    /// post-state: the throwing op's own effects (a call may write heap/state
+    /// before throwing) are real, while LATER operations in the block have not
+    /// executed.
+    ///
+    /// FIXED(R1): an earlier revision of this doc comment claimed a pre-state,
+    /// which would roll back effects produced before the throw. That is
+    /// forbidden; the implementation has always stored the post-state.
     fn transfer_block(
         &mut self,
         block: BlockId,
@@ -812,11 +1015,11 @@ impl<'a> Solver<'a> {
         let block_ops = self.lowered.cfg.blocks[block as usize].ops.clone();
         let mut at_throw: BTreeMap<u32, State> = BTreeMap::new();
         for op_index in block_ops {
-            self.transfers += 1;
-            if self.transfers >= max_transfers_budget() {
+            if self.transfers >= self.transfer_limit || self.control.checkpoint().is_err() {
                 self.budget_exhausted = true;
                 break;
             }
+            self.transfers += 1;
             let may_throw = self.lowered.ops[op_index as usize].may_throw;
             self.transfer_op(&mut state, op_index);
             if may_throw {
@@ -1043,14 +1246,8 @@ impl<'a> Solver<'a> {
                     _ => None,
                 };
                 let strong = unique_site
-                    .map(|site| {
-                        !self
-                            .lowered
-                            .cfg
-                            .looping_blocks
-                            .contains(&self.block_of_op[site as usize])
-                    })
-                    .unwrap_or(false);
+                    .and_then(|site| self.block_of_op.get(site as usize))
+                    .is_some_and(|block| !self.lowered.cfg.looping_blocks.contains(block));
                 if strong {
                     // Strong update: single concrete object proven outside loops.
                     if let Some((_, field_key)) = sites.first() {
@@ -1125,10 +1322,62 @@ impl<'a> Solver<'a> {
                     .iter()
                     .filter(|target| self.summaries.contains_key(*target))
                     .collect();
+                // Read set: these are the summaries this call actually consumes.
+                // A target with no summary yet is not a read -- nothing was
+                // taken from it, so it must not create a dependency edge.
+                self.read
+                    .extend(known_targets.iter().map(|target| (*target).clone()));
+                // But it IS a negative dependency. Three different situations
+                // land here and are deliberately not distinguished:
+                //   1. an external / unresolved name that will never have a
+                //      summary (harmless to record, just conservative),
+                //   2. an in-repo function whose file failed to parse or was
+                //      ignored -- it GAINS a summary once that is fixed,
+                //   3. an in-repo function whose own solve was cut -- it gains
+                //      a summary once the budget is raised.
+                // Cases 2 and 3 must invalidate this function (ET-08: "a
+                // missing target is still a dependency"), and case 3 is exactly
+                // what `read_truncated` cannot see, because that flag only says
+                // *this* solve was cut. Recording all three over-invalidates
+                // cheaply; under-invalidating leaves stale facts alive.
+                for target in &callee_value.targets {
+                    if !self.summaries.contains_key(target) {
+                        self.probed_absent.insert(target.clone());
+                    }
+                }
                 let mut result = Value::top("call_result_unknown")
                     .with_origins(vec![Origin::CallResult(op_index)]);
                 let mut summarized = false;
-                if !callee_value.unknown
+                // k=1: a context summary computed for THIS exact callsite
+                // (single target) is the most precise view; it already carries
+                // the concrete values for this calling context.
+                let mut used_context = false;
+                if callee_value.targets.len() == 1
+                    && !callee_value.unknown
+                    && let Some(context_key) = context_key(
+                        &callee_value.targets[0],
+                        &self.function.symbol,
+                        op_index,
+                        &arg_values,
+                    )
+                    && let Some(summary) = self.summaries.get(&context_key)
+                    && let Some(returns) = &summary.returns
+                {
+                    // Scalar contexts have no caller-local parameter/site
+                    // origins. Apply the common return boundary for callsite
+                    // provenance and conservative callee-allocation handling.
+                    result = apply_summary_value(returns, &arg_values, op_index);
+                    summarized = true;
+                    used_context = true;
+                    if let Some(effects) = &summary.effects {
+                        state.effects = state.effects.join(effects);
+                    }
+                    if let Some(written) = &summary.written {
+                        self.apply_summary_heap(state, written, &arg_values, op_index);
+                    }
+                }
+                if !summarized
+                    && !callee_value.unknown
                     && !known_targets.is_empty()
                     && known_targets.len() == callee_value.targets.len()
                 {
@@ -1138,19 +1387,6 @@ impl<'a> Solver<'a> {
                     let mut callee_effects = Effects::default();
                     for target in &known_targets {
                         let summary = &self.summaries[target.as_str()];
-                        if std::env::var("ATLAS_DEBUG_SOLVE").is_ok() {
-                            eprintln!(
-                                "[m1-call] op{op_index} args={:?} summary_returns={:?}",
-                                arg_values
-                                    .iter()
-                                    .map(|v| (v.constants.clone(), v.origins.clone()))
-                                    .collect::<Vec<_>>(),
-                                summary
-                                    .returns
-                                    .as_ref()
-                                    .map(|r| (r.constants.clone(), r.origins.clone()))
-                            );
-                        }
                         let applied = match &summary.returns {
                             Some(returns) => apply_summary_value(returns, &arg_values, op_index),
                             None => Value::top("callee_summary_pending")
@@ -1197,7 +1433,7 @@ impl<'a> Solver<'a> {
                         .reasons
                         .insert("callee_summary_pending_interprocedural".into());
                 }
-                if summarized {
+                if summarized && !used_context {
                     // Re-base the callees' recorded heap writes onto the
                     // actual arguments so later reads observe the call's
                     // write effects (R2).
@@ -1329,8 +1565,18 @@ impl<'a> Solver<'a> {
 
     /// Best-known exception value for an op: known callee summaries contribute
     /// their throws; anything else stays an unknown exception value.
+    ///
+    /// FIXED(P0): `Summary::throws` is a *callee-relative* value. It carries the
+    /// callee's own `Parameter(i)` and `Allocation(site)` origins, so it must be
+    /// rebased through [`apply_summary_value`] exactly like `Summary::returns`.
+    /// This path used to merge the raw summary instead, which leaked callee
+    /// origins into the caller: `function h(a,b){throw b}` reached from
+    /// `g(y)` with `y=7` produced `Parameter(1)`, which the caller then resolved
+    /// to a *known* `undefined`; a thrown object literal aliased a caller-local
+    /// heap op by integer collision. Both were definite wrong values reported
+    /// with `unknown=false`, which is the outcome the engine must never emit.
     fn thrown_value_for_op(&self, state: &State, op: u32) -> Value {
-        if let OpKind::Call { callee, .. } = &self.lowered.ops[op as usize].kind {
+        if let OpKind::Call { callee, args, .. } = &self.lowered.ops[op as usize].kind {
             let callee_value = self.value_of(state, *callee);
             if !callee_value.unknown
                 && !callee_value.targets.is_empty()
@@ -1339,15 +1585,39 @@ impl<'a> Solver<'a> {
                     .iter()
                     .all(|target| self.summaries.contains_key(target))
             {
+                let arg_values: Vec<Value> =
+                    args.iter().map(|arg| self.value_of(state, *arg)).collect();
+                // k=1: a context summary computed for THIS exact callsite was
+                // derived from these same arguments, and its throws still carry
+                // callee-relative origins.
+                if callee_value.targets.len() == 1
+                    && let Some(context_key) = context_key(
+                        &callee_value.targets[0],
+                        &self.function.symbol,
+                        op,
+                        &arg_values,
+                    )
+                    && let Some(throws) = self
+                        .summaries
+                        .get(&context_key)
+                        .and_then(|summary| summary.throws.as_ref())
+                {
+                    return apply_summary_value(throws, &arg_values, op);
+                }
                 let mut joined: Option<Value> = None;
                 for target in &callee_value.targets {
-                    let summary = &self.summaries[target.as_str()];
-                    if let Some(throws) = &summary.throws {
-                        joined = Some(match joined {
-                            Some(existing) => existing.merge(throws),
-                            None => throws.clone(),
-                        });
-                    }
+                    // Every target carries a summary (guarded above) and
+                    // `summary()` always stores `Some(throws)`, so an unobserved
+                    // throw is the explicit `no_throw_observed` unknown rather
+                    // than a silently dropped exception edge.
+                    let Some(throws) = self.summaries[target.as_str()].throws.as_ref() else {
+                        continue;
+                    };
+                    let applied = apply_summary_value(throws, &arg_values, op);
+                    joined = Some(match joined {
+                        Some(existing) => existing.merge(&applied),
+                        None => applied,
+                    });
                 }
                 if let Some(joined) = joined {
                     return joined;
@@ -1467,11 +1737,10 @@ impl<'a> Solver<'a> {
                 if !actual.unknown
                     && actual.origins.len() == 1
                     && let Some(Origin::Allocation(site_op)) = actual.origins.first()
-                    && !self
-                        .lowered
-                        .cfg
-                        .looping_blocks
-                        .contains(&self.block_of_op[*site_op as usize])
+                    && self
+                        .block_of_op
+                        .get(*site_op as usize)
+                        .is_some_and(|block| !self.lowered.cfg.looping_blocks.contains(block))
                 {
                     let key = (format!("op{site_op}"), field.clone());
                     let merged = match state.heap.get(&key) {
@@ -1656,8 +1925,9 @@ impl<'a> Solver<'a> {
             }
             Term::Sink => {}
         }
-        // Exception edges from may-throw ops in this block observe the state
-        // as of just before the throwing op, never the block end state.
+        // Exception edges from may-throw ops in this block observe the state as
+        // of just AFTER the throwing op -- its own effects are real -- never the
+        // block end state, which would also include later statements.
         if let Some(edges) = self.exception_by_block.get(&block).cloned() {
             for (op, handler) in edges {
                 let base = at_throw.get(&op).cloned().unwrap_or_else(|| out.clone());
@@ -1706,7 +1976,7 @@ impl<'a> Solver<'a> {
             throw_values,
             ..
         } = self;
-        let effects = block_effects
+        let mut effects = block_effects
             .into_values()
             .fold(Effects::default(), |acc, effects| acc.join(&effects));
         let frontier: Vec<BlockId> = if budget_exhausted {
@@ -1789,12 +2059,22 @@ impl<'a> Solver<'a> {
                     }
                     acc
                 });
+        if budget_exhausted {
+            returns = returns.merge(&Value::top("analysis_work_incomplete"));
+            throws = throws.merge(&Value::top("analysis_work_incomplete"));
+            effects.unknown_call = true;
+        }
         let internal = SolveInternal {
             returns: returns.clone(),
             throws: throws.clone(),
             effects: effects.clone(),
             written,
             callsites: self.callsites,
+            read: self.read.clone(),
+            probed_absent: self.probed_absent.clone(),
+            // A cut solve cannot vouch for its read set; consumers must
+            // over-approximate rather than treat it as complete.
+            read_truncated: self.budget_exhausted,
         };
         if !has_return {
             returns.unknown = true;
@@ -1804,7 +2084,7 @@ impl<'a> Solver<'a> {
             throws.unknown = true;
             throws.reasons.insert("no_throw_observed".into());
         }
-        SolveOutput {
+        let mut output = SolveOutput {
             status,
             block_states,
             frontier,
@@ -1826,7 +2106,20 @@ impl<'a> Solver<'a> {
             coverage,
             budgets,
             internal,
+        };
+        if budget_exhausted {
+            // This function's own solve was cut, so it may claim an unprocessed
+            // block. Under `run()`'s invariant the frontier is already non-empty
+            // here and the backfill never actually fires -- this grant is
+            // defensive, and it is the only place allowed to make it.
+            output.mark_incomplete(
+                "partial_budget",
+                "analysis_work_incomplete",
+                lowered.cfg.entry,
+                true,
+            );
         }
+        output
     }
 }
 
@@ -2017,29 +2310,10 @@ pub fn js_string(value: &ConstValue) -> Option<String> {
         ConstValue::Null => Some("null".into()),
         ConstValue::Undefined => Some("undefined".into()),
         ConstValue::Num { value: n } => {
-            if n.is_nan() {
-                return Some("NaN".into());
-            }
-            if *n == 0.0 {
-                return Some("0".into()); // covers -0 too
-            }
-            if n.fract() == 0.0 && n.abs() < 1e21 {
-                // JS prints plain digits below 1e21. `{:.0}` renders the exact
-                // integer value of the f64 without narrow-integer saturation
-                // (1e20 exceeds i64 but is exactly representable).
-                return Some(format!("{:.0}", n));
-            }
-            // JS uses plain decimal notation roughly in [1e-6, 1e21); inside
-            // that band Rust's shortest round-trip formatting matches, so the
-            // concatenation result is exact. Outside it (exponent forms) the
-            // result stays unknown rather than guessing the format.
-            if n.abs() >= 1e-6 && n.abs() < 1e21 {
-                let text = format!("{}", n);
-                if !text.contains('e') && !text.contains('E') {
-                    return Some(text);
-                }
-            }
-            None
+            // ECMAScript uses the shortest round-tripping decimal, not the
+            // exact decimal expansion of the binary float. This also handles
+            // signed zero, exponent thresholds and non-finite numbers locally.
+            Some(ryu_js::Buffer::new().format(*n).to_owned())
         }
     }
 }
@@ -2317,8 +2591,23 @@ pub fn apply_summary_value(summary_value: &Value, args: &[Value], callsite_op: u
                         );
                     }
                 }
-                None => origins.push(origin.clone()),
+                None => {
+                    if !value.constants.contains(&ConstValue::Undefined) {
+                        value.constants.push(ConstValue::Undefined);
+                    }
+                    origins.push(Origin::Constant);
+                }
             },
+            Origin::Allocation(_) => {
+                // Allocation op ids are function-local. Returned heap graphs
+                // are not imported yet; aliasing a caller-local op with the
+                // same integer would fabricate field values or panic.
+                value.unknown = true;
+                value
+                    .reasons
+                    .insert("callee_allocation_heap_not_imported".into());
+                origins.push(Origin::CallResult(callsite_op));
+            }
             other => origins.push(other.clone()),
         }
     }

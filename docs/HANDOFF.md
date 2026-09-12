@@ -2,7 +2,7 @@
 
 版本：Foundation 0.1，2026-09-08。工作目录为独立 `/Users/yinsijie/CodeRepo/Atlas`，不是 Modus 内 `code-atlas`。先读 `../README.md` 与 `ARCHITECTURE.md`，然后根据任务读取 `specs/` 对应完整合同。不要重建另一份相同基础，不把“此切片通过”写为 Atlas 整体完成。
 
-2026-09-09 执行补充：用户采用外部 Coding Agent 每日 10 小时开发、交回独立复审的工作方式。日常执行从 [每日任务书](DAILY_DEVELOPMENT_WORK_ORDER.md)、[可直接转交的提示词](START_CODING_AGENT.md) 和 [持续进度](implementation/progress.json) 接续。本文保留长期技术依赖；每日任务书细化工作窗口与交付，不缩减完整产品目标。
+2026-09-09 执行补充：用户采用外部 Coding Agent 持续开发、阶段成果交回独立复审的工作方式。执行从 [持续开发任务书](DAILY_DEVELOPMENT_WORK_ORDER.md)、[可直接转交的提示词](START_CODING_AGENT.md) 和 [持续进度](implementation/progress.json) 接续。本文保留长期技术依赖；持续开发任务书细化工作项与交付，不缩减完整产品目标。
 
 ## 接手时先做
 
@@ -14,7 +14,8 @@
 ## 当前可依赖的事实
 
 - 有独立 Rust/Node/SQLite/CLI/HTTP/Web 链路。旧 Modus code-atlas 未迁移、未接入新服务。
-- 静态能力是函数结构与词法候选，加上 0.2 的声明 profile 内局部语义：worker Flow IR → Rust CFG（finally completion/短路/循环/switch）→ 局部抽象解释（def-use、值来源、有限常量折叠、循环不动点、显式 unknown 与预算）。CLI `flows`/`flow` 与 HTTP `/api/flows`、`/api/flow` 已接通，函数面板消费同一事实。跨过程符号摘要（调用点代回、SCC 固定点）已接通并有 D13/D14/D15/D17 反例；k=1 上下文敏感、堆别名精度与真实执行仍是目标。
+- 静态能力是函数结构与词法候选，加上 0.2 的声明 profile 内局部语义：worker Flow IR → Rust CFG（finally completion/短路/循环/switch）→ 局部抽象解释（def-use、值来源、有限常量折叠、循环不动点、显式 unknown 与预算）。CLI `flows`/`flow` 与 HTTP `/api/flows`、`/api/flow` 已接通，函数面板消费同一事实。跨过程符号摘要（调用点代回、SCC 固定点）已接通并有 D13/D14/D15/D17 反例；有界标量参数 k=1 上下文已接通（每 callee 至多 8 个调用点）；完整堆/闭包上下文、堆别名精度与真实执行仍是目标。
+- 索引全链协作取消、发布事务取消门与共享求解预算已接通；`flow.frontier`、调用点 unknown 与计数是部分结果的查询合同。
 - 有界分页/遍历、快照源码和 SelectionContext 可用；没有持久作业、增量索引、正式工具注册/MCP、回执或可控 target runner。
 - Web 实际使用服务事实，候选高亮保留，函数详情面板显示块级控制流与值来源摘要；没有正式 3D、运行血流、函数微操、AI 代码写入。
 - CLI 的 worker 参数指定 Atlas 自有受信任提取程序。不要把它扩展为直接运行用户代码的入口。
@@ -53,6 +54,6 @@ AI Coding 第一条完整链应做到：选函数标注新增约束 → 导出�
 
 ## 明确未完成的工程工作
 
-公开 schema/golden/兼容性；依赖许可/分发；Windows/Linux 与 Node24 实际资格；超深 AST 的 worker 栈预算；扫描期间整体 deadline 与更强路径竞争防护；总响应预算与取消；断电耐久、GC、存储迁移；更多语言/框架；源码隐私/披露规则；完整真实大仓库基准；远程服务认证；持久工作台状态；Modus adapter。生产诊断仍是候选拓展，不能默认接入生产数据库。
+公开 schema/golden/兼容性；依赖许可/分发；Windows/Linux 与 Node24 实际资格；超深 AST 的 worker 栈预算；更强路径竞争防护；查询响应的细化预算与取消；断电耐久、GC、存储迁移；更多语言/框架；源码隐私/披露规则；完整真实大仓库基准；远程服务认证；持久工作台状态；Modus adapter。生产诊断仍是候选拓展，不能默认接入生产数据库。
 
 这些是接力任务，不是永久放弃。允许替换框架和目录，要求保留身份、授权、本地数据、明确未知、终止和真实验收。不要为了沿用旧代码而保留错误，也不要为展示进度而把未实现功能画成可用按钮。

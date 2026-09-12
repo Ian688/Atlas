@@ -1,5 +1,5 @@
 {
-  "time_utc": "2026-09-09T03:31:35.530530+00:00",
+  "time_utc": "2026-09-09T07:59:40.412664+00:00",
   "fixture_sha256": "b372e4682948272dcb13bd46ccf4dd2f75103f0fb3fa12f4c61f6389a131ffdf",
   "analysis": {
     "call_count": 9,
@@ -20,9 +20,9 @@
     "edge_count": 29,
     "engine": "foundation-flow-0.2.0",
     "file_count": 1,
-    "flow_digest": "50d1e8a2995fec9f796c426540072e57890b21df64845adb7c224c51ce6c6835",
+    "flow_digest": "bb665da335275371af59fc06b4f619cb533ede788ee553899ec979f8f9f38b30",
     "function_count": 19,
-    "id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+    "id": "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
     "limitations": [
       "Lexical declaration candidates, not a complete runtime call graph or execution trace.",
       "Snapshot captures files over an interval; it is not an atomic filesystem transaction.",
@@ -92,7 +92,7 @@
         "id": "atlas-local-absint",
         "version": "0.1.0"
       },
-      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+      "analysis_id": "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
       "binding_kinds": {
         "b:probe.mjs:1045:change": "param",
         "b:probe.mjs:1059:x": "let",
@@ -512,7 +512,7 @@
         "id": "atlas-local-absint",
         "version": "0.1.0"
       },
-      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+      "analysis_id": "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
       "binding_kinds": {
         "b:probe.mjs:143:o": "const"
       },
@@ -834,7 +834,7 @@
         "id": "atlas-local-absint",
         "version": "0.1.0"
       },
-      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+      "analysis_id": "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
       "binding_kinds": {
         "b:probe.mjs:222:change": "param",
         "b:probe.mjs:238:o": "const"
@@ -1162,7 +1162,7 @@
         "id": "atlas-local-absint",
         "version": "0.1.0"
       },
-      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+      "analysis_id": "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
       "binding_kinds": {},
       "binding_names": {},
       "block_states": [
@@ -1346,7 +1346,7 @@
         "id": "atlas-local-absint",
         "version": "0.1.0"
       },
-      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+      "analysis_id": "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
       "binding_kinds": {},
       "binding_names": {},
       "block_states": [
@@ -1530,7 +1530,7 @@
         "id": "atlas-local-absint",
         "version": "0.1.0"
       },
-      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+      "analysis_id": "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
       "binding_kinds": {
         "b:probe.mjs:417:flag": "param",
         "b:probe.mjs:431:o": "const"
@@ -2043,7 +2043,7 @@
         "id": "atlas-local-absint",
         "version": "0.1.0"
       },
-      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+      "analysis_id": "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
       "binding_kinds": {
         "b:probe.mjs:515:f": "const"
       },
@@ -2374,7 +2374,7 @@
         "id": "atlas-local-absint",
         "version": "0.1.0"
       },
-      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+      "analysis_id": "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
       "binding_kinds": {},
       "binding_names": {},
       "block_states": [
@@ -2615,7 +2615,7 @@
         "id": "atlas-local-absint",
         "version": "0.1.0"
       },
-      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+      "analysis_id": "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
       "binding_kinds": {
         "b:probe.mjs:649:f": "function",
         "b:probe.mjs:676:inner": "function"
@@ -2752,10 +2752,7 @@
                 "CallResult(op1)",
                 "Constant"
               ],
-              "reasons": [
-                "call_result_unknown",
-                "callee_summary_pending_interprocedural"
-              ],
+              "reasons": [],
               "targets": [],
               "typed_constants": [
                 {
@@ -2763,7 +2760,7 @@
                   "value": 1.0
                 }
               ],
-              "unknown": true
+              "unknown": false
             },
             "start": 720,
             "targets": [
@@ -2799,10 +2796,7 @@
             "CallResult(op1)",
             "Constant"
           ],
-          "reasons": [
-            "call_result_unknown",
-            "callee_summary_pending_interprocedural"
-          ],
+          "reasons": [],
           "targets": [],
           "typed_constants": [
             {
@@ -2810,7 +2804,7 @@
               "value": 1.0
             }
           ],
-          "unknown": true
+          "unknown": false
         },
         "summary_throws": {
           "constants": [],
@@ -2901,10 +2895,7 @@
           "CallResult(op1)",
           "Constant"
         ],
-        "reasons": [
-          "call_result_unknown",
-          "callee_summary_pending_interprocedural"
-        ],
+        "reasons": [],
         "targets": [],
         "typed_constants": [
           {
@@ -2912,7 +2903,7 @@
             "value": 1.0
           }
         ],
-        "unknown": true
+        "unknown": false
       },
       "status": "complete_within_profile",
       "symbol": "symbol:probe.mjs:606:730",
@@ -2933,7 +2924,7 @@
         "id": "atlas-local-absint",
         "version": "0.1.0"
       },
-      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+      "analysis_id": "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
       "binding_kinds": {
         "b:probe.mjs:765:x": "let",
         "b:probe.mjs:778:previous": "const"
@@ -3209,7 +3200,7 @@
         "id": "atlas-local-absint",
         "version": "0.1.0"
       },
-      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+      "analysis_id": "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
       "binding_kinds": {
         "b:probe.mjs:881:x": "const"
       },
@@ -3574,7 +3565,7 @@
         "id": "atlas-local-absint",
         "version": "0.1.0"
       },
-      "analysis_id": "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+      "analysis_id": "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
       "binding_kinds": {
         "b:probe.mjs:942:fail": "function",
         "b:probe.mjs:995:e": "catch"
@@ -3921,7 +3912,7 @@
     {
       "argv": [
         "node",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-1a1z21a8/oracle.mjs"
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-bdg4b869/oracle.mjs"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -3930,9 +3921,9 @@
       "argv": [
         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
         "--store",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-1a1z21a8/store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-bdg4b869/store",
         "index",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-1a1z21a8/project"
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-bdg4b869/project"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -3941,9 +3932,9 @@
       "argv": [
         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
         "--store",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-1a1z21a8/store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-bdg4b869/store",
         "nodes",
-        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+        "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
         "--kind",
         "function",
         "--limit",
@@ -3956,9 +3947,9 @@
       "argv": [
         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
         "--store",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-1a1z21a8/store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-bdg4b869/store",
         "flow",
-        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+        "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
         "symbol:probe.mjs:1014:1126"
       ],
       "exit_code": 0,
@@ -3968,9 +3959,9 @@
       "argv": [
         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
         "--store",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-1a1z21a8/store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-bdg4b869/store",
         "flow",
-        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+        "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
         "symbol:probe.mjs:103:189"
       ],
       "exit_code": 0,
@@ -3980,9 +3971,9 @@
       "argv": [
         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
         "--store",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-1a1z21a8/store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-bdg4b869/store",
         "flow",
-        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+        "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
         "symbol:probe.mjs:190:282"
       ],
       "exit_code": 0,
@@ -3992,9 +3983,9 @@
       "argv": [
         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
         "--store",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-1a1z21a8/store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-bdg4b869/store",
         "flow",
-        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+        "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
         "symbol:probe.mjs:283:335"
       ],
       "exit_code": 0,
@@ -4004,9 +3995,9 @@
       "argv": [
         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
         "--store",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-1a1z21a8/store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-bdg4b869/store",
         "flow",
-        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+        "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
         "symbol:probe.mjs:336:387"
       ],
       "exit_code": 0,
@@ -4016,9 +4007,9 @@
       "argv": [
         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
         "--store",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-1a1z21a8/store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-bdg4b869/store",
         "flow",
-        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+        "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
         "symbol:probe.mjs:388:476"
       ],
       "exit_code": 0,
@@ -4028,9 +4019,9 @@
       "argv": [
         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
         "--store",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-1a1z21a8/store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-bdg4b869/store",
         "flow",
-        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+        "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
         "symbol:probe.mjs:477:547"
       ],
       "exit_code": 0,
@@ -4040,9 +4031,9 @@
       "argv": [
         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
         "--store",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-1a1z21a8/store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-bdg4b869/store",
         "flow",
-        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+        "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
         "symbol:probe.mjs:548:605"
       ],
       "exit_code": 0,
@@ -4052,9 +4043,9 @@
       "argv": [
         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
         "--store",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-1a1z21a8/store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-bdg4b869/store",
         "flow",
-        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+        "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
         "symbol:probe.mjs:606:730"
       ],
       "exit_code": 0,
@@ -4064,9 +4055,9 @@
       "argv": [
         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
         "--store",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-1a1z21a8/store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-bdg4b869/store",
         "flow",
-        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+        "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
         "symbol:probe.mjs:731:812"
       ],
       "exit_code": 0,
@@ -4076,9 +4067,9 @@
       "argv": [
         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
         "--store",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-1a1z21a8/store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-bdg4b869/store",
         "flow",
-        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+        "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
         "symbol:probe.mjs:813:901"
       ],
       "exit_code": 0,
@@ -4088,9 +4079,9 @@
       "argv": [
         "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
         "--store",
-        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-1a1z21a8/store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-bdg4b869/store",
         "flow",
-        "988a8483f4a58d03d4846b6193b326900cead812d43bac78324b3399c87138ae",
+        "1b3acee85382957b70b7a3095f8b5bc31fd39869a2aca93a2a0dc32b2c2d0086",
         "symbol:probe.mjs:902:1013"
       ],
       "exit_code": 0,

@@ -1,0 +1,10 @@
+[
+  {
+    "probe": "semantics",
+    "exit_code": 0
+  },
+  {
+    "probe": "boundaries",
+    "exit_code": 0
+  }
+]

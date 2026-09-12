@@ -2,7 +2,7 @@ mod server;
 mod worker;
 
 use atlas_contract::{ParseRequest, ScanLimits};
-use atlas_engine::{analyze, scan, store::Store};
+use atlas_engine::{analyze, control::ExecutionControl, scan, store::Store};
 use clap::{Parser, Subcommand};
 use std::{path::PathBuf, time::Duration};
 
@@ -122,62 +122,49 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("index deadline must be 1..3600 seconds".into());
             }
             let pipeline_started = std::time::Instant::now();
-            // W06: SIGINT/SIGTERM cancel the pipeline — kill the owned worker
-            // child and exit without publishing. The watcher hard-exits after
-            // a short grace so a blocked scan stage cannot outlive the
-            // cancellation by more than the grace window.
+            let control = ExecutionControl::new(Some(
+                pipeline_started + Duration::from_secs(index_deadline_seconds),
+            ));
             let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
-            let signal_watcher = tokio::spawn(async move {
-                let sigint = tokio::signal::ctrl_c();
-                #[cfg(unix)]
-                {
-                    use tokio::signal::unix::{SignalKind, signal};
-                    let mut sigterm = signal(SignalKind::terminate()).expect("sigterm handler");
-                    tokio::select! {
-                        _ = sigint => {}
-                        _ = sigterm.recv() => {}
-                    }
-                }
-                #[cfg(not(unix))]
-                {
-                    let _ = sigint.await;
-                }
-                let _ = cancel_tx.send(true);
-                tokio::time::sleep(Duration::from_millis(300)).await;
-                std::process::exit(130);
-            });
-            let stage_budget = |own: Duration| -> Duration {
-                let remaining = Duration::from_secs(index_deadline_seconds)
-                    .saturating_sub(pipeline_started.elapsed());
-                own.min(remaining)
-            };
-            let snapshot = scan::scan(
-                &root,
-                &store,
-                ScanLimits::default(),
-                Some(stage_budget(Duration::from_secs(scan_deadline_seconds))),
-            )?;
-            let request = ParseRequest {
-                schema: "atlas.parse-request.v1".into(),
-                snapshot_id: snapshot.id.clone(),
-                files: store.sources(&snapshot)?,
-            };
+            let _signal_watcher = signal_watcher(control.clone(), cancel_tx)?;
+            // Filesystem and Rust work must not occupy the async runtime that
+            // receives signals. The same control remains live through commit.
+            let scan_store = store.clone();
+            let scan_control = control.clone();
+            let (snapshot, request) = tokio::task::spawn_blocking(move || {
+                let snapshot = scan::scan_controlled(
+                    &root,
+                    &scan_store,
+                    ScanLimits::default(),
+                    Some(Duration::from_secs(scan_deadline_seconds)),
+                    &scan_control,
+                )?;
+                let request = ParseRequest {
+                    schema: "atlas.parse-request.v1".into(),
+                    snapshot_id: snapshot.id.clone(),
+                    files: scan_store.sources_controlled(&snapshot, &scan_control)?,
+                };
+                Ok::<_, atlas_engine::Error>((snapshot, request))
+            })
+            .await??;
+            control.checkpoint()?;
+            let remaining = Duration::from_secs(index_deadline_seconds)
+                .saturating_sub(pipeline_started.elapsed());
             let facts = worker::parse(
                 &node,
                 &worker,
                 &request,
-                stage_budget(Duration::from_secs(timeout_seconds)),
+                Duration::from_secs(timeout_seconds).min(remaining),
                 32 * 1024 * 1024,
-                cancel_rx.clone(),
+                cancel_rx,
             )
             .await?;
-            signal_watcher.abort();
-            let analysis = analyze::analyze(
-                &store,
-                &snapshot,
-                facts,
-                Some(pipeline_started + Duration::from_secs(index_deadline_seconds)),
-            )?;
+            control.checkpoint()?;
+            let analysis_store = store.clone();
+            let analysis = tokio::task::spawn_blocking(move || {
+                analyze::analyze_controlled(&analysis_store, &snapshot, facts, &control)
+            })
+            .await??;
             print(store.metadata(&analysis.id)?)?;
         }
         Action::Report { analysis } => print(store.metadata(&analysis)?)?,
@@ -214,4 +201,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     Ok(())
+}
+
+/// Every exit path drops the listener; cancellation uses cooperative cleanup,
+/// not process::exit, so the owned worker is always waited on.
+struct SignalWatcher(tokio::task::JoinHandle<()>);
+
+impl Drop for SignalWatcher {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
+fn signal_watcher(
+    control: ExecutionControl,
+    cancel: tokio::sync::watch::Sender<bool>,
+) -> std::io::Result<SignalWatcher> {
+    #[cfg(unix)]
+    let wait = {
+        use tokio::signal::unix::{SignalKind, signal};
+        // Register before starting the pipeline, including on one-core hosts.
+        let mut sigint = signal(SignalKind::interrupt())?;
+        let mut sigterm = signal(SignalKind::terminate())?;
+        async move {
+            tokio::select! {
+                _ = sigint.recv() => {}
+                _ = sigterm.recv() => {}
+            }
+        }
+    };
+    #[cfg(not(unix))]
+    let wait = async {
+        let _ = tokio::signal::ctrl_c().await;
+    };
+    Ok(SignalWatcher(tokio::spawn(async move {
+        wait.await;
+        if control.cancel() {
+            let _ = cancel.send(true);
+            eprintln!("index_cancellation_requested");
+        }
+    })))
 }

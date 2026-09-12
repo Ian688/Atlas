@@ -64,13 +64,17 @@ Node worker 加载 Atlas 固定的 TypeScript 编译器。编译器 host 只读 
 
 直接标识符调用可以利用 compiler symbol/alias 找到唯一声明作为候选；参数遮蔽不会按同名字符串绑定。无显式模块语法的重复脚本函数名保留歧义。已检测到写入的函数绑定、语法错误/dynamic 文件的目标、属性调用、构造、可选调用、外部依赖均不声称确定目标。
 
-**未实现**：完整语义诊断/类型检查、所有 CommonJS/re-export 关系清点、动态 import、闭包环境/函数执行时间、this/继承/堆别名完整模型、反射、框架依赖注入、跨语言联系、k=1 上下文敏感摘要与捕获 origin 重代入。候选关系不能证明目标会被执行或只可能执行它。纯源码解析也不会告诉用户某次复制"实际复制了哪些字节"。
+**未实现**：完整语义诊断/类型检查、所有 CommonJS/re-export 关系清点、动态 import、闭包环境/函数执行时间、this/继承/堆别名完整模型、反射、框架依赖注入、跨语言联系、完整堆/闭包上下文敏感摘要与捕获 origin 重代入。候选关系不能证明目标会被执行或只可能执行它。纯源码解析也不会告诉用户某次复制"实际复制了哪些字节"。
 
 **Flow IR 与局部求解（0.2 新增，声明 profile 内）**：worker 将每个函数体降级为 `atlas.flow-ir.v1`（`js-structured-control.v1` profile）的结构化语句/表达式、Scope/Binding 与显式 unknown；Rust 校验锚点/引用/预算后构建基本块 CFG——`Completion(kind,value)` 驱动共享 finally dispatch、catch 不重入、短路/条件/`??`/switch 均为显式分支边，循环回边经迭代 Kosaraju 标记。局部抽象解释（`atlas-local-absint`）在有界格（常量 8/目标 64/来源 8/堆 32）上求 def-use、初始化状态（含 TDZ）、值来源与 JS 语义常量折叠；预算中断报告 `partial_budget` 与 frontier，不产生否定性证明。派生事实与 analysis id 以 `flow_digest` 绑定，旧分析不变。未声明构造（for-of/in、解构、async/await、逻辑赋值等）为显式 unknown，不是静默跳过，也不能把本 profile 内的普通赋值/参数/条件 unknown 化。
 
 Rust 对 worker 版本、已确认文件集合、实体锚点、容器、调用归属、图引用作校验。覆盖报告包含已遇到源文件、真正送入语言解析的源文件、清单状态与未知调用分母。解析报告成功不代表代码可运行或业务正确。
 
-worker stdin ≤160 MiB、stdout ≤32 MiB、stderr ≤64 KiB，V8 old-space 为 512 MiB。调用有 1–600 秒配置期限；失败或超时杀死并回收直接 worker，部分输出不发布 Analysis。该机制用于受信任的 Atlas worker，不是任意用户代码 runner，不提供完整进程树/OS 沙箱承诺，也不是总体 RSS 硬上限。文件系统阶段尚无整个作业 deadline。
+数值转字符串使用固定版本 `ryu-js 1.0.3` 的本地 Rust 转换，遵循最短可往返十进制与指数阈值规则；不能用 f64 的精确整数展开代替 JavaScript `String(number)`。测试中的 Node 只执行受控 fixture，产品索引不执行用户代码。
+
+有界标量上下文：在符号摘要之上，每个 callee 最多对 8 个调用点的完整标量实参单独求解。上下文键绑定 callee、caller、调用操作与规范化实参；实参变化后重新调度。对象、捕获与符号参数使用原符号摘要，不将 caller 的局部分配点/参数编号当作 callee 身份。初始、SCC 与上下文求解共享总 transfer 预算；不收敛或预算耗尽会降级所有受影响的结果，`flow.frontier` 和预算计数随不可变事实发布。
+
+worker stdin ≤160 MiB、stdout ≤32 MiB、stderr ≤64 KiB，V8 old-space 为 512 MiB。调用有 1–600 秒配置期限；失败或超时杀死并回收直接 worker，部分输出不发布 Analysis。该机制用于受信任的 Atlas worker，不是任意用户代码 runner，不提供完整进程树/OS 沙箱承诺，也不是总体 RSS 硬上限。CLI 的整体 deadline 覆盖扫描、worker、Rust 分析和 SQLite 发布锁等待。扫描阶段自己的 deadline 同样覆盖快照发布。SIGINT/SIGTERM listener 保持到流水线结束；同步扫描/求解在 blocking 线程执行，控制对象在有界检查点检查取消。SQLite 写锁按短周期等待，最终 commit 与取消接受使用同一个门：先接受取消则回滚，先完成 commit 则保留成功的不可变版本。协作取消不承诺中断正在进行的单次操作系统 I/O 或磁盘提交，不使用硬退出伪装子进程已回收。当前仍无持久作业队列、owner 租约或进程崩溃重启恢复。
 
 ## 6. 图算法与查询
 

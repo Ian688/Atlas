@@ -1,0 +1,9 @@
+test_budget_publication_is_partial_bounded_and_immutable (__main__.SemanticContracts.test_budget_publication_is_partial_bounded_and_immutable) ... ok
+test_context_cap_preserves_every_callers_possible_result (__main__.SemanticContracts.test_context_cap_preserves_every_callers_possible_result) ... ok
+test_number_to_string_matches_node_at_rounding_and_exponent_boundaries (__main__.SemanticContracts.test_number_to_string_matches_node_at_rounding_and_exponent_boundaries) ... ok
+test_parameter_permutation_and_refined_scalar_contexts (__main__.SemanticContracts.test_parameter_permutation_and_refined_scalar_contexts) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 5.911s
+
+OK

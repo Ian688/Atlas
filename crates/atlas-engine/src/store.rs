@@ -1,4 +1,4 @@
-use crate::{Result, digest, invalid};
+use crate::{Result, control::ExecutionControl, digest, invalid};
 use atlas_contract::{Analysis, Snapshot, SourceFile};
 use rusqlite::{Connection, OptionalExtension, params};
 use std::{
@@ -11,6 +11,34 @@ use std::{
 #[derive(Clone)]
 pub struct Store {
     pub root: PathBuf,
+}
+
+/// Wait for the SQLite writer in short, cancellable intervals. Acquire the
+/// write lock before reading existing metadata to avoid a deferred transaction
+/// read-to-write upgrade racing another publisher.
+fn publication_transaction<'a>(
+    conn: &'a Connection,
+    control: &ExecutionControl,
+) -> Result<rusqlite::Transaction<'a>> {
+    conn.busy_timeout(Duration::from_millis(25))?;
+    let started = std::time::Instant::now();
+    loop {
+        control.checkpoint()?;
+        match rusqlite::Transaction::new_unchecked(conn, rusqlite::TransactionBehavior::Immediate) {
+            Ok(tx) => return Ok(tx),
+            Err(error) => {
+                control.checkpoint()?;
+                if !matches!(
+                    error.sqlite_error_code(),
+                    Some(rusqlite::ErrorCode::DatabaseBusy | rusqlite::ErrorCode::DatabaseLocked)
+                ) || started.elapsed() >= Duration::from_secs(5)
+                {
+                    return Err(error.into());
+                }
+                std::thread::sleep(Duration::from_millis(5));
+            }
+        }
+    }
 }
 
 impl Store {
@@ -74,23 +102,34 @@ impl Store {
         Ok(bytes)
     }
     pub fn publish_snapshot(&self, snapshot: &Snapshot) -> Result<()> {
+        self.publish_snapshot_controlled(snapshot, &ExecutionControl::new(None))
+    }
+    pub fn publish_snapshot_controlled(
+        &self,
+        snapshot: &Snapshot,
+        control: &ExecutionControl,
+    ) -> Result<()> {
+        control.checkpoint()?;
         let mut identity = snapshot.clone();
         identity.id.clear();
         if digest(&serde_json::to_vec(&identity)?) != snapshot.id {
             return Err(invalid("snapshot_identity_mismatch"));
         }
         for entry in &snapshot.entries {
+            control.checkpoint()?;
             if let Some(hash) = &entry.blob {
                 self.read_blob(hash)?;
             }
         }
         let body = serde_json::to_string(snapshot)?;
         let conn = self.connection()?;
-        conn.execute(
+        let tx = publication_transaction(&conn, control)?;
+        control.checkpoint()?;
+        tx.execute(
             "INSERT OR IGNORE INTO snapshots VALUES(?1,?2)",
             params![snapshot.id, body],
         )?;
-        let existing: String = conn.query_row(
+        let existing: String = tx.query_row(
             "SELECT body FROM snapshots WHERE id=?1",
             [&snapshot.id],
             |r| r.get(0),
@@ -98,7 +137,7 @@ impl Store {
         if existing != body {
             return Err(invalid("immutable_snapshot_conflict"));
         }
-        Ok(())
+        control.publish(|| Ok(tx.commit()?))
     }
     pub fn snapshot(&self, id: &str) -> Result<Snapshot> {
         let body: Option<String> = self
@@ -109,8 +148,16 @@ impl Store {
             .map_err(Into::into)
     }
     pub fn sources(&self, snapshot: &Snapshot) -> Result<Vec<SourceFile>> {
+        self.sources_controlled(snapshot, &ExecutionControl::new(None))
+    }
+    pub fn sources_controlled(
+        &self,
+        snapshot: &Snapshot,
+        control: &ExecutionControl,
+    ) -> Result<Vec<SourceFile>> {
         let mut files = Vec::new();
         for entry in &snapshot.entries {
+            control.checkpoint()?;
             if let Some(hash) = &entry.blob {
                 // JSON is read only by TypeScript's virtual module resolver, never executed.
                 if (crate::scan::is_source(&entry.path)
@@ -138,6 +185,16 @@ impl Store {
         analysis: &Analysis,
         flow: &[crate::facts::FunctionFlowFact],
     ) -> Result<()> {
+        self.publish_analysis_with_flow_controlled(analysis, flow, &ExecutionControl::new(None))
+    }
+
+    pub fn publish_analysis_with_flow_controlled(
+        &self,
+        analysis: &Analysis,
+        flow: &[crate::facts::FunctionFlowFact],
+        control: &ExecutionControl,
+    ) -> Result<()> {
+        control.checkpoint()?;
         self.snapshot(&analysis.snapshot_id)?;
         let mut identity = analysis.clone();
         identity.id.clear();
@@ -174,8 +231,9 @@ impl Store {
             .count()
             .into();
         let encoded = serde_json::to_string(&metadata)?;
-        let mut conn = self.connection()?;
-        let tx = conn.transaction()?;
+        let conn = self.connection()?;
+        let tx = publication_transaction(&conn, control)?;
+        control.checkpoint()?;
         let old: Option<String> = tx
             .query_row(
                 "SELECT metadata FROM analyses WHERE id=?1",
@@ -187,13 +245,14 @@ impl Store {
             if old != encoded {
                 return Err(invalid("immutable_analysis_conflict"));
             }
-            return Ok(());
+            return control.finish_publication(|| Ok(()));
         }
         tx.execute(
             "INSERT INTO analyses VALUES(?1,?2,?3)",
             params![analysis.id, analysis.snapshot_id, encoded],
         )?;
         for node in &analysis.nodes {
+            control.checkpoint()?;
             tx.execute(
                 "INSERT INTO nodes VALUES(?1,?2,?3,?4,?5)",
                 params![
@@ -206,6 +265,7 @@ impl Store {
             )?;
         }
         for edge in &analysis.edges {
+            control.checkpoint()?;
             tx.execute(
                 "INSERT INTO edges VALUES(?1,?2,?3,?4,?5,?6)",
                 params![
@@ -219,6 +279,7 @@ impl Store {
             )?;
         }
         for record in flow {
+            control.checkpoint()?;
             tx.execute(
                 "INSERT INTO facts VALUES(?1,?2,?3,?4)",
                 params![
@@ -229,8 +290,7 @@ impl Store {
                 ],
             )?;
         }
-        tx.commit()?;
-        Ok(())
+        control.finish_publication(|| Ok(tx.commit()?))
     }
     pub fn flow_fact(&self, analysis: &str, symbol: &str) -> Result<serde_json::Value> {
         let body: Option<String> = self
@@ -262,9 +322,21 @@ impl Store {
                 |r| r.get(0),
             )
             .optional()?;
-        Ok(serde_json::from_str(
-            &value.ok_or_else(|| invalid("analysis_not_found"))?,
-        )?)
+        let mut parsed: serde_json::Value =
+            serde_json::from_str(&value.ok_or_else(|| invalid("analysis_not_found"))?)?;
+        // Injected at response time, never persisted. `analysis.id` is a digest
+        // over the stored structure, so a per-build value inside it would give
+        // the same snapshot + source a different identity on every rebuild and
+        // break reproducible publication. A top-level key keeps existing
+        // consumers (`coverage`, `id`, ...) reading exactly what they read
+        // before.
+        if let Some(object) = parsed.as_object_mut() {
+            object.insert(
+                "binary_fingerprint".into(),
+                serde_json::json!(env!("ATLAS_BUILD_FINGERPRINT")),
+            );
+        }
+        Ok(parsed)
     }
     pub fn source(
         &self,

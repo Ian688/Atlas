@@ -539,15 +539,21 @@ class Integration(unittest.TestCase):
             [str(BIN), "--store", str(self.store), "index", str(self.project)],
             cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
         )
-        # Wait until the real worker process is alive (ps-based; pgrep -f is
-        # unreliable on some platforms).
+        # Wait until THIS atlas process has spawned its worker child. Matching
+        # only by command text can hit unrelated wrapper shells whose command
+        # line quotes this test, so require the ppid to be our atlas pid.
         worker_pid = None
-        deadline = _time.monotonic() + 30
+        deadline = _time.monotonic() + 60
         while _time.monotonic() < deadline:
-            out = subprocess.run(["ps", "-eo", "pid,command"], capture_output=True, text=True)
+            out = subprocess.run(["ps", "-eo", "pid,ppid,command"], capture_output=True, text=True)
             for line in out.stdout.splitlines():
-                if "workers/typescript/worker.mjs" in line and "grep" not in line:
-                    worker_pid = int(line.split()[0])
+                fields = line.split(None, 2)
+                if (
+                    len(fields) == 3
+                    and fields[1] == str(proc.pid)
+                    and "worker.mjs" in fields[2]
+                ):
+                    worker_pid = int(fields[0])
                     break
             if worker_pid is not None:
                 break
@@ -562,10 +568,18 @@ class Integration(unittest.TestCase):
             proc.kill()
             self.fail("atlas did not exit after SIGINT")
         self.assertNotEqual(proc.returncode, 0)
-        # The owned worker child must be reaped.
+        # The owned worker child must be reaped. Scope the check to children of
+        # THIS test's atlas process (ppid match) so unrelated workers from other
+        # tests or manual runs cannot make the assertion flaky.
         _time.sleep(0.5)
-        alive = subprocess.run(["pgrep", "-f", "workers/typescript/worker.mjs"], capture_output=True, text=True)
-        self.assertEqual(alive.stdout.strip(), "", "worker child must be reaped after cancellation")
+        ps_out = subprocess.run(["ps", "-eo", "pid,ppid,command"], capture_output=True, text=True)
+        leaked = [
+            line for line in ps_out.stdout.splitlines()
+            if "worker.mjs" in line
+            and len(line.split()) >= 2
+            and line.split()[1] == str(proc.pid)
+        ]
+        self.assertEqual(leaked, [], "worker child must be reaped after cancellation")
         # And nothing may be published.
         import sqlite3
         db = self.store / "atlas.db"
@@ -575,6 +589,36 @@ class Integration(unittest.TestCase):
                 facts = conn.execute("SELECT COUNT(*) FROM facts").fetchone()[0]
             self.assertEqual(analyses, 0)
             self.assertEqual(facts, 0)
+
+    def test_k1_context_sensitive_folding_end_to_end(self):
+        """k=1: the same callee called with different constants folds each
+        callsite precisely (pick(5)→[1], pick(6)→[2]) through the real
+        worker→Rust→CLI chain."""
+        shutil.rmtree(self.project)
+        self.project.mkdir()
+        (self.project / "pick.js").write_text(
+            "export function pick(x) {\n"
+            "  if (x === 5) {\n"
+            "    return 1;\n"
+            "  }\n"
+            "  return 2;\n"
+            "}\n"
+            "export function callA() {\n"
+            "  return pick(5);\n"
+            "}\n"
+            "export function callB() {\n"
+            "  return pick(6);\n"
+            "}\n"
+        )
+        a = self.index()
+        symbols = {n["name"]: n["id"] for n in self.cli("nodes", a["id"], "--kind", "function")["items"]}
+        fa = self.cli("flow", a["id"], symbols["callA"])
+        fb = self.cli("flow", a["id"], symbols["callB"])
+        self.assertEqual(fa["returns"]["constants"], [1.0], "pick(5) folds to 1 per context")
+        self.assertEqual(fb["returns"]["constants"], [2.0], "pick(6) folds to 2 per context")
+        self.assertEqual(
+            fa["interprocedural"]["callsites"][0]["result"]["constants"], [1.0])
+        self.assertEqual(fb["interprocedural"]["callsites"][0]["result"]["constants"], [2.0])
 
     def test_flow_queries_reject_unknown_symbols(self):
         """D20-lite: invented flow facts cannot be queried into existence."""

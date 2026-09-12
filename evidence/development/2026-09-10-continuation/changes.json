@@ -1,0 +1,30 @@
+{
+  "modified_since_handoff": [
+    "Cargo.lock",
+    "README.md",
+    "crates/atlas-app/src/main.rs",
+    "crates/atlas-app/src/worker.rs",
+    "crates/atlas-engine/Cargo.toml",
+    "crates/atlas-engine/src/analyze.rs",
+    "crates/atlas-engine/src/facts.rs",
+    "crates/atlas-engine/src/inter.rs",
+    "crates/atlas-engine/src/lib.rs",
+    "crates/atlas-engine/src/scan.rs",
+    "crates/atlas-engine/src/solve.rs",
+    "crates/atlas-engine/src/store.rs",
+    "crates/atlas-engine/tests/flow_semantics.rs",
+    "docs/ARCHITECTURE.md",
+    "docs/HANDOFF.md",
+    "docs/START_CODING_AGENT.md",
+    "docs/implementation/progress.json",
+    "scripts/verify.py"
+  ],
+  "added_since_handoff": [
+    "crates/atlas-engine/src/control.rs",
+    "crates/atlas-engine/tests/cancellation.rs",
+    "crates/atlas-engine/tests/interproc_context.rs",
+    "scripts/test_cancellation.py",
+    "scripts/test_semantic_contracts.py"
+  ],
+  "removed_since_handoff": []
+}

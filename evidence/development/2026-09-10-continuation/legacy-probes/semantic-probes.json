@@ -1,0 +1,4325 @@
+{
+  "time_utc": "2026-09-09T22:55:50.136257+00:00",
+  "fixture_sha256": "b372e4682948272dcb13bd46ccf4dd2f75103f0fb3fa12f4c61f6389a131ffdf",
+  "analysis": {
+    "call_count": 9,
+    "coverage": {
+      "catalog_entries": 2,
+      "disposition:captured": 1,
+      "disposition:directory": 1,
+      "encountered_source_files": 1,
+      "flow_complete_within_profile": 19,
+      "flow_frontier_functions": 0,
+      "flow_functions": 19,
+      "flow_partial": 0,
+      "flow_unknown_regions": 0,
+      "interproc_recursive_sccs": 0,
+      "interproc_sccs": 19,
+      "parsed_source_files": 1
+    },
+    "diagnostics": [],
+    "edge_count": 29,
+    "engine": "foundation-flow-0.2.0",
+    "file_count": 1,
+    "flow_digest": "39fb3de5dbb4c6f2d90156895ed10a6368fd149eab4146e7b7e2a84bad289fc9",
+    "function_count": 19,
+    "id": "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+    "limitations": [
+      "Lexical declaration candidates, not a complete runtime call graph or execution trace.",
+      "Snapshot captures files over an interval; it is not an atomic filesystem transaction.",
+      "Only captured UTF-8 JS/TS inputs; external dependencies, standard library and project tsconfig are not loaded.",
+      "Ignored directories are explicit boundaries; their unvisited descendants are not counted.",
+      "Local flow facts cover declared profile js-structured-control.v1 only; other constructs are explicit unknowns. Interprocedural summaries are symbolic per function, with up to 8 scalar-argument calling contexts per callee; other calls use the symbolic fallback. Captured origins are not re-substituted and unknown callees stay top."
+    ],
+    "node_count": 21,
+    "producer": "typescript/5.9.3;worker/0.2.0",
+    "recursive_components": [],
+    "schema": "atlas.analysis.v1",
+    "snapshot_id": "67dacc719f74abdac45c82def109dfa4735b9aa3c0aebd9cb29233a9b91359b7",
+    "unresolved_call_count": 4
+  },
+  "oracle": {
+    "knownMutation": {
+      "kind": "number",
+      "value": 2
+    },
+    "unknownMutation": {
+      "kind": "number",
+      "value": 2
+    },
+    "mixedAddition": {
+      "kind": "number",
+      "value": 2
+    },
+    "nullAddition": {
+      "kind": "number",
+      "value": 1
+    },
+    "missingField": {
+      "kind": "undefined"
+    },
+    "viaIdentity": {
+      "kind": "number",
+      "value": 1
+    },
+    "identityNumber": {
+      "kind": "number",
+      "value": 41
+    },
+    "captureChange": {
+      "kind": "number",
+      "value": 2
+    },
+    "increment": {
+      "kind": "number",
+      "value": 1
+    },
+    "finallyReturn": {
+      "kind": "number",
+      "value": 1
+    },
+    "throwCatch": {
+      "kind": "number",
+      "value": 7
+    },
+    "exceptionState": {
+      "kind": "number",
+      "value": 1
+    }
+  },
+  "facts": {
+    "exceptionState": {
+      "algorithm": {
+        "id": "atlas-local-absint",
+        "version": "0.2.0"
+      },
+      "analysis_id": "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+      "binding_kinds": {
+        "b:probe.mjs:1045:change": "param",
+        "b:probe.mjs:1059:x": "let",
+        "b:probe.mjs:1098:e": "catch"
+      },
+      "binding_names": {
+        "b:probe.mjs:1045:change": "change",
+        "b:probe.mjs:1059:x": "x",
+        "b:probe.mjs:1098:e": "e"
+      },
+      "block_states": [
+        {
+          "bindings": [
+            {
+              "binding": "b:probe.mjs:1045:change",
+              "defs": [],
+              "init": "Initialized",
+              "name": "change",
+              "value": {
+                "constants": [],
+                "origins": [
+                  "Parameter(0)"
+                ],
+                "reasons": [],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": false
+              }
+            },
+            {
+              "binding": "b:probe.mjs:1059:x",
+              "defs": [],
+              "init": "NotInitialized",
+              "name": "x",
+              "value": {
+                "constants": [],
+                "origins": [],
+                "reasons": [
+                  "value_not_yet_assigned"
+                ],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": true
+              }
+            }
+          ],
+          "block": 0,
+          "completion": "normal",
+          "truncated": false
+        },
+        {
+          "bindings": [
+            {
+              "binding": "b:probe.mjs:1045:change",
+              "defs": [],
+              "init": "Initialized",
+              "name": "change",
+              "value": {
+                "constants": [],
+                "origins": [
+                  "Parameter(0)"
+                ],
+                "reasons": [],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": false
+              }
+            },
+            {
+              "binding": "b:probe.mjs:1059:x",
+              "defs": [
+                1
+              ],
+              "init": "Initialized",
+              "name": "x",
+              "value": {
+                "constants": [
+                  1.0
+                ],
+                "origins": [
+                  "Derived(op1)",
+                  "Constant"
+                ],
+                "reasons": [],
+                "targets": [],
+                "typed_constants": [
+                  {
+                    "kind": "number",
+                    "value": 1.0
+                  }
+                ],
+                "unknown": false
+              }
+            }
+          ],
+          "block": 1,
+          "completion": "normal",
+          "truncated": false
+        }
+      ],
+      "blocks": [
+        {
+          "id": 0,
+          "ops": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            9
+          ],
+          "successors": [],
+          "term": "return"
+        },
+        {
+          "id": 1,
+          "ops": [
+            6,
+            7,
+            8
+          ],
+          "successors": [],
+          "term": "return"
+        },
+        {
+          "id": 2,
+          "ops": [],
+          "successors": [
+            [
+              3,
+              "normal"
+            ]
+          ],
+          "term": "goto"
+        },
+        {
+          "id": 3,
+          "ops": [],
+          "successors": [],
+          "term": "sink"
+        },
+        {
+          "id": 4,
+          "ops": [],
+          "successors": [],
+          "term": "throw"
+        }
+      ],
+      "budgets": {
+        "cap_constants": 8,
+        "cap_heap": 32,
+        "cap_origins": 8,
+        "cap_targets": 64,
+        "job_max_transfers": 2400000,
+        "job_total_transfers": 402,
+        "max_block_visits": 1,
+        "max_contexts_per_function": 8,
+        "scalar_contexts": 0,
+        "transfers": 10
+      },
+      "coverage": {
+        "cfg_blocks": 5,
+        "reachable_blocks": 2,
+        "supported_op_transfers": 10,
+        "unknown_op_transfers": 0
+      },
+      "def_use": [
+        {
+          "binding": "b:probe.mjs:1059:x",
+          "defs": [
+            1,
+            5
+          ],
+          "name": "x",
+          "uses": [
+            {
+              "def": 1,
+              "uses": [
+                5,
+                8
+              ]
+            },
+            {
+              "def": 5,
+              "uses": [
+                9
+              ]
+            }
+          ]
+        },
+        {
+          "binding": "b:probe.mjs:1098:e",
+          "defs": [
+            7
+          ],
+          "name": "e",
+          "uses": []
+        }
+      ],
+      "effects": {
+        "escaped_local_value": false,
+        "may_access_global": false,
+        "may_call": [],
+        "may_read_heap": false,
+        "may_throw": true,
+        "may_write_heap": false,
+        "registers_callback": false,
+        "unknown_call": true
+      },
+      "entry": 0,
+      "exception_edges": [
+        [
+          3,
+          1
+        ]
+      ],
+      "exit_exceptional": 4,
+      "exit_normal": 3,
+      "frontier": [],
+      "interprocedural": {
+        "callsites": [
+          {
+            "args": [],
+            "end": 1080,
+            "label": "op2()",
+            "op": 3,
+            "result": {
+              "constants": [],
+              "origins": [
+                "CallResult(op3)"
+              ],
+              "reasons": [
+                "call_result_unknown"
+              ],
+              "targets": [],
+              "typed_constants": [],
+              "unknown": true
+            },
+            "start": 1072,
+            "targets": [],
+            "targets_complete": false,
+            "unknown_component": false
+          }
+        ],
+        "recursive_sccs": 0,
+        "rounds_max": 2,
+        "scc_count": 19,
+        "status": "complete_within_profile",
+        "summary_effects": {
+          "escaped_local_value": false,
+          "may_access_global": false,
+          "may_call": [],
+          "may_read_heap": false,
+          "may_throw": true,
+          "may_write_heap": false,
+          "registers_callback": false,
+          "unknown_call": true
+        },
+        "summary_returns": {
+          "constants": [
+            2.0,
+            1.0
+          ],
+          "origins": [
+            "Derived(op5)",
+            "Constant",
+            "Derived(op1)"
+          ],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [
+            {
+              "kind": "number",
+              "value": 2.0
+            },
+            {
+              "kind": "number",
+              "value": 1.0
+            }
+          ],
+          "unknown": false
+        },
+        "summary_throws": {
+          "constants": [],
+          "origins": [],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [],
+          "unknown": false
+        }
+      },
+      "looping_blocks": [],
+      "name": "exceptionState",
+      "ops": [
+        {
+          "detail": "1.0",
+          "end": 1064,
+          "index": 0,
+          "kind": "const",
+          "may_throw": false,
+          "start": 1063
+        },
+        {
+          "detail": "b:probe.mjs:1059:x <- op0",
+          "end": 1065,
+          "index": 1,
+          "kind": "assign_binding",
+          "may_throw": false,
+          "start": 1055
+        },
+        {
+          "detail": "b:probe.mjs:1045:change",
+          "end": 1078,
+          "index": 2,
+          "kind": "read_local",
+          "may_throw": false,
+          "start": 1072
+        },
+        {
+          "detail": "op2()",
+          "end": 1080,
+          "index": 3,
+          "kind": "call",
+          "may_throw": true,
+          "start": 1072
+        },
+        {
+          "detail": "2.0",
+          "end": 1087,
+          "index": 4,
+          "kind": "const",
+          "may_throw": false,
+          "start": 1086
+        },
+        {
+          "detail": "b:probe.mjs:1059:x <- op4",
+          "end": 1087,
+          "index": 5,
+          "kind": "assign_binding",
+          "may_throw": false,
+          "start": 1082
+        },
+        {
+          "detail": "",
+          "end": 1114,
+          "index": 6,
+          "kind": "current_exception",
+          "may_throw": false,
+          "start": 1066
+        },
+        {
+          "detail": "b:probe.mjs:1098:e <- op6",
+          "end": 1114,
+          "index": 7,
+          "kind": "assign_binding",
+          "may_throw": false,
+          "start": 1066
+        },
+        {
+          "detail": "b:probe.mjs:1059:x",
+          "end": 1111,
+          "index": 8,
+          "kind": "read_local",
+          "may_throw": false,
+          "start": 1110
+        },
+        {
+          "detail": "b:probe.mjs:1059:x",
+          "end": 1123,
+          "index": 9,
+          "kind": "read_local",
+          "may_throw": false,
+          "start": 1122
+        }
+      ],
+      "path": "probe.mjs",
+      "profile": "js-structured-control.v1",
+      "pruned_edges": [],
+      "returns": {
+        "constants": [
+          2.0,
+          1.0
+        ],
+        "origins": [
+          "Derived(op5)",
+          "Constant",
+          "Derived(op1)"
+        ],
+        "reasons": [],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 2.0
+          },
+          {
+            "kind": "number",
+            "value": 1.0
+          }
+        ],
+        "unknown": false
+      },
+      "status": "complete_within_profile",
+      "symbol": "symbol:probe.mjs:1014:1126",
+      "throws": {
+        "constants": [],
+        "origins": [],
+        "reasons": [
+          "no_throw_observed"
+        ],
+        "targets": [],
+        "typed_constants": [],
+        "unknown": true
+      },
+      "unknown_reasons": [
+        "unknown_callee_effects"
+      ]
+    },
+    "knownMutation": {
+      "algorithm": {
+        "id": "atlas-local-absint",
+        "version": "0.2.0"
+      },
+      "analysis_id": "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+      "binding_kinds": {
+        "b:probe.mjs:143:o": "const"
+      },
+      "binding_names": {
+        "b:probe.mjs:143:o": "o"
+      },
+      "block_states": [
+        {
+          "bindings": [
+            {
+              "binding": "b:probe.mjs:143:o",
+              "defs": [],
+              "init": "NotInitialized",
+              "name": "o",
+              "value": {
+                "constants": [],
+                "origins": [],
+                "reasons": [
+                  "value_not_yet_assigned"
+                ],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": true
+              }
+            }
+          ],
+          "block": 0,
+          "completion": "normal",
+          "truncated": false
+        }
+      ],
+      "blocks": [
+        {
+          "id": 0,
+          "ops": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "successors": [],
+          "term": "return"
+        },
+        {
+          "id": 1,
+          "ops": [],
+          "successors": [
+            [
+              2,
+              "normal"
+            ]
+          ],
+          "term": "goto"
+        },
+        {
+          "id": 2,
+          "ops": [],
+          "successors": [],
+          "term": "sink"
+        },
+        {
+          "id": 3,
+          "ops": [],
+          "successors": [],
+          "term": "throw"
+        }
+      ],
+      "budgets": {
+        "cap_constants": 8,
+        "cap_heap": 32,
+        "cap_origins": 8,
+        "cap_targets": 64,
+        "job_max_transfers": 2400000,
+        "job_total_transfers": 402,
+        "max_block_visits": 1,
+        "max_contexts_per_function": 8,
+        "scalar_contexts": 0,
+        "transfers": 8
+      },
+      "coverage": {
+        "cfg_blocks": 4,
+        "reachable_blocks": 1,
+        "supported_op_transfers": 8,
+        "unknown_op_transfers": 0
+      },
+      "def_use": [
+        {
+          "binding": "b:probe.mjs:143:o",
+          "defs": [
+            2
+          ],
+          "name": "o",
+          "uses": [
+            {
+              "def": 2,
+              "uses": [
+                4,
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "effects": {
+        "escaped_local_value": true,
+        "may_access_global": false,
+        "may_call": [
+          "symbol:probe.mjs:1:38"
+        ],
+        "may_read_heap": true,
+        "may_throw": true,
+        "may_write_heap": true,
+        "registers_callback": false,
+        "unknown_call": false
+      },
+      "entry": 0,
+      "exception_edges": [],
+      "exit_exceptional": 3,
+      "exit_normal": 2,
+      "frontier": [],
+      "interprocedural": {
+        "callsites": [
+          {
+            "args": [
+              {
+                "constants": [],
+                "origins": [
+                  "Derived(op2)",
+                  "Allocation(op1)"
+                ],
+                "reasons": [],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": false
+              }
+            ],
+            "end": 170,
+            "label": "op3(op4)",
+            "op": 5,
+            "result": {
+              "constants": [],
+              "origins": [
+                "CallResult(op5)"
+              ],
+              "reasons": [],
+              "targets": [],
+              "typed_constants": [],
+              "unknown": false
+            },
+            "start": 159,
+            "targets": [
+              "symbol:probe.mjs:1:38"
+            ],
+            "targets_complete": true,
+            "unknown_component": false
+          }
+        ],
+        "recursive_sccs": 0,
+        "rounds_max": 2,
+        "scc_count": 19,
+        "status": "complete_within_profile",
+        "summary_effects": {
+          "escaped_local_value": true,
+          "may_access_global": false,
+          "may_call": [
+            "symbol:probe.mjs:1:38"
+          ],
+          "may_read_heap": true,
+          "may_throw": true,
+          "may_write_heap": true,
+          "registers_callback": false,
+          "unknown_call": false
+        },
+        "summary_returns": {
+          "constants": [
+            1.0,
+            2.0
+          ],
+          "origins": [
+            "Derived(op7)",
+            "Constant",
+            "CallResult(op5)"
+          ],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [
+            {
+              "kind": "number",
+              "value": 1.0
+            },
+            {
+              "kind": "number",
+              "value": 2.0
+            }
+          ],
+          "unknown": false
+        },
+        "summary_throws": {
+          "constants": [],
+          "origins": [],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [],
+          "unknown": false
+        }
+      },
+      "looping_blocks": [],
+      "name": "knownMutation",
+      "ops": [
+        {
+          "detail": "1.0",
+          "end": 156,
+          "index": 0,
+          "kind": "const",
+          "may_throw": false,
+          "start": 155
+        },
+        {
+          "detail": "value: op0",
+          "end": 157,
+          "index": 1,
+          "kind": "alloc_object",
+          "may_throw": false,
+          "start": 147
+        },
+        {
+          "detail": "b:probe.mjs:143:o <- op1",
+          "end": 158,
+          "index": 2,
+          "kind": "assign_binding",
+          "may_throw": false,
+          "start": 137
+        },
+        {
+          "detail": "b:probe.mjs:10:setValue",
+          "end": 167,
+          "index": 3,
+          "kind": "read_local",
+          "may_throw": false,
+          "start": 159
+        },
+        {
+          "detail": "b:probe.mjs:143:o",
+          "end": 169,
+          "index": 4,
+          "kind": "read_local",
+          "may_throw": false,
+          "start": 168
+        },
+        {
+          "detail": "op3(op4)",
+          "end": 170,
+          "index": 5,
+          "kind": "call",
+          "may_throw": true,
+          "start": 159
+        },
+        {
+          "detail": "b:probe.mjs:143:o",
+          "end": 180,
+          "index": 6,
+          "kind": "read_local",
+          "may_throw": false,
+          "start": 179
+        },
+        {
+          "detail": "op6.value",
+          "end": 186,
+          "index": 7,
+          "kind": "property_read",
+          "may_throw": true,
+          "start": 179
+        }
+      ],
+      "path": "probe.mjs",
+      "profile": "js-structured-control.v1",
+      "pruned_edges": [],
+      "returns": {
+        "constants": [
+          1.0,
+          2.0
+        ],
+        "origins": [
+          "Derived(op7)",
+          "Constant",
+          "CallResult(op5)"
+        ],
+        "reasons": [],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 1.0
+          },
+          {
+            "kind": "number",
+            "value": 2.0
+          }
+        ],
+        "unknown": false
+      },
+      "status": "complete_within_profile",
+      "symbol": "symbol:probe.mjs:103:189",
+      "throws": {
+        "constants": [],
+        "origins": [],
+        "reasons": [
+          "no_throw_observed"
+        ],
+        "targets": [],
+        "typed_constants": [],
+        "unknown": true
+      },
+      "unknown_reasons": [
+        "capture_or_untracked_binding_read"
+      ]
+    },
+    "unknownMutation": {
+      "algorithm": {
+        "id": "atlas-local-absint",
+        "version": "0.2.0"
+      },
+      "analysis_id": "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+      "binding_kinds": {
+        "b:probe.mjs:222:change": "param",
+        "b:probe.mjs:238:o": "const"
+      },
+      "binding_names": {
+        "b:probe.mjs:222:change": "change",
+        "b:probe.mjs:238:o": "o"
+      },
+      "block_states": [
+        {
+          "bindings": [
+            {
+              "binding": "b:probe.mjs:222:change",
+              "defs": [],
+              "init": "Initialized",
+              "name": "change",
+              "value": {
+                "constants": [],
+                "origins": [
+                  "Parameter(0)"
+                ],
+                "reasons": [],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": false
+              }
+            },
+            {
+              "binding": "b:probe.mjs:238:o",
+              "defs": [],
+              "init": "NotInitialized",
+              "name": "o",
+              "value": {
+                "constants": [],
+                "origins": [],
+                "reasons": [
+                  "value_not_yet_assigned"
+                ],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": true
+              }
+            }
+          ],
+          "block": 0,
+          "completion": "normal",
+          "truncated": false
+        }
+      ],
+      "blocks": [
+        {
+          "id": 0,
+          "ops": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "successors": [],
+          "term": "return"
+        },
+        {
+          "id": 1,
+          "ops": [],
+          "successors": [
+            [
+              2,
+              "normal"
+            ]
+          ],
+          "term": "goto"
+        },
+        {
+          "id": 2,
+          "ops": [],
+          "successors": [],
+          "term": "sink"
+        },
+        {
+          "id": 3,
+          "ops": [],
+          "successors": [],
+          "term": "throw"
+        }
+      ],
+      "budgets": {
+        "cap_constants": 8,
+        "cap_heap": 32,
+        "cap_origins": 8,
+        "cap_targets": 64,
+        "job_max_transfers": 2400000,
+        "job_total_transfers": 402,
+        "max_block_visits": 1,
+        "max_contexts_per_function": 8,
+        "scalar_contexts": 0,
+        "transfers": 8
+      },
+      "coverage": {
+        "cfg_blocks": 4,
+        "reachable_blocks": 1,
+        "supported_op_transfers": 8,
+        "unknown_op_transfers": 0
+      },
+      "def_use": [
+        {
+          "binding": "b:probe.mjs:238:o",
+          "defs": [
+            2
+          ],
+          "name": "o",
+          "uses": [
+            {
+              "def": 2,
+              "uses": [
+                4,
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "effects": {
+        "escaped_local_value": true,
+        "may_access_global": false,
+        "may_call": [],
+        "may_read_heap": true,
+        "may_throw": true,
+        "may_write_heap": false,
+        "registers_callback": true,
+        "unknown_call": true
+      },
+      "entry": 0,
+      "exception_edges": [],
+      "exit_exceptional": 3,
+      "exit_normal": 2,
+      "frontier": [],
+      "interprocedural": {
+        "callsites": [
+          {
+            "args": [
+              {
+                "constants": [],
+                "origins": [
+                  "Derived(op2)",
+                  "Allocation(op1)"
+                ],
+                "reasons": [],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": false
+              }
+            ],
+            "end": 263,
+            "label": "op3(op4)",
+            "op": 5,
+            "result": {
+              "constants": [],
+              "origins": [
+                "CallResult(op5)"
+              ],
+              "reasons": [
+                "call_result_unknown"
+              ],
+              "targets": [],
+              "typed_constants": [],
+              "unknown": true
+            },
+            "start": 254,
+            "targets": [],
+            "targets_complete": false,
+            "unknown_component": false
+          }
+        ],
+        "recursive_sccs": 0,
+        "rounds_max": 2,
+        "scc_count": 19,
+        "status": "complete_within_profile",
+        "summary_effects": {
+          "escaped_local_value": true,
+          "may_access_global": false,
+          "may_call": [],
+          "may_read_heap": true,
+          "may_throw": true,
+          "may_write_heap": false,
+          "registers_callback": true,
+          "unknown_call": true
+        },
+        "summary_returns": {
+          "constants": [
+            1.0
+          ],
+          "origins": [
+            "Derived(op7)",
+            "Constant"
+          ],
+          "reasons": [
+            "unknown_call_may_modify"
+          ],
+          "targets": [],
+          "typed_constants": [
+            {
+              "kind": "number",
+              "value": 1.0
+            }
+          ],
+          "unknown": true
+        },
+        "summary_throws": {
+          "constants": [],
+          "origins": [],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [],
+          "unknown": false
+        }
+      },
+      "looping_blocks": [],
+      "name": "unknownMutation",
+      "ops": [
+        {
+          "detail": "1.0",
+          "end": 251,
+          "index": 0,
+          "kind": "const",
+          "may_throw": false,
+          "start": 250
+        },
+        {
+          "detail": "value: op0",
+          "end": 252,
+          "index": 1,
+          "kind": "alloc_object",
+          "may_throw": false,
+          "start": 242
+        },
+        {
+          "detail": "b:probe.mjs:238:o <- op1",
+          "end": 253,
+          "index": 2,
+          "kind": "assign_binding",
+          "may_throw": false,
+          "start": 232
+        },
+        {
+          "detail": "b:probe.mjs:222:change",
+          "end": 260,
+          "index": 3,
+          "kind": "read_local",
+          "may_throw": false,
+          "start": 254
+        },
+        {
+          "detail": "b:probe.mjs:238:o",
+          "end": 262,
+          "index": 4,
+          "kind": "read_local",
+          "may_throw": false,
+          "start": 261
+        },
+        {
+          "detail": "op3(op4)",
+          "end": 263,
+          "index": 5,
+          "kind": "call",
+          "may_throw": true,
+          "start": 254
+        },
+        {
+          "detail": "b:probe.mjs:238:o",
+          "end": 273,
+          "index": 6,
+          "kind": "read_local",
+          "may_throw": false,
+          "start": 272
+        },
+        {
+          "detail": "op6.value",
+          "end": 279,
+          "index": 7,
+          "kind": "property_read",
+          "may_throw": true,
+          "start": 272
+        }
+      ],
+      "path": "probe.mjs",
+      "profile": "js-structured-control.v1",
+      "pruned_edges": [],
+      "returns": {
+        "constants": [
+          1.0
+        ],
+        "origins": [
+          "Derived(op7)",
+          "Constant"
+        ],
+        "reasons": [
+          "unknown_call_may_modify"
+        ],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 1.0
+          }
+        ],
+        "unknown": true
+      },
+      "status": "complete_within_profile",
+      "symbol": "symbol:probe.mjs:190:282",
+      "throws": {
+        "constants": [],
+        "origins": [],
+        "reasons": [
+          "no_throw_observed"
+        ],
+        "targets": [],
+        "typed_constants": [],
+        "unknown": true
+      },
+      "unknown_reasons": [
+        "unknown_callee_effects"
+      ]
+    },
+    "mixedAddition": {
+      "algorithm": {
+        "id": "atlas-local-absint",
+        "version": "0.2.0"
+      },
+      "analysis_id": "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+      "binding_kinds": {},
+      "binding_names": {},
+      "block_states": [
+        {
+          "bindings": [],
+          "block": 0,
+          "completion": "normal",
+          "truncated": false
+        }
+      ],
+      "blocks": [
+        {
+          "id": 0,
+          "ops": [
+            0,
+            1,
+            2
+          ],
+          "successors": [],
+          "term": "return"
+        },
+        {
+          "id": 1,
+          "ops": [],
+          "successors": [
+            [
+              2,
+              "normal"
+            ]
+          ],
+          "term": "goto"
+        },
+        {
+          "id": 2,
+          "ops": [],
+          "successors": [],
+          "term": "sink"
+        },
+        {
+          "id": 3,
+          "ops": [],
+          "successors": [],
+          "term": "throw"
+        }
+      ],
+      "budgets": {
+        "cap_constants": 8,
+        "cap_heap": 32,
+        "cap_origins": 8,
+        "cap_targets": 64,
+        "job_max_transfers": 2400000,
+        "job_total_transfers": 402,
+        "max_block_visits": 1,
+        "max_contexts_per_function": 8,
+        "scalar_contexts": 0,
+        "transfers": 3
+      },
+      "coverage": {
+        "cfg_blocks": 4,
+        "reachable_blocks": 1,
+        "supported_op_transfers": 3,
+        "unknown_op_transfers": 0
+      },
+      "def_use": [],
+      "effects": {
+        "escaped_local_value": false,
+        "may_access_global": false,
+        "may_call": [],
+        "may_read_heap": false,
+        "may_throw": true,
+        "may_write_heap": false,
+        "registers_callback": false,
+        "unknown_call": false
+      },
+      "entry": 0,
+      "exception_edges": [],
+      "exit_exceptional": 3,
+      "exit_normal": 2,
+      "frontier": [],
+      "interprocedural": {
+        "callsites": [],
+        "recursive_sccs": 0,
+        "rounds_max": 2,
+        "scc_count": 19,
+        "status": "complete_within_profile",
+        "summary_effects": {
+          "escaped_local_value": false,
+          "may_access_global": false,
+          "may_call": [],
+          "may_read_heap": false,
+          "may_throw": true,
+          "may_write_heap": false,
+          "registers_callback": false,
+          "unknown_call": false
+        },
+        "summary_returns": {
+          "constants": [
+            2.0
+          ],
+          "origins": [
+            "Constant"
+          ],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [
+            {
+              "kind": "number",
+              "value": 2.0
+            }
+          ],
+          "unknown": false
+        },
+        "summary_throws": {
+          "constants": [],
+          "origins": [],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [],
+          "unknown": false
+        }
+      },
+      "looping_blocks": [],
+      "name": "mixedAddition",
+      "ops": [
+        {
+          "detail": "true",
+          "end": 328,
+          "index": 0,
+          "kind": "const",
+          "may_throw": false,
+          "start": 324
+        },
+        {
+          "detail": "1.0",
+          "end": 332,
+          "index": 1,
+          "kind": "const",
+          "may_throw": false,
+          "start": 331
+        },
+        {
+          "detail": "+ (op0, op1)",
+          "end": 332,
+          "index": 2,
+          "kind": "binary",
+          "may_throw": true,
+          "start": 324
+        }
+      ],
+      "path": "probe.mjs",
+      "profile": "js-structured-control.v1",
+      "pruned_edges": [],
+      "returns": {
+        "constants": [
+          2.0
+        ],
+        "origins": [
+          "Constant"
+        ],
+        "reasons": [],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 2.0
+          }
+        ],
+        "unknown": false
+      },
+      "status": "complete_within_profile",
+      "symbol": "symbol:probe.mjs:283:335",
+      "throws": {
+        "constants": [],
+        "origins": [],
+        "reasons": [
+          "no_throw_observed"
+        ],
+        "targets": [],
+        "typed_constants": [],
+        "unknown": true
+      },
+      "unknown_reasons": []
+    },
+    "nullAddition": {
+      "algorithm": {
+        "id": "atlas-local-absint",
+        "version": "0.2.0"
+      },
+      "analysis_id": "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+      "binding_kinds": {},
+      "binding_names": {},
+      "block_states": [
+        {
+          "bindings": [],
+          "block": 0,
+          "completion": "normal",
+          "truncated": false
+        }
+      ],
+      "blocks": [
+        {
+          "id": 0,
+          "ops": [
+            0,
+            1,
+            2
+          ],
+          "successors": [],
+          "term": "return"
+        },
+        {
+          "id": 1,
+          "ops": [],
+          "successors": [
+            [
+              2,
+              "normal"
+            ]
+          ],
+          "term": "goto"
+        },
+        {
+          "id": 2,
+          "ops": [],
+          "successors": [],
+          "term": "sink"
+        },
+        {
+          "id": 3,
+          "ops": [],
+          "successors": [],
+          "term": "throw"
+        }
+      ],
+      "budgets": {
+        "cap_constants": 8,
+        "cap_heap": 32,
+        "cap_origins": 8,
+        "cap_targets": 64,
+        "job_max_transfers": 2400000,
+        "job_total_transfers": 402,
+        "max_block_visits": 1,
+        "max_contexts_per_function": 8,
+        "scalar_contexts": 0,
+        "transfers": 3
+      },
+      "coverage": {
+        "cfg_blocks": 4,
+        "reachable_blocks": 1,
+        "supported_op_transfers": 3,
+        "unknown_op_transfers": 0
+      },
+      "def_use": [],
+      "effects": {
+        "escaped_local_value": false,
+        "may_access_global": false,
+        "may_call": [],
+        "may_read_heap": false,
+        "may_throw": true,
+        "may_write_heap": false,
+        "registers_callback": false,
+        "unknown_call": false
+      },
+      "entry": 0,
+      "exception_edges": [],
+      "exit_exceptional": 3,
+      "exit_normal": 2,
+      "frontier": [],
+      "interprocedural": {
+        "callsites": [],
+        "recursive_sccs": 0,
+        "rounds_max": 2,
+        "scc_count": 19,
+        "status": "complete_within_profile",
+        "summary_effects": {
+          "escaped_local_value": false,
+          "may_access_global": false,
+          "may_call": [],
+          "may_read_heap": false,
+          "may_throw": true,
+          "may_write_heap": false,
+          "registers_callback": false,
+          "unknown_call": false
+        },
+        "summary_returns": {
+          "constants": [
+            1.0
+          ],
+          "origins": [
+            "Constant"
+          ],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [
+            {
+              "kind": "number",
+              "value": 1.0
+            }
+          ],
+          "unknown": false
+        },
+        "summary_throws": {
+          "constants": [],
+          "origins": [],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [],
+          "unknown": false
+        }
+      },
+      "looping_blocks": [],
+      "name": "nullAddition",
+      "ops": [
+        {
+          "detail": "null",
+          "end": 380,
+          "index": 0,
+          "kind": "const",
+          "may_throw": false,
+          "start": 376
+        },
+        {
+          "detail": "1.0",
+          "end": 384,
+          "index": 1,
+          "kind": "const",
+          "may_throw": false,
+          "start": 383
+        },
+        {
+          "detail": "+ (op0, op1)",
+          "end": 384,
+          "index": 2,
+          "kind": "binary",
+          "may_throw": true,
+          "start": 376
+        }
+      ],
+      "path": "probe.mjs",
+      "profile": "js-structured-control.v1",
+      "pruned_edges": [],
+      "returns": {
+        "constants": [
+          1.0
+        ],
+        "origins": [
+          "Constant"
+        ],
+        "reasons": [],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 1.0
+          }
+        ],
+        "unknown": false
+      },
+      "status": "complete_within_profile",
+      "symbol": "symbol:probe.mjs:336:387",
+      "throws": {
+        "constants": [],
+        "origins": [],
+        "reasons": [
+          "no_throw_observed"
+        ],
+        "targets": [],
+        "typed_constants": [],
+        "unknown": true
+      },
+      "unknown_reasons": []
+    },
+    "missingField": {
+      "algorithm": {
+        "id": "atlas-local-absint",
+        "version": "0.2.0"
+      },
+      "analysis_id": "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+      "binding_kinds": {
+        "b:probe.mjs:417:flag": "param",
+        "b:probe.mjs:431:o": "const"
+      },
+      "binding_names": {
+        "b:probe.mjs:417:flag": "flag",
+        "b:probe.mjs:431:o": "o"
+      },
+      "block_states": [
+        {
+          "bindings": [
+            {
+              "binding": "b:probe.mjs:417:flag",
+              "defs": [],
+              "init": "Initialized",
+              "name": "flag",
+              "value": {
+                "constants": [],
+                "origins": [
+                  "Parameter(0)"
+                ],
+                "reasons": [],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": false
+              }
+            },
+            {
+              "binding": "b:probe.mjs:431:o",
+              "defs": [],
+              "init": "NotInitialized",
+              "name": "o",
+              "value": {
+                "constants": [],
+                "origins": [],
+                "reasons": [
+                  "value_not_yet_assigned"
+                ],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": true
+              }
+            }
+          ],
+          "block": 0,
+          "completion": "normal",
+          "truncated": false
+        },
+        {
+          "bindings": [
+            {
+              "binding": "b:probe.mjs:417:flag",
+              "defs": [],
+              "init": "Initialized",
+              "name": "flag",
+              "value": {
+                "constants": [],
+                "origins": [
+                  "Parameter(0)"
+                ],
+                "reasons": [],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": false
+              }
+            },
+            {
+              "binding": "b:probe.mjs:431:o",
+              "defs": [],
+              "init": "NotInitialized",
+              "name": "o",
+              "value": {
+                "constants": [],
+                "origins": [],
+                "reasons": [
+                  "value_not_yet_assigned"
+                ],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": true
+              }
+            },
+            {
+              "binding": "t:symbol:probe.mjs:388:476/cond:1",
+              "defs": [
+                3,
+                5
+              ],
+              "init": "Initialized",
+              "name": "t:symbol:probe.mjs:388:476/cond:1",
+              "value": {
+                "constants": [],
+                "origins": [
+                  "Derived(op3)",
+                  "Allocation(op2)",
+                  "Derived(op5)",
+                  "Allocation(op4)"
+                ],
+                "reasons": [],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": false
+              }
+            }
+          ],
+          "block": 1,
+          "completion": "normal",
+          "truncated": false
+        },
+        {
+          "bindings": [
+            {
+              "binding": "b:probe.mjs:417:flag",
+              "defs": [],
+              "init": "Initialized",
+              "name": "flag",
+              "value": {
+                "constants": [],
+                "origins": [
+                  "Parameter(0)"
+                ],
+                "reasons": [],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": false
+              }
+            },
+            {
+              "binding": "b:probe.mjs:431:o",
+              "defs": [],
+              "init": "NotInitialized",
+              "name": "o",
+              "value": {
+                "constants": [],
+                "origins": [],
+                "reasons": [
+                  "value_not_yet_assigned"
+                ],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": true
+              }
+            }
+          ],
+          "block": 2,
+          "completion": "normal",
+          "truncated": false
+        },
+        {
+          "bindings": [
+            {
+              "binding": "b:probe.mjs:417:flag",
+              "defs": [],
+              "init": "Initialized",
+              "name": "flag",
+              "value": {
+                "constants": [],
+                "origins": [
+                  "Parameter(0)"
+                ],
+                "reasons": [],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": false
+              }
+            },
+            {
+              "binding": "b:probe.mjs:431:o",
+              "defs": [],
+              "init": "NotInitialized",
+              "name": "o",
+              "value": {
+                "constants": [],
+                "origins": [],
+                "reasons": [
+                  "value_not_yet_assigned"
+                ],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": true
+              }
+            }
+          ],
+          "block": 3,
+          "completion": "normal",
+          "truncated": false
+        }
+      ],
+      "blocks": [
+        {
+          "id": 0,
+          "ops": [
+            0
+          ],
+          "successors": [
+            [
+              2,
+              "true"
+            ],
+            [
+              3,
+              "false"
+            ]
+          ],
+          "term": "branch"
+        },
+        {
+          "id": 1,
+          "ops": [
+            6,
+            7,
+            8,
+            9
+          ],
+          "successors": [],
+          "term": "return"
+        },
+        {
+          "id": 2,
+          "ops": [
+            1,
+            2,
+            3
+          ],
+          "successors": [
+            [
+              1,
+              "normal"
+            ]
+          ],
+          "term": "goto"
+        },
+        {
+          "id": 3,
+          "ops": [
+            4,
+            5
+          ],
+          "successors": [
+            [
+              1,
+              "normal"
+            ]
+          ],
+          "term": "goto"
+        },
+        {
+          "id": 4,
+          "ops": [],
+          "successors": [
+            [
+              5,
+              "normal"
+            ]
+          ],
+          "term": "goto"
+        },
+        {
+          "id": 5,
+          "ops": [],
+          "successors": [],
+          "term": "sink"
+        },
+        {
+          "id": 6,
+          "ops": [],
+          "successors": [],
+          "term": "throw"
+        }
+      ],
+      "budgets": {
+        "cap_constants": 8,
+        "cap_heap": 32,
+        "cap_origins": 8,
+        "cap_targets": 64,
+        "job_max_transfers": 2400000,
+        "job_total_transfers": 402,
+        "max_block_visits": 2,
+        "max_contexts_per_function": 8,
+        "scalar_contexts": 0,
+        "transfers": 14
+      },
+      "coverage": {
+        "cfg_blocks": 7,
+        "reachable_blocks": 4,
+        "supported_op_transfers": 14,
+        "unknown_op_transfers": 0
+      },
+      "def_use": [
+        {
+          "binding": "b:probe.mjs:431:o",
+          "defs": [
+            7
+          ],
+          "name": "o",
+          "uses": [
+            {
+              "def": 7,
+              "uses": [
+                8
+              ]
+            }
+          ]
+        },
+        {
+          "binding": "t:symbol:probe.mjs:388:476/cond:1",
+          "defs": [
+            3,
+            5
+          ],
+          "name": "t:symbol:probe.mjs:388:476/cond:1",
+          "uses": [
+            {
+              "def": 3,
+              "uses": [
+                6
+              ]
+            },
+            {
+              "def": 5,
+              "uses": [
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "effects": {
+        "escaped_local_value": false,
+        "may_access_global": false,
+        "may_call": [],
+        "may_read_heap": true,
+        "may_throw": true,
+        "may_write_heap": false,
+        "registers_callback": false,
+        "unknown_call": false
+      },
+      "entry": 0,
+      "exception_edges": [],
+      "exit_exceptional": 6,
+      "exit_normal": 5,
+      "frontier": [],
+      "interprocedural": {
+        "callsites": [],
+        "recursive_sccs": 0,
+        "rounds_max": 2,
+        "scc_count": 19,
+        "status": "complete_within_profile",
+        "summary_effects": {
+          "escaped_local_value": false,
+          "may_access_global": false,
+          "may_call": [],
+          "may_read_heap": true,
+          "may_throw": true,
+          "may_write_heap": false,
+          "registers_callback": false,
+          "unknown_call": false
+        },
+        "summary_returns": {
+          "constants": [
+            1.0,
+            "undefined"
+          ],
+          "origins": [
+            "Derived(op9)",
+            "Constant"
+          ],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [
+            {
+              "kind": "number",
+              "value": 1.0
+            },
+            {
+              "kind": "undefined"
+            }
+          ],
+          "unknown": false
+        },
+        "summary_throws": {
+          "constants": [],
+          "origins": [],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [],
+          "unknown": false
+        }
+      },
+      "looping_blocks": [],
+      "name": "missingField",
+      "ops": [
+        {
+          "detail": "b:probe.mjs:417:flag",
+          "end": 439,
+          "index": 0,
+          "kind": "read_local",
+          "may_throw": false,
+          "start": 435
+        },
+        {
+          "detail": "1.0",
+          "end": 451,
+          "index": 1,
+          "kind": "const",
+          "may_throw": false,
+          "start": 450
+        },
+        {
+          "detail": "value: op1",
+          "end": 452,
+          "index": 2,
+          "kind": "alloc_object",
+          "may_throw": false,
+          "start": 442
+        },
+        {
+          "detail": "t:symbol:probe.mjs:388:476/cond:1 <- op2",
+          "end": 457,
+          "index": 3,
+          "kind": "assign_binding",
+          "may_throw": false,
+          "start": 435
+        },
+        {
+          "detail": "",
+          "end": 457,
+          "index": 4,
+          "kind": "alloc_object",
+          "may_throw": false,
+          "start": 455
+        },
+        {
+          "detail": "t:symbol:probe.mjs:388:476/cond:1 <- op4",
+          "end": 457,
+          "index": 5,
+          "kind": "assign_binding",
+          "may_throw": false,
+          "start": 435
+        },
+        {
+          "detail": "t:symbol:probe.mjs:388:476/cond:1",
+          "end": 457,
+          "index": 6,
+          "kind": "read_local",
+          "may_throw": false,
+          "start": 435
+        },
+        {
+          "detail": "b:probe.mjs:431:o <- op6",
+          "end": 458,
+          "index": 7,
+          "kind": "assign_binding",
+          "may_throw": false,
+          "start": 425
+        },
+        {
+          "detail": "b:probe.mjs:431:o",
+          "end": 467,
+          "index": 8,
+          "kind": "read_local",
+          "may_throw": false,
+          "start": 466
+        },
+        {
+          "detail": "op8.value",
+          "end": 473,
+          "index": 9,
+          "kind": "property_read",
+          "may_throw": true,
+          "start": 466
+        }
+      ],
+      "path": "probe.mjs",
+      "profile": "js-structured-control.v1",
+      "pruned_edges": [],
+      "returns": {
+        "constants": [
+          1.0,
+          "undefined"
+        ],
+        "origins": [
+          "Derived(op9)",
+          "Constant"
+        ],
+        "reasons": [],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 1.0
+          },
+          {
+            "kind": "undefined"
+          }
+        ],
+        "unknown": false
+      },
+      "status": "complete_within_profile",
+      "symbol": "symbol:probe.mjs:388:476",
+      "throws": {
+        "constants": [],
+        "origins": [],
+        "reasons": [
+          "no_throw_observed"
+        ],
+        "targets": [],
+        "typed_constants": [],
+        "unknown": true
+      },
+      "unknown_reasons": []
+    },
+    "viaIdentity": {
+      "algorithm": {
+        "id": "atlas-local-absint",
+        "version": "0.2.0"
+      },
+      "analysis_id": "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+      "binding_kinds": {
+        "b:probe.mjs:515:f": "const"
+      },
+      "binding_names": {
+        "b:probe.mjs:515:f": "f"
+      },
+      "block_states": [
+        {
+          "bindings": [
+            {
+              "binding": "b:probe.mjs:515:f",
+              "defs": [],
+              "init": "NotInitialized",
+              "name": "f",
+              "value": {
+                "constants": [],
+                "origins": [],
+                "reasons": [
+                  "value_not_yet_assigned"
+                ],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": true
+              }
+            }
+          ],
+          "block": 0,
+          "completion": "normal",
+          "truncated": false
+        }
+      ],
+      "blocks": [
+        {
+          "id": 0,
+          "ops": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "successors": [],
+          "term": "return"
+        },
+        {
+          "id": 1,
+          "ops": [],
+          "successors": [
+            [
+              2,
+              "normal"
+            ]
+          ],
+          "term": "goto"
+        },
+        {
+          "id": 2,
+          "ops": [],
+          "successors": [],
+          "term": "sink"
+        },
+        {
+          "id": 3,
+          "ops": [],
+          "successors": [],
+          "term": "throw"
+        }
+      ],
+      "budgets": {
+        "cap_constants": 8,
+        "cap_heap": 32,
+        "cap_origins": 8,
+        "cap_targets": 64,
+        "job_max_transfers": 2400000,
+        "job_total_transfers": 402,
+        "max_block_visits": 1,
+        "max_contexts_per_function": 8,
+        "scalar_contexts": 0,
+        "transfers": 6
+      },
+      "coverage": {
+        "cfg_blocks": 4,
+        "reachable_blocks": 1,
+        "supported_op_transfers": 6,
+        "unknown_op_transfers": 0
+      },
+      "def_use": [
+        {
+          "binding": "b:probe.mjs:515:f",
+          "defs": [
+            3
+          ],
+          "name": "f",
+          "uses": [
+            {
+              "def": 3,
+              "uses": [
+                4
+              ]
+            }
+          ]
+        }
+      ],
+      "effects": {
+        "escaped_local_value": false,
+        "may_access_global": false,
+        "may_call": [
+          "symbol:probe.mjs:39:67",
+          "symbol:probe.mjs:68:102"
+        ],
+        "may_read_heap": false,
+        "may_throw": true,
+        "may_write_heap": false,
+        "registers_callback": true,
+        "unknown_call": false
+      },
+      "entry": 0,
+      "exception_edges": [],
+      "exit_exceptional": 3,
+      "exit_normal": 2,
+      "frontier": [],
+      "interprocedural": {
+        "callsites": [
+          {
+            "args": [
+              {
+                "constants": [],
+                "origins": [
+                  "Capture(b:probe.mjs:48:one)"
+                ],
+                "reasons": [
+                  "value_from_enclosing_scope"
+                ],
+                "targets": [
+                  "symbol:probe.mjs:39:67"
+                ],
+                "typed_constants": [],
+                "unknown": false
+              }
+            ],
+            "end": 532,
+            "label": "op0(op1)",
+            "op": 2,
+            "result": {
+              "constants": [],
+              "origins": [
+                "CallResult(op2)",
+                "Capture(b:probe.mjs:48:one)"
+              ],
+              "reasons": [
+                "value_from_enclosing_scope"
+              ],
+              "targets": [
+                "symbol:probe.mjs:39:67"
+              ],
+              "typed_constants": [],
+              "unknown": false
+            },
+            "start": 519,
+            "targets": [
+              "symbol:probe.mjs:68:102"
+            ],
+            "targets_complete": true,
+            "unknown_component": false
+          },
+          {
+            "args": [],
+            "end": 544,
+            "label": "op4()",
+            "op": 5,
+            "result": {
+              "constants": [
+                1.0
+              ],
+              "origins": [
+                "CallResult(op5)",
+                "Constant"
+              ],
+              "reasons": [],
+              "targets": [],
+              "typed_constants": [
+                {
+                  "kind": "number",
+                  "value": 1.0
+                }
+              ],
+              "unknown": false
+            },
+            "start": 541,
+            "targets": [
+              "symbol:probe.mjs:39:67"
+            ],
+            "targets_complete": true,
+            "unknown_component": false
+          }
+        ],
+        "recursive_sccs": 0,
+        "rounds_max": 2,
+        "scc_count": 19,
+        "status": "complete_within_profile",
+        "summary_effects": {
+          "escaped_local_value": false,
+          "may_access_global": false,
+          "may_call": [
+            "symbol:probe.mjs:39:67",
+            "symbol:probe.mjs:68:102"
+          ],
+          "may_read_heap": false,
+          "may_throw": true,
+          "may_write_heap": false,
+          "registers_callback": true,
+          "unknown_call": false
+        },
+        "summary_returns": {
+          "constants": [
+            1.0
+          ],
+          "origins": [
+            "CallResult(op5)",
+            "Constant"
+          ],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [
+            {
+              "kind": "number",
+              "value": 1.0
+            }
+          ],
+          "unknown": false
+        },
+        "summary_throws": {
+          "constants": [],
+          "origins": [],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [],
+          "unknown": false
+        }
+      },
+      "looping_blocks": [],
+      "name": "viaIdentity",
+      "ops": [
+        {
+          "detail": "b:probe.mjs:77:identity",
+          "end": 527,
+          "index": 0,
+          "kind": "read_local",
+          "may_throw": false,
+          "start": 519
+        },
+        {
+          "detail": "b:probe.mjs:48:one",
+          "end": 531,
+          "index": 1,
+          "kind": "read_local",
+          "may_throw": false,
+          "start": 528
+        },
+        {
+          "detail": "op0(op1)",
+          "end": 532,
+          "index": 2,
+          "kind": "call",
+          "may_throw": true,
+          "start": 519
+        },
+        {
+          "detail": "b:probe.mjs:515:f <- op2",
+          "end": 533,
+          "index": 3,
+          "kind": "assign_binding",
+          "may_throw": false,
+          "start": 509
+        },
+        {
+          "detail": "b:probe.mjs:515:f",
+          "end": 542,
+          "index": 4,
+          "kind": "read_local",
+          "may_throw": false,
+          "start": 541
+        },
+        {
+          "detail": "op4()",
+          "end": 544,
+          "index": 5,
+          "kind": "call",
+          "may_throw": true,
+          "start": 541
+        }
+      ],
+      "path": "probe.mjs",
+      "profile": "js-structured-control.v1",
+      "pruned_edges": [],
+      "returns": {
+        "constants": [
+          1.0
+        ],
+        "origins": [
+          "CallResult(op5)",
+          "Constant"
+        ],
+        "reasons": [],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 1.0
+          }
+        ],
+        "unknown": false
+      },
+      "status": "complete_within_profile",
+      "symbol": "symbol:probe.mjs:477:547",
+      "throws": {
+        "constants": [],
+        "origins": [],
+        "reasons": [
+          "no_throw_observed"
+        ],
+        "targets": [],
+        "typed_constants": [],
+        "unknown": true
+      },
+      "unknown_reasons": [
+        "capture_or_untracked_binding_read"
+      ]
+    },
+    "identityNumber": {
+      "algorithm": {
+        "id": "atlas-local-absint",
+        "version": "0.2.0"
+      },
+      "analysis_id": "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+      "binding_kinds": {},
+      "binding_names": {},
+      "block_states": [
+        {
+          "bindings": [],
+          "block": 0,
+          "completion": "normal",
+          "truncated": false
+        }
+      ],
+      "blocks": [
+        {
+          "id": 0,
+          "ops": [
+            0,
+            1,
+            2
+          ],
+          "successors": [],
+          "term": "return"
+        },
+        {
+          "id": 1,
+          "ops": [],
+          "successors": [
+            [
+              2,
+              "normal"
+            ]
+          ],
+          "term": "goto"
+        },
+        {
+          "id": 2,
+          "ops": [],
+          "successors": [],
+          "term": "sink"
+        },
+        {
+          "id": 3,
+          "ops": [],
+          "successors": [],
+          "term": "throw"
+        }
+      ],
+      "budgets": {
+        "cap_constants": 8,
+        "cap_heap": 32,
+        "cap_origins": 8,
+        "cap_targets": 64,
+        "job_max_transfers": 2400000,
+        "job_total_transfers": 402,
+        "max_block_visits": 1,
+        "max_contexts_per_function": 8,
+        "scalar_contexts": 0,
+        "transfers": 3
+      },
+      "coverage": {
+        "cfg_blocks": 4,
+        "reachable_blocks": 1,
+        "supported_op_transfers": 3,
+        "unknown_op_transfers": 0
+      },
+      "def_use": [],
+      "effects": {
+        "escaped_local_value": false,
+        "may_access_global": false,
+        "may_call": [
+          "symbol:probe.mjs:68:102"
+        ],
+        "may_read_heap": false,
+        "may_throw": true,
+        "may_write_heap": false,
+        "registers_callback": false,
+        "unknown_call": false
+      },
+      "entry": 0,
+      "exception_edges": [],
+      "exit_exceptional": 3,
+      "exit_normal": 2,
+      "frontier": [],
+      "interprocedural": {
+        "callsites": [
+          {
+            "args": [
+              {
+                "constants": [
+                  41.0
+                ],
+                "origins": [
+                  "Constant"
+                ],
+                "reasons": [],
+                "targets": [],
+                "typed_constants": [
+                  {
+                    "kind": "number",
+                    "value": 41.0
+                  }
+                ],
+                "unknown": false
+              }
+            ],
+            "end": 602,
+            "label": "op0(op1)",
+            "op": 2,
+            "result": {
+              "constants": [
+                41.0
+              ],
+              "origins": [
+                "CallResult(op2)",
+                "Constant"
+              ],
+              "reasons": [],
+              "targets": [],
+              "typed_constants": [
+                {
+                  "kind": "number",
+                  "value": 41.0
+                }
+              ],
+              "unknown": false
+            },
+            "start": 590,
+            "targets": [
+              "symbol:probe.mjs:68:102"
+            ],
+            "targets_complete": true,
+            "unknown_component": false
+          }
+        ],
+        "recursive_sccs": 0,
+        "rounds_max": 2,
+        "scc_count": 19,
+        "status": "complete_within_profile",
+        "summary_effects": {
+          "escaped_local_value": false,
+          "may_access_global": false,
+          "may_call": [
+            "symbol:probe.mjs:68:102"
+          ],
+          "may_read_heap": false,
+          "may_throw": true,
+          "may_write_heap": false,
+          "registers_callback": false,
+          "unknown_call": false
+        },
+        "summary_returns": {
+          "constants": [
+            41.0
+          ],
+          "origins": [
+            "CallResult(op2)",
+            "Constant"
+          ],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [
+            {
+              "kind": "number",
+              "value": 41.0
+            }
+          ],
+          "unknown": false
+        },
+        "summary_throws": {
+          "constants": [],
+          "origins": [],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [],
+          "unknown": false
+        }
+      },
+      "looping_blocks": [],
+      "name": "identityNumber",
+      "ops": [
+        {
+          "detail": "b:probe.mjs:77:identity",
+          "end": 598,
+          "index": 0,
+          "kind": "read_local",
+          "may_throw": false,
+          "start": 590
+        },
+        {
+          "detail": "41.0",
+          "end": 601,
+          "index": 1,
+          "kind": "const",
+          "may_throw": false,
+          "start": 599
+        },
+        {
+          "detail": "op0(op1)",
+          "end": 602,
+          "index": 2,
+          "kind": "call",
+          "may_throw": true,
+          "start": 590
+        }
+      ],
+      "path": "probe.mjs",
+      "profile": "js-structured-control.v1",
+      "pruned_edges": [],
+      "returns": {
+        "constants": [
+          41.0
+        ],
+        "origins": [
+          "CallResult(op2)",
+          "Constant"
+        ],
+        "reasons": [],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 41.0
+          }
+        ],
+        "unknown": false
+      },
+      "status": "complete_within_profile",
+      "symbol": "symbol:probe.mjs:548:605",
+      "throws": {
+        "constants": [],
+        "origins": [],
+        "reasons": [
+          "no_throw_observed"
+        ],
+        "targets": [],
+        "typed_constants": [],
+        "unknown": true
+      },
+      "unknown_reasons": [
+        "capture_or_untracked_binding_read"
+      ]
+    },
+    "captureChange": {
+      "algorithm": {
+        "id": "atlas-local-absint",
+        "version": "0.2.0"
+      },
+      "analysis_id": "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+      "binding_kinds": {
+        "b:probe.mjs:649:f": "function",
+        "b:probe.mjs:676:inner": "function"
+      },
+      "binding_names": {
+        "b:probe.mjs:649:f": "f",
+        "b:probe.mjs:676:inner": "inner"
+      },
+      "block_states": [
+        {
+          "bindings": [],
+          "block": 0,
+          "completion": "normal",
+          "truncated": false
+        }
+      ],
+      "blocks": [
+        {
+          "id": 0,
+          "ops": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "successors": [],
+          "term": "return"
+        },
+        {
+          "id": 1,
+          "ops": [],
+          "successors": [
+            [
+              2,
+              "normal"
+            ]
+          ],
+          "term": "goto"
+        },
+        {
+          "id": 2,
+          "ops": [],
+          "successors": [],
+          "term": "sink"
+        },
+        {
+          "id": 3,
+          "ops": [],
+          "successors": [],
+          "term": "throw"
+        }
+      ],
+      "budgets": {
+        "cap_constants": 8,
+        "cap_heap": 32,
+        "cap_origins": 8,
+        "cap_targets": 64,
+        "job_max_transfers": 2400000,
+        "job_total_transfers": 402,
+        "max_block_visits": 1,
+        "max_contexts_per_function": 8,
+        "scalar_contexts": 0,
+        "transfers": 8
+      },
+      "coverage": {
+        "cfg_blocks": 4,
+        "reachable_blocks": 1,
+        "supported_op_transfers": 8,
+        "unknown_op_transfers": 0
+      },
+      "def_use": [
+        {
+          "binding": "b:probe.mjs:649:f",
+          "defs": [
+            1,
+            5
+          ],
+          "name": "f",
+          "uses": [
+            {
+              "def": 1,
+              "uses": [
+                5
+              ]
+            }
+          ]
+        },
+        {
+          "binding": "b:probe.mjs:676:inner",
+          "defs": [
+            3
+          ],
+          "name": "inner",
+          "uses": [
+            {
+              "def": 3,
+              "uses": [
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "effects": {
+        "escaped_local_value": false,
+        "may_access_global": false,
+        "may_call": [
+          "symbol:probe.mjs:640:666",
+          "symbol:probe.mjs:667:699"
+        ],
+        "may_read_heap": false,
+        "may_throw": true,
+        "may_write_heap": false,
+        "registers_callback": false,
+        "unknown_call": false
+      },
+      "entry": 0,
+      "exception_edges": [],
+      "exit_exceptional": 3,
+      "exit_normal": 2,
+      "frontier": [],
+      "interprocedural": {
+        "callsites": [
+          {
+            "args": [],
+            "end": 727,
+            "label": "op6()",
+            "op": 7,
+            "result": {
+              "constants": [
+                1.0
+              ],
+              "origins": [
+                "CallResult(op7)",
+                "CallResult(op1)",
+                "Constant"
+              ],
+              "reasons": [],
+              "targets": [],
+              "typed_constants": [
+                {
+                  "kind": "number",
+                  "value": 1.0
+                }
+              ],
+              "unknown": false
+            },
+            "start": 720,
+            "targets": [
+              "symbol:probe.mjs:667:699"
+            ],
+            "targets_complete": true,
+            "unknown_component": false
+          }
+        ],
+        "recursive_sccs": 0,
+        "rounds_max": 2,
+        "scc_count": 19,
+        "status": "complete_within_profile",
+        "summary_effects": {
+          "escaped_local_value": false,
+          "may_access_global": false,
+          "may_call": [
+            "symbol:probe.mjs:640:666",
+            "symbol:probe.mjs:667:699"
+          ],
+          "may_read_heap": false,
+          "may_throw": true,
+          "may_write_heap": false,
+          "registers_callback": false,
+          "unknown_call": false
+        },
+        "summary_returns": {
+          "constants": [
+            1.0
+          ],
+          "origins": [
+            "CallResult(op7)",
+            "CallResult(op1)",
+            "Constant"
+          ],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [
+            {
+              "kind": "number",
+              "value": 1.0
+            }
+          ],
+          "unknown": false
+        },
+        "summary_throws": {
+          "constants": [],
+          "origins": [],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [],
+          "unknown": false
+        }
+      },
+      "looping_blocks": [],
+      "name": "captureChange",
+      "ops": [
+        {
+          "detail": "symbol:probe.mjs:640:666",
+          "end": 650,
+          "index": 0,
+          "kind": "function_ref",
+          "may_throw": false,
+          "start": 649
+        },
+        {
+          "detail": "b:probe.mjs:649:f <- op0",
+          "end": 650,
+          "index": 1,
+          "kind": "assign_binding",
+          "may_throw": false,
+          "start": 649
+        },
+        {
+          "detail": "symbol:probe.mjs:667:699",
+          "end": 681,
+          "index": 2,
+          "kind": "function_ref",
+          "may_throw": false,
+          "start": 676
+        },
+        {
+          "detail": "b:probe.mjs:676:inner <- op2",
+          "end": 681,
+          "index": 3,
+          "kind": "assign_binding",
+          "may_throw": false,
+          "start": 676
+        },
+        {
+          "detail": "symbol:probe.mjs:704:711",
+          "end": 711,
+          "index": 4,
+          "kind": "function_ref",
+          "may_throw": false,
+          "start": 704
+        },
+        {
+          "detail": "b:probe.mjs:649:f <- op4",
+          "end": 711,
+          "index": 5,
+          "kind": "assign_binding",
+          "may_throw": false,
+          "start": 700
+        },
+        {
+          "detail": "b:probe.mjs:676:inner",
+          "end": 725,
+          "index": 6,
+          "kind": "read_local",
+          "may_throw": false,
+          "start": 720
+        },
+        {
+          "detail": "op6()",
+          "end": 727,
+          "index": 7,
+          "kind": "call",
+          "may_throw": true,
+          "start": 720
+        }
+      ],
+      "path": "probe.mjs",
+      "profile": "js-structured-control.v1",
+      "pruned_edges": [],
+      "returns": {
+        "constants": [
+          1.0
+        ],
+        "origins": [
+          "CallResult(op7)",
+          "CallResult(op1)",
+          "Constant"
+        ],
+        "reasons": [],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 1.0
+          }
+        ],
+        "unknown": false
+      },
+      "status": "complete_within_profile",
+      "symbol": "symbol:probe.mjs:606:730",
+      "throws": {
+        "constants": [],
+        "origins": [],
+        "reasons": [
+          "no_throw_observed"
+        ],
+        "targets": [],
+        "typed_constants": [],
+        "unknown": true
+      },
+      "unknown_reasons": []
+    },
+    "increment": {
+      "algorithm": {
+        "id": "atlas-local-absint",
+        "version": "0.2.0"
+      },
+      "analysis_id": "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+      "binding_kinds": {
+        "b:probe.mjs:765:x": "let",
+        "b:probe.mjs:778:previous": "const"
+      },
+      "binding_names": {
+        "b:probe.mjs:765:x": "x",
+        "b:probe.mjs:778:previous": "previous"
+      },
+      "block_states": [
+        {
+          "bindings": [
+            {
+              "binding": "b:probe.mjs:765:x",
+              "defs": [],
+              "init": "NotInitialized",
+              "name": "x",
+              "value": {
+                "constants": [],
+                "origins": [],
+                "reasons": [
+                  "value_not_yet_assigned"
+                ],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": true
+              }
+            },
+            {
+              "binding": "b:probe.mjs:778:previous",
+              "defs": [],
+              "init": "NotInitialized",
+              "name": "previous",
+              "value": {
+                "constants": [],
+                "origins": [],
+                "reasons": [
+                  "value_not_yet_assigned"
+                ],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": true
+              }
+            }
+          ],
+          "block": 0,
+          "completion": "normal",
+          "truncated": false
+        }
+      ],
+      "blocks": [
+        {
+          "id": 0,
+          "ops": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "successors": [],
+          "term": "return"
+        },
+        {
+          "id": 1,
+          "ops": [],
+          "successors": [
+            [
+              2,
+              "normal"
+            ]
+          ],
+          "term": "goto"
+        },
+        {
+          "id": 2,
+          "ops": [],
+          "successors": [],
+          "term": "sink"
+        },
+        {
+          "id": 3,
+          "ops": [],
+          "successors": [],
+          "term": "throw"
+        }
+      ],
+      "budgets": {
+        "cap_constants": 8,
+        "cap_heap": 32,
+        "cap_origins": 8,
+        "cap_targets": 64,
+        "job_max_transfers": 2400000,
+        "job_total_transfers": 402,
+        "max_block_visits": 1,
+        "max_contexts_per_function": 8,
+        "scalar_contexts": 0,
+        "transfers": 6
+      },
+      "coverage": {
+        "cfg_blocks": 4,
+        "reachable_blocks": 1,
+        "supported_op_transfers": 6,
+        "unknown_op_transfers": 0
+      },
+      "def_use": [
+        {
+          "binding": "b:probe.mjs:765:x",
+          "defs": [
+            1,
+            3
+          ],
+          "name": "x",
+          "uses": [
+            {
+              "def": 1,
+              "uses": [
+                3
+              ]
+            }
+          ]
+        },
+        {
+          "binding": "b:probe.mjs:778:previous",
+          "defs": [
+            4
+          ],
+          "name": "previous",
+          "uses": [
+            {
+              "def": 4,
+              "uses": [
+                5
+              ]
+            }
+          ]
+        }
+      ],
+      "effects": {
+        "escaped_local_value": false,
+        "may_access_global": true,
+        "may_call": [],
+        "may_read_heap": false,
+        "may_throw": true,
+        "may_write_heap": true,
+        "registers_callback": false,
+        "unknown_call": true
+      },
+      "entry": 0,
+      "exception_edges": [],
+      "exit_exceptional": 3,
+      "exit_normal": 2,
+      "frontier": [],
+      "interprocedural": {
+        "callsites": [],
+        "recursive_sccs": 0,
+        "rounds_max": 2,
+        "scc_count": 19,
+        "status": "complete_within_profile",
+        "summary_effects": {
+          "escaped_local_value": false,
+          "may_access_global": true,
+          "may_call": [],
+          "may_read_heap": false,
+          "may_throw": true,
+          "may_write_heap": true,
+          "registers_callback": false,
+          "unknown_call": true
+        },
+        "summary_returns": {
+          "constants": [],
+          "origins": [
+            "Derived(op4)",
+            "Derived(op3)"
+          ],
+          "reasons": [
+            "increment_result_unknown"
+          ],
+          "targets": [],
+          "typed_constants": [],
+          "unknown": true
+        },
+        "summary_throws": {
+          "constants": [],
+          "origins": [],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [],
+          "unknown": false
+        }
+      },
+      "looping_blocks": [],
+      "name": "increment",
+      "ops": [
+        {
+          "detail": "1.0",
+          "end": 770,
+          "index": 0,
+          "kind": "const",
+          "may_throw": false,
+          "start": 769
+        },
+        {
+          "detail": "b:probe.mjs:765:x <- op0",
+          "end": 771,
+          "index": 1,
+          "kind": "assign_binding",
+          "may_throw": false,
+          "start": 761
+        },
+        {
+          "detail": "increment_result_unknown",
+          "end": 792,
+          "index": 2,
+          "kind": "unknown",
+          "may_throw": true,
+          "start": 789
+        },
+        {
+          "detail": "b:probe.mjs:765:x++ <- op2 (compound)",
+          "end": 792,
+          "index": 3,
+          "kind": "assign_binding",
+          "may_throw": true,
+          "start": 789
+        },
+        {
+          "detail": "b:probe.mjs:778:previous <- op3",
+          "end": 793,
+          "index": 4,
+          "kind": "assign_binding",
+          "may_throw": false,
+          "start": 772
+        },
+        {
+          "detail": "b:probe.mjs:778:previous",
+          "end": 809,
+          "index": 5,
+          "kind": "read_local",
+          "may_throw": false,
+          "start": 801
+        }
+      ],
+      "path": "probe.mjs",
+      "profile": "js-structured-control.v1",
+      "pruned_edges": [],
+      "returns": {
+        "constants": [],
+        "origins": [
+          "Derived(op4)",
+          "Derived(op3)"
+        ],
+        "reasons": [
+          "increment_result_unknown"
+        ],
+        "targets": [],
+        "typed_constants": [],
+        "unknown": true
+      },
+      "status": "complete_within_profile",
+      "symbol": "symbol:probe.mjs:731:812",
+      "throws": {
+        "constants": [],
+        "origins": [],
+        "reasons": [
+          "no_throw_observed"
+        ],
+        "targets": [],
+        "typed_constants": [],
+        "unknown": true
+      },
+      "unknown_reasons": [
+        "unmodeled_construct:increment_result_unknown"
+      ]
+    },
+    "finallyReturn": {
+      "algorithm": {
+        "id": "atlas-local-absint",
+        "version": "0.2.0"
+      },
+      "analysis_id": "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+      "binding_kinds": {
+        "b:probe.mjs:881:x": "const"
+      },
+      "binding_names": {
+        "b:probe.mjs:881:x": "x"
+      },
+      "block_states": [
+        {
+          "bindings": [
+            {
+              "binding": "b:probe.mjs:881:x",
+              "defs": [],
+              "init": "NotInitialized",
+              "name": "x",
+              "value": {
+                "constants": [],
+                "origins": [],
+                "reasons": [
+                  "value_not_yet_assigned"
+                ],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": true
+              }
+            }
+          ],
+          "block": 0,
+          "completion": "normal",
+          "truncated": false
+        },
+        {
+          "bindings": [
+            {
+              "binding": "b:probe.mjs:881:x",
+              "defs": [],
+              "init": "NotInitialized",
+              "name": "x",
+              "value": {
+                "constants": [],
+                "origins": [],
+                "reasons": [
+                  "value_not_yet_assigned"
+                ],
+                "targets": [],
+                "typed_constants": [],
+                "unknown": true
+              }
+            }
+          ],
+          "block": 1,
+          "completion": "return",
+          "truncated": false
+        },
+        {
+          "bindings": [
+            {
+              "binding": "b:probe.mjs:881:x",
+              "defs": [
+                5
+              ],
+              "init": "Initialized",
+              "name": "x",
+              "value": {
+                "constants": [
+                  2.0
+                ],
+                "origins": [
+                  "Derived(op5)",
+                  "Constant"
+                ],
+                "reasons": [],
+                "targets": [],
+                "typed_constants": [
+                  {
+                    "kind": "number",
+                    "value": 2.0
+                  }
+                ],
+                "unknown": false
+              }
+            }
+          ],
+          "block": 4,
+          "completion": "return",
+          "truncated": false
+        }
+      ],
+      "blocks": [
+        {
+          "id": 0,
+          "ops": [
+            0,
+            1
+          ],
+          "successors": [
+            [
+              1,
+              "normal"
+            ]
+          ],
+          "term": "goto"
+        },
+        {
+          "id": 1,
+          "ops": [
+            4,
+            5
+          ],
+          "successors": [
+            [
+              3,
+              "finally_normal"
+            ],
+            [
+              4,
+              "finally_return"
+            ],
+            [
+              5,
+              "finally_throw"
+            ]
+          ],
+          "term": "dispatch"
+        },
+        {
+          "id": 2,
+          "ops": [
+            2,
+            3
+          ],
+          "successors": [
+            [
+              1,
+              "normal"
+            ]
+          ],
+          "term": "goto"
+        },
+        {
+          "id": 3,
+          "ops": [
+            6
+          ],
+          "successors": [],
+          "term": "return"
+        },
+        {
+          "id": 4,
+          "ops": [],
+          "successors": [],
+          "term": "return"
+        },
+        {
+          "id": 5,
+          "ops": [],
+          "successors": [],
+          "term": "throw"
+        },
+        {
+          "id": 6,
+          "ops": [],
+          "successors": [
+            [
+              7,
+              "normal"
+            ]
+          ],
+          "term": "goto"
+        },
+        {
+          "id": 7,
+          "ops": [],
+          "successors": [],
+          "term": "sink"
+        },
+        {
+          "id": 8,
+          "ops": [],
+          "successors": [],
+          "term": "throw"
+        }
+      ],
+      "budgets": {
+        "cap_constants": 8,
+        "cap_heap": 32,
+        "cap_origins": 8,
+        "cap_targets": 64,
+        "job_max_transfers": 2400000,
+        "job_total_transfers": 402,
+        "max_block_visits": 1,
+        "max_contexts_per_function": 8,
+        "scalar_contexts": 0,
+        "transfers": 4
+      },
+      "coverage": {
+        "cfg_blocks": 9,
+        "reachable_blocks": 3,
+        "supported_op_transfers": 3,
+        "unknown_op_transfers": 0
+      },
+      "def_use": [
+        {
+          "binding": "b:probe.mjs:881:x",
+          "defs": [
+            5
+          ],
+          "name": "x",
+          "uses": []
+        }
+      ],
+      "effects": {
+        "escaped_local_value": false,
+        "may_access_global": false,
+        "may_call": [],
+        "may_read_heap": false,
+        "may_throw": false,
+        "may_write_heap": false,
+        "registers_callback": false,
+        "unknown_call": false
+      },
+      "entry": 0,
+      "exception_edges": [],
+      "exit_exceptional": 8,
+      "exit_normal": 7,
+      "frontier": [],
+      "interprocedural": {
+        "callsites": [],
+        "recursive_sccs": 0,
+        "rounds_max": 2,
+        "scc_count": 19,
+        "status": "complete_within_profile",
+        "summary_effects": {
+          "escaped_local_value": false,
+          "may_access_global": false,
+          "may_call": [],
+          "may_read_heap": false,
+          "may_throw": false,
+          "may_write_heap": false,
+          "registers_callback": false,
+          "unknown_call": false
+        },
+        "summary_returns": {
+          "constants": [
+            1.0
+          ],
+          "origins": [
+            "Constant"
+          ],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [
+            {
+              "kind": "number",
+              "value": 1.0
+            }
+          ],
+          "unknown": false
+        },
+        "summary_throws": {
+          "constants": [],
+          "origins": [],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [],
+          "unknown": false
+        }
+      },
+      "looping_blocks": [
+        1,
+        2
+      ],
+      "name": "finallyReturn",
+      "ops": [
+        {
+          "detail": "1.0",
+          "end": 861,
+          "index": 0,
+          "kind": "const",
+          "may_throw": false,
+          "start": 860
+        },
+        {
+          "detail": "Return (op0)",
+          "end": 862,
+          "index": 1,
+          "kind": "set_completion",
+          "may_throw": false,
+          "start": 853
+        },
+        {
+          "detail": "",
+          "end": 889,
+          "index": 2,
+          "kind": "current_exception",
+          "may_throw": false,
+          "start": 847
+        },
+        {
+          "detail": "Throw (op2)",
+          "end": 889,
+          "index": 3,
+          "kind": "set_completion",
+          "may_throw": false,
+          "start": 847
+        },
+        {
+          "detail": "2.0",
+          "end": 886,
+          "index": 4,
+          "kind": "const",
+          "may_throw": false,
+          "start": 885
+        },
+        {
+          "detail": "b:probe.mjs:881:x <- op4",
+          "end": 887,
+          "index": 5,
+          "kind": "assign_binding",
+          "may_throw": false,
+          "start": 875
+        },
+        {
+          "detail": "9.0",
+          "end": 898,
+          "index": 6,
+          "kind": "const",
+          "may_throw": false,
+          "start": 897
+        }
+      ],
+      "path": "probe.mjs",
+      "profile": "js-structured-control.v1",
+      "pruned_edges": [],
+      "returns": {
+        "constants": [
+          1.0
+        ],
+        "origins": [
+          "Constant"
+        ],
+        "reasons": [],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 1.0
+          }
+        ],
+        "unknown": false
+      },
+      "status": "complete_within_profile",
+      "symbol": "symbol:probe.mjs:813:901",
+      "throws": {
+        "constants": [],
+        "origins": [],
+        "reasons": [
+          "no_throw_observed"
+        ],
+        "targets": [],
+        "typed_constants": [],
+        "unknown": true
+      },
+      "unknown_reasons": []
+    },
+    "throwCatch": {
+      "algorithm": {
+        "id": "atlas-local-absint",
+        "version": "0.2.0"
+      },
+      "analysis_id": "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+      "binding_kinds": {
+        "b:probe.mjs:942:fail": "function",
+        "b:probe.mjs:995:e": "catch"
+      },
+      "binding_names": {
+        "b:probe.mjs:942:fail": "fail",
+        "b:probe.mjs:995:e": "e"
+      },
+      "block_states": [
+        {
+          "bindings": [],
+          "block": 0,
+          "completion": "normal",
+          "truncated": false
+        },
+        {
+          "bindings": [
+            {
+              "binding": "b:probe.mjs:942:fail",
+              "defs": [
+                1
+              ],
+              "init": "Initialized",
+              "name": "fail",
+              "value": {
+                "constants": [],
+                "origins": [
+                  "Derived(op1)",
+                  "FunctionValue(op0)"
+                ],
+                "reasons": [],
+                "targets": [
+                  "symbol:probe.mjs:933:961"
+                ],
+                "typed_constants": [],
+                "unknown": false
+              }
+            }
+          ],
+          "block": 1,
+          "completion": "normal",
+          "truncated": false
+        }
+      ],
+      "blocks": [
+        {
+          "id": 0,
+          "ops": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          "successors": [],
+          "term": "return"
+        },
+        {
+          "id": 1,
+          "ops": [
+            5,
+            6,
+            7
+          ],
+          "successors": [],
+          "term": "return"
+        },
+        {
+          "id": 2,
+          "ops": [],
+          "successors": [
+            [
+              3,
+              "normal"
+            ]
+          ],
+          "term": "goto"
+        },
+        {
+          "id": 3,
+          "ops": [],
+          "successors": [],
+          "term": "sink"
+        },
+        {
+          "id": 4,
+          "ops": [],
+          "successors": [],
+          "term": "throw"
+        }
+      ],
+      "budgets": {
+        "cap_constants": 8,
+        "cap_heap": 32,
+        "cap_origins": 8,
+        "cap_targets": 64,
+        "job_max_transfers": 2400000,
+        "job_total_transfers": 402,
+        "max_block_visits": 1,
+        "max_contexts_per_function": 8,
+        "scalar_contexts": 0,
+        "transfers": 8
+      },
+      "coverage": {
+        "cfg_blocks": 5,
+        "reachable_blocks": 2,
+        "supported_op_transfers": 8,
+        "unknown_op_transfers": 0
+      },
+      "def_use": [
+        {
+          "binding": "b:probe.mjs:942:fail",
+          "defs": [
+            1
+          ],
+          "name": "fail",
+          "uses": [
+            {
+              "def": 1,
+              "uses": [
+                2
+              ]
+            }
+          ]
+        },
+        {
+          "binding": "b:probe.mjs:995:e",
+          "defs": [
+            6
+          ],
+          "name": "e",
+          "uses": [
+            {
+              "def": 6,
+              "uses": [
+                7
+              ]
+            }
+          ]
+        }
+      ],
+      "effects": {
+        "escaped_local_value": false,
+        "may_access_global": false,
+        "may_call": [
+          "symbol:probe.mjs:933:961"
+        ],
+        "may_read_heap": false,
+        "may_throw": true,
+        "may_write_heap": false,
+        "registers_callback": false,
+        "unknown_call": false
+      },
+      "entry": 0,
+      "exception_edges": [
+        [
+          3,
+          1
+        ]
+      ],
+      "exit_exceptional": 4,
+      "exit_normal": 3,
+      "frontier": [],
+      "interprocedural": {
+        "callsites": [
+          {
+            "args": [],
+            "end": 974,
+            "label": "op2()",
+            "op": 3,
+            "result": {
+              "constants": [],
+              "origins": [
+                "CallResult(op3)"
+              ],
+              "reasons": [],
+              "targets": [],
+              "typed_constants": [],
+              "unknown": false
+            },
+            "start": 968,
+            "targets": [
+              "symbol:probe.mjs:933:961"
+            ],
+            "targets_complete": true,
+            "unknown_component": false
+          }
+        ],
+        "recursive_sccs": 0,
+        "rounds_max": 2,
+        "scc_count": 19,
+        "status": "complete_within_profile",
+        "summary_effects": {
+          "escaped_local_value": false,
+          "may_access_global": false,
+          "may_call": [
+            "symbol:probe.mjs:933:961"
+          ],
+          "may_read_heap": false,
+          "may_throw": true,
+          "may_write_heap": false,
+          "registers_callback": false,
+          "unknown_call": false
+        },
+        "summary_returns": {
+          "constants": [
+            1.0,
+            7.0
+          ],
+          "origins": [
+            "Constant",
+            "Derived(op6)",
+            "Exception(op5)"
+          ],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [
+            {
+              "kind": "number",
+              "value": 1.0
+            },
+            {
+              "kind": "number",
+              "value": 7.0
+            }
+          ],
+          "unknown": false
+        },
+        "summary_throws": {
+          "constants": [],
+          "origins": [],
+          "reasons": [],
+          "targets": [],
+          "typed_constants": [],
+          "unknown": false
+        }
+      },
+      "looping_blocks": [],
+      "name": "throwCatch",
+      "ops": [
+        {
+          "detail": "symbol:probe.mjs:933:961",
+          "end": 946,
+          "index": 0,
+          "kind": "function_ref",
+          "may_throw": false,
+          "start": 942
+        },
+        {
+          "detail": "b:probe.mjs:942:fail <- op0",
+          "end": 946,
+          "index": 1,
+          "kind": "assign_binding",
+          "may_throw": false,
+          "start": 942
+        },
+        {
+          "detail": "b:probe.mjs:942:fail",
+          "end": 972,
+          "index": 2,
+          "kind": "read_local",
+          "may_throw": false,
+          "start": 968
+        },
+        {
+          "detail": "op2()",
+          "end": 974,
+          "index": 3,
+          "kind": "call",
+          "may_throw": true,
+          "start": 968
+        },
+        {
+          "detail": "1.0",
+          "end": 984,
+          "index": 4,
+          "kind": "const",
+          "may_throw": false,
+          "start": 983
+        },
+        {
+          "detail": "",
+          "end": 1011,
+          "index": 5,
+          "kind": "current_exception",
+          "may_throw": false,
+          "start": 962
+        },
+        {
+          "detail": "b:probe.mjs:995:e <- op5",
+          "end": 1011,
+          "index": 6,
+          "kind": "assign_binding",
+          "may_throw": false,
+          "start": 962
+        },
+        {
+          "detail": "b:probe.mjs:995:e",
+          "end": 1008,
+          "index": 7,
+          "kind": "read_local",
+          "may_throw": false,
+          "start": 1007
+        }
+      ],
+      "path": "probe.mjs",
+      "profile": "js-structured-control.v1",
+      "pruned_edges": [],
+      "returns": {
+        "constants": [
+          1.0,
+          7.0
+        ],
+        "origins": [
+          "Constant",
+          "Derived(op6)",
+          "Exception(op5)"
+        ],
+        "reasons": [],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 1.0
+          },
+          {
+            "kind": "number",
+            "value": 7.0
+          }
+        ],
+        "unknown": false
+      },
+      "status": "complete_within_profile",
+      "symbol": "symbol:probe.mjs:902:1013",
+      "throws": {
+        "constants": [],
+        "origins": [],
+        "reasons": [
+          "no_throw_observed"
+        ],
+        "targets": [],
+        "typed_constants": [],
+        "unknown": true
+      },
+      "unknown_reasons": []
+    }
+  },
+  "commands": [
+    {
+      "argv": [
+        "node",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-96rlagx_/oracle.mjs"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+        "--store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-96rlagx_/store",
+        "index",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-96rlagx_/project"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+        "--store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-96rlagx_/store",
+        "nodes",
+        "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+        "--kind",
+        "function",
+        "--limit",
+        "500"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+        "--store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-96rlagx_/store",
+        "flow",
+        "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+        "symbol:probe.mjs:1014:1126"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+        "--store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-96rlagx_/store",
+        "flow",
+        "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+        "symbol:probe.mjs:103:189"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+        "--store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-96rlagx_/store",
+        "flow",
+        "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+        "symbol:probe.mjs:190:282"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+        "--store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-96rlagx_/store",
+        "flow",
+        "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+        "symbol:probe.mjs:283:335"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+        "--store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-96rlagx_/store",
+        "flow",
+        "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+        "symbol:probe.mjs:336:387"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+        "--store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-96rlagx_/store",
+        "flow",
+        "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+        "symbol:probe.mjs:388:476"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+        "--store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-96rlagx_/store",
+        "flow",
+        "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+        "symbol:probe.mjs:477:547"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+        "--store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-96rlagx_/store",
+        "flow",
+        "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+        "symbol:probe.mjs:548:605"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+        "--store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-96rlagx_/store",
+        "flow",
+        "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+        "symbol:probe.mjs:606:730"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+        "--store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-96rlagx_/store",
+        "flow",
+        "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+        "symbol:probe.mjs:731:812"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+        "--store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-96rlagx_/store",
+        "flow",
+        "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+        "symbol:probe.mjs:813:901"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/yinsijie/CodeRepo/Atlas/target/debug/atlas",
+        "--store",
+        "/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-independent-w01-96rlagx_/store",
+        "flow",
+        "87dfa0927adbd2171696f2e37cb3b6074aa08c7b9e321d6bd5853348489ef71d",
+        "symbol:probe.mjs:902:1013"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    }
+  ],
+  "checks": [
+    {
+      "name": "exceptionState",
+      "expected": {
+        "kind": "number",
+        "value": 1
+      },
+      "actual": {
+        "constants": [
+          2.0,
+          1.0
+        ],
+        "origins": [
+          "Derived(op5)",
+          "Constant",
+          "Derived(op1)"
+        ],
+        "reasons": [],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 2.0
+          },
+          {
+            "kind": "number",
+            "value": 1.0
+          }
+        ],
+        "unknown": false
+      },
+      "status": "PASS"
+    },
+    {
+      "name": "knownMutation",
+      "expected": {
+        "kind": "number",
+        "value": 2
+      },
+      "actual": {
+        "constants": [
+          1.0,
+          2.0
+        ],
+        "origins": [
+          "Derived(op7)",
+          "Constant",
+          "CallResult(op5)"
+        ],
+        "reasons": [],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 1.0
+          },
+          {
+            "kind": "number",
+            "value": 2.0
+          }
+        ],
+        "unknown": false
+      },
+      "status": "PASS"
+    },
+    {
+      "name": "unknownMutation",
+      "expected": {
+        "kind": "number",
+        "value": 2
+      },
+      "actual": {
+        "constants": [
+          1.0
+        ],
+        "origins": [
+          "Derived(op7)",
+          "Constant"
+        ],
+        "reasons": [
+          "unknown_call_may_modify"
+        ],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 1.0
+          }
+        ],
+        "unknown": true
+      },
+      "status": "PASS"
+    },
+    {
+      "name": "mixedAddition",
+      "expected": {
+        "kind": "number",
+        "value": 2
+      },
+      "actual": {
+        "constants": [
+          2.0
+        ],
+        "origins": [
+          "Constant"
+        ],
+        "reasons": [],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 2.0
+          }
+        ],
+        "unknown": false
+      },
+      "status": "PASS"
+    },
+    {
+      "name": "nullAddition",
+      "expected": {
+        "kind": "number",
+        "value": 1
+      },
+      "actual": {
+        "constants": [
+          1.0
+        ],
+        "origins": [
+          "Constant"
+        ],
+        "reasons": [],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 1.0
+          }
+        ],
+        "unknown": false
+      },
+      "status": "PASS"
+    },
+    {
+      "name": "missingField",
+      "expected": {
+        "kind": "undefined"
+      },
+      "actual": {
+        "constants": [
+          1.0,
+          "undefined"
+        ],
+        "origins": [
+          "Derived(op9)",
+          "Constant"
+        ],
+        "reasons": [],
+        "targets": [],
+        "typed_constants": [
+          {
+            "kind": "number",
+            "value": 1.0
+          },
+          {
+            "kind": "undefined"
+          }
+        ],
+        "unknown": false
+      },
+      "status": "PASS"
+    }
+  ]
+}

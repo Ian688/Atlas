@@ -32,7 +32,8 @@ target/debug/atlas --store local-state serve <上一步返回的id>
 - 清点目录、文件、忽略边界、链接、过大/不稳定文件；保留未解析项与实际分母。扫描不会执行被分析项目。
 - 保存不可变内容快照。项目文件修改以后，旧分析和旧选区依然读取旧字节。
 - 提取 JS/TS 函数、嵌套层级、导入与调用点；通过编译器绑定取得有限的词法调用候选。重绑定、歧义、动态调用等保留未知。
-- 在声明 profile（`js-structured-control.v1`）内把函数体降级为带锚点的 Flow IR，并在 Rust 构建基本块 CFG（含 finally 的 completion 语义、短路/条件分支、循环回边、switch 链），再做有界局部抽象解释：def-use、值来源（`Parameter(i)`、`CallResult`、`Allocation`、`Capture` 等）、有限常量折叠与显式 unknown/预算报告。跨过程符号摘要（参数来源按调用点代回、SCC 固定点、递归有限轮）已实现并有反例；未知 callee 与捕获 origin 重代入等边界保留显式 unknown。
+- 在声明 profile（`js-structured-control.v1`）内把函数体降级为带锚点的 Flow IR，并在 Rust 构建基本块 CFG（含 finally 的 completion 语义、短路/条件分支、循环回边、switch 链），再做有界局部抽象解释：def-use、值来源（`Parameter(i)`、`CallResult`、`Allocation`、`Capture` 等）、有限常量折叠与显式 unknown/预算报告。跨过程符号摘要（参数来源按调用点代回、SCC 固定点、递归有限轮）及有界标量参数上下文已接通：每个 callee 最多保留 8 个调用点上下文，其余回退到符号摘要。未知 callee、跨函数堆分配与捕获 origin 等边界保留显式 unknown。
+- 索引支持 SIGINT/SIGTERM 协作取消；扫描、worker、Rust 求解及发布锁等待共用控制，提交前接受取消会阻止新分析发布。计算预算耗尽可发布带 unknown、frontier 与实际预算计数的部分事实，deadline 耗尽则拒绝发布。持久作业队列与恢复租约仍待实现。
 - 用 Rust 构建包含关系、调用候选图、递归分量；按版本分页、多跳遍历、读取 UTF-8 源码窗口。
 - 在真实 2D 页面中浏览文件与函数，选中对象高亮相关候选，其他对象变淡，导出带分析版本的本地 JSON 上下文。函数详情面板显示所选函数的块级控制流与绑定值来源摘要（`atlas-local-absint`，仅声明 profile 内）。
 - 外部 Agent 可以调用 CLI/本地 HTTP，或操作有语义标签的网页；导出上下文不会自动发送给任何模型。
@@ -60,6 +61,8 @@ cargo test --workspace --locked
 cargo build --workspace --locked
 npm test --prefix workers/typescript
 python3 scripts/test_integration.py
+python3 scripts/test_cancellation.py
+python3 scripts/test_semantic_contracts.py
 node examples/calculator/demo.mjs
 ```
 

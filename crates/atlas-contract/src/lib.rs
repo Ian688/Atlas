@@ -10,7 +10,7 @@ pub use flow::{
 pub const SNAPSHOT_SCHEMA: &str = "atlas.snapshot.v1";
 pub const FACTS_SCHEMA: &str = "atlas.language-facts.v1";
 pub const ANALYSIS_SCHEMA: &str = "atlas.analysis.v1";
-pub const ENGINE_VERSION: &str = "foundation-flow-0.2.0";
+pub const ENGINE_VERSION: &str = "foundation-flow-0.2.1";
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ScanLimits {

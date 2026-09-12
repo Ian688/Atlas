@@ -416,20 +416,32 @@ class FileBuilder {
 
   lowerExpr(node, fn) {
     const [start, end] = this.u8(node);
-    if (ts.isNumericLiteral(node)) return { start, end, expr: 'const', value: { const: 'num', value: Number(node.text) } };
+    if (ts.isNumericLiteral(node)) {
+      const value = Number(node.text);
+      // A literal such as 1e999 overflows to Infinity. JSON has no token for a
+      // non-finite number, so a `num` constant would reach the engine as null
+      // and fail the whole response for every file, not just this function.
+      // The profile does not model non-finite numeric literals: report an
+      // explicit unknown instead of a constant that cannot cross the wire.
+      if (!Number.isFinite(value)) return { start, end, expr: 'unknown', reason: 'non_finite_numeric_literal' };
+      return { start, end, expr: 'const', value: { const: 'num', value } };
+    }
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return { start, end, expr: 'const', value: { const: 'str', value: node.text } };
     if (ts.isRegularExpressionLiteral(node)) return { start, end, expr: 'unknown', reason: 'regex_literal' };
     if (node.kind === ts.SyntaxKind.TrueKeyword) return { start, end, expr: 'const', value: { const: 'bool', value: true } };
     if (node.kind === ts.SyntaxKind.FalseKeyword) return { start, end, expr: 'const', value: { const: 'bool', value: false } };
     if (node.kind === ts.SyntaxKind.NullKeyword) return { start, end, expr: 'const', value: { const: 'null' } };
     if (ts.isIdentifier(node)) {
-      if (node.text === 'undefined') return { start, end, expr: 'const', value: { const: 'undefined' } };
       const symbol = this.checker.getSymbolAtLocation(node);
       const bindingId = symbol && this.symbolBindings.get(symbol);
       if (bindingId) {
         if (this.declaringFunction.get(bindingId) !== (this.currentFunction && this.currentFunction.symbol)) this.captured.add(bindingId);
         return { start, end, expr: 'local', binding: bindingId };
       }
+      // FIXED(V-08b): only fold `undefined` to the global constant AFTER scope
+      // resolution. A parameter or local named `undefined` is a real binding;
+      // folding it by name produced a definite value for an unknown one.
+      if (node.text === 'undefined') return { start, end, expr: 'const', value: { const: 'undefined' } };
       return { start, end, expr: 'external', name: node.text };
     }
     if (node.kind === ts.SyntaxKind.ThisKeyword) return { start, end, expr: 'this' };
