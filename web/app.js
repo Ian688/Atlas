@@ -66,7 +66,14 @@ function renderPatches(proposals){
     const validation=inner.validation||{};
     body.append(flowNode('flow-head',`提案 ${proposal.id.slice(0,12)} · ${proposal.state} · ${proposal.proposed_by}${inner.summary?` · ${inner.summary}`:''}`));
     if(validation.ok){
-      body.append(flowNode('flow-line',`对固定快照校验通过：${validation.hunks} 个 hunk · ${(validation.patched_paths||[]).join(', ')}`));
+      // The form decides what apply and revert will do, so it is shown before
+      // the diff rather than being left for the reader to infer from the header.
+      const forms=validation.forms||[];
+      const formText=forms.map(entry=>`${entry.form==='create'?'新建':(entry.form==='delete'?'删除':'修改')} ${entry.path}`).join(' · ');
+      body.append(flowNode('flow-line',`对固定快照校验通过：${validation.hunks} 个 hunk · ${formText||(validation.patched_paths||[]).join(', ')}`));
+      if(forms.some(entry=>entry.form==='create'))body.append(flowNode('flow-line',`这份提案会新建文件（target_exists=${inner.target_exists===false?'false':'true'}）：apply 会创建它，revert 会删除它（只在文件仍是 apply 写下的字节时）。`));
+      if(forms.some(entry=>entry.form==='delete'))body.append(flowNode('flow-line','这份提案会删除文件：apply 只在磁盘上仍是提案所依据的字节时删除，revert 会按固定快照的字节恢复。'));
+      if((validation.deleted_paths||[]).length)body.append(flowNode('flow-line',`删除路径：${validation.deleted_paths.join(', ')}`));
     }else{
       body.append(flowNode('flow-unknown',`对固定快照校验未通过，因此它不可验证：${validation.reason||'未知原因'}`));
     }

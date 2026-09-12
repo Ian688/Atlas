@@ -1,0 +1,10 @@
+test_a_spent_budget_is_a_named_refusal_not_a_raw_sqlite_error (__main__.StoreConcurrency.test_a_spent_budget_is_a_named_refusal_not_a_raw_sqlite_error) ... ok
+test_a_write_waits_for_a_held_writer_instead_of_failing (__main__.StoreConcurrency.test_a_write_waits_for_a_held_writer_instead_of_failing) ... ok
+test_concurrent_first_opens_converge_on_one_analysis (__main__.StoreConcurrency.test_concurrent_first_opens_converge_on_one_analysis) ... ok
+test_reading_does_not_queue_behind_a_writer (__main__.StoreConcurrency.test_reading_does_not_queue_behind_a_writer) ... ok
+test_the_same_request_key_from_two_processes_is_one_job (__main__.StoreConcurrency.test_the_same_request_key_from_two_processes_is_one_job) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 25.337s
+
+OK

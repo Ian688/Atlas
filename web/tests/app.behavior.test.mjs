@@ -854,6 +854,34 @@ check('a verified proposal shows the graph diff, the observed test and the CLI-o
   assert.match(shown, /验证与应用只能在本机 CLI 上做/, 'the boundary must be stated');
 });
 
+check('a create or delete proposal is shown as that, not as an edit', async () => {
+  const t = boot(routeBase());
+  t.routes.patches = { proposals: [{ id: 'p'.repeat(64), state: 'proposed', proposed_by: 'session-1',
+    proposal: { intent: true, code_exists: false, target_exists: false, summary: 'add a file',
+      diff: '--- /dev/null +++ b/src/new.js',
+      validation: { ok: true, hunks: 1, patched_paths: ['src/new.js'], deleted_paths: [],
+        forms: [{ path: 'src/new.js', form: 'create' }] } } }] };
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  const shown = t.el('patch-body').textContent;
+  assert.match(shown, /新建 src\/new\.js/, 'a creation must be named as one');
+  assert.match(shown, /revert 会删除它/, 'and the revert semantics stated');
+  assert.match(shown, /target_exists=false/, 'a create names a path with no entity yet');
+  // A deletion carries its own wording and its removed paths.
+  t.routes.patches = { proposals: [{ id: 'q'.repeat(64), state: 'verified', proposed_by: 'session-1',
+    proposal: { intent: true, code_exists: false, target_exists: true, summary: 'drop a file',
+      diff: '--- a/src/old.js +++ /dev/null',
+      validation: { ok: true, hunks: 1, patched_paths: [], deleted_paths: ['src/old.js'],
+        forms: [{ path: 'src/old.js', form: 'delete' }] } },
+    verification: { graph_diff: { nodes: {} } } }] };
+  await t.run(`loadPatches(state.selected)`);
+  const deleted = t.el('patch-body').textContent;
+  assert.match(deleted, /删除 src\/old\.js/);
+  assert.match(deleted, /apply 只在磁盘上仍是提案所依据的字节时删除/);
+  assert.match(deleted, /删除路径：src\/old\.js/);
+});
+
 check('a proposal with no verification says so instead of implying one', async () => {
   const t = boot(routeBase());
   t.routes.patches = { analysis_id: report.id, entity_id: FN_A.id, proposals: [proposal()] };

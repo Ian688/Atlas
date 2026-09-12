@@ -1031,6 +1031,18 @@ async fn run_claimed_job(
     }
 }
 
+/// The blob id of a snapshot entry, which is also the digest of its bytes: the
+/// check "the file on disk is still the bytes this proposal was verified
+/// against" is a comparison of content addresses, not of timestamps.
+fn pinned_digest(snapshot: &atlas_contract::Snapshot, path: &str) -> Result<String, String> {
+    snapshot
+        .entries
+        .iter()
+        .find(|entry| entry.path == path)
+        .and_then(|entry| entry.blob.clone())
+        .ok_or_else(|| format!("pinned_blob_missing:{path}"))
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
@@ -1558,8 +1570,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 proposed_by,
                 summary,
             } => {
-                let entity = runner::resolve_entity(&store, &analysis, &entity)?;
                 let text = std::fs::read_to_string(&diff)?;
+                // A proposal that creates a file names a path with no entity
+                // yet; every other reference must resolve.
+                let (entity, adds_target) =
+                    patchwork::resolve_proposal_entity(&store, &analysis, &entity, &text)?;
                 // The diff is checked against the pinned bytes before the
                 // proposal is stored. Storing an unapplicable proposal would
                 // make it look reviewable when it is not.
@@ -1571,6 +1586,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     &proposed_by,
                     summary.as_deref(),
                 )?;
+                let _ = adds_target;
                 let valid = stored.state != patch::STATE_REJECTED;
                 print(json!({
                     "outcome": if created { if valid {"proposed"} else {"rejected"} } else {"already_proposed"},
@@ -1664,18 +1680,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .ok_or("analysis_has_no_snapshot")?,
                 )?;
                 let files = patch::snapshot_files(&store, &snapshot)?;
-                let (patched_files, _) = patch::apply(&files, &parsed)?;
+                let outcome = patch::apply(&files, &parsed)?;
                 let target = target.canonicalize()?;
-                for (path, bytes) in &patched_files {
-                    // The bytes on disk must still be the bytes this proposal
-                    // was verified against. Anything else is somebody's work.
-                    let pinned = snapshot
-                        .entries
-                        .iter()
-                        .find(|entry| &entry.path == path)
-                        .and_then(|entry| entry.blob.clone())
-                        .ok_or_else(|| format!("pinned_blob_missing:{path}"))?;
-                    patch::write_checked(&target, path, bytes, &pinned)?;
+                // The bytes on disk must still be the bytes this proposal was
+                // verified against. Each form checks a different thing: a
+                // modify and a delete require the pinned bytes to be there, a
+                // create requires that nothing is.
+                for entry in &outcome.report {
+                    match entry.form.as_str() {
+                        "create" => {
+                            let bytes = outcome
+                                .files
+                                .get(&entry.path)
+                                .ok_or_else(|| format!("patched_bytes_missing:{}", entry.path))?;
+                            patch::create_checked(&target, &entry.path, bytes)?;
+                        }
+                        "delete" => {
+                            let pinned = pinned_digest(&snapshot, &entry.path)?;
+                            patch::remove_checked(&target, &entry.path, &pinned)?;
+                        }
+                        _ => {
+                            let pinned = pinned_digest(&snapshot, &entry.path)?;
+                            let bytes = outcome
+                                .files
+                                .get(&entry.path)
+                                .ok_or_else(|| format!("patched_bytes_missing:{}", entry.path))?;
+                            patch::write_checked(&target, &entry.path, bytes, &pinned)?;
+                        }
+                    }
                 }
                 if !store.mark_patch_applied(&id, &target.display().to_string())? {
                     return Err("proposal_apply_lost_a_race".into());
@@ -1697,19 +1729,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .ok_or("analysis_has_no_snapshot")?,
                 )?;
                 let files = patch::snapshot_files(&store, &snapshot)?;
-                let (patched_files, _) = patch::apply(&files, &parsed)?;
-                for path in patched_files.keys() {
-                    let pinned = snapshot
-                        .entries
-                        .iter()
-                        .find(|entry| &entry.path == path)
-                        .and_then(|entry| entry.blob.clone())
-                        .ok_or_else(|| format!("pinned_blob_missing:{path}"))?;
-                    let original = store.read_blob(&pinned)?;
-                    let applied = patched_files.get(path).unwrap();
-                    // Refuse if the file moved since apply: reverting over a
-                    // newer edit would delete that edit.
-                    patch::write_checked(&target, path, &original, &atlas_engine::digest(applied))?;
+                let outcome = patch::apply(&files, &parsed)?;
+                for entry in &outcome.report {
+                    let path = entry.path.as_str();
+                    match entry.form.as_str() {
+                        // Undoing a create is removing the file, and only if it
+                        // is still exactly what apply wrote.
+                        "create" => {
+                            patch::remove_checked(&target, path, &entry.patched_digest)?;
+                        }
+                        // Undoing a delete is restoring the pinned bytes, and
+                        // only into a path nothing has taken.
+                        "delete" => {
+                            let pinned = pinned_digest(&snapshot, path)?;
+                            let original = store.read_blob(&pinned)?;
+                            patch::restore_checked(&target, path, &original)?;
+                        }
+                        // Refuse if the file moved since apply: reverting over a
+                        // newer edit would delete that edit.
+                        _ => {
+                            let pinned = pinned_digest(&snapshot, path)?;
+                            let original = store.read_blob(&pinned)?;
+                            patch::write_checked(&target, path, &original, &entry.patched_digest)?;
+                        }
+                    }
                 }
                 store.mark_patch_reverted(&id, Some("reverted_by_operator"))?;
                 print(store.patch_proposal(&id)?)?

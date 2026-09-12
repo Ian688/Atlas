@@ -205,11 +205,13 @@ pub async fn verify_proposal(
         )
         .map_err(|e| e.to_string())?;
     let files = patch::snapshot_files(store, &snapshot).map_err(|e| e.to_string())?;
-    let (patched_files, report) = patch::apply(&files, &parsed).map_err(|e| e.to_string())?;
+    let outcome = patch::apply(&files, &parsed).map_err(|e| e.to_string())?;
     // An isolated copy: the user's checkout is never the thing that gets
     // re-indexed, so a proposal cannot affect the analysis it was proposed
-    // against.
-    let dir = patch::materialize(store, &snapshot, &patched_files).map_err(|e| e.to_string())?;
+    // against. A `create` adds a file the analysis never saw and a `delete`
+    // leaves one out, so the copy is assembled from the outcome, not from the
+    // snapshot plus edits.
+    let dir = patch::materialize(store, &snapshot, &outcome).map_err(|e| e.to_string())?;
     let options_for_index = crate::IndexOptions::new(
         options.node.clone(),
         options.worker.clone(),
@@ -245,7 +247,8 @@ pub async fn verify_proposal(
         "base_analysis_id": proposal.analysis_id,
         "patched_snapshot_id": result.metadata["snapshot_id"],
         "patched_analysis_id": result.analysis_id,
-        "applied_files": report,
+        "applied_files": outcome.report,
+        "deleted_paths": outcome.deleted.iter().collect::<Vec<_>>(),
         "graph_diff": graph,
         "test": test,
         "isolation": {
@@ -365,6 +368,40 @@ pub async fn run_declared_test(
 /// Shared by the CLI and the HTTP review surface so that "a proposal was
 /// validated against the pinned bytes" means the same thing on both, and so a
 /// page cannot register something the CLI would have refused.
+/// Resolve the entity a proposal is about.
+///
+/// A proposal that *creates* a file names a path the analysis does not have --
+/// there is no entity to resolve. That is allowed only when the diff really
+/// creates exactly that path; anything else stays an unresolved reference,
+/// because "I could not find this entity" and "this proposal adds it" are
+/// different statements and only one of them is in the diff.
+pub fn resolve_proposal_entity(
+    store: &Store,
+    analysis: &str,
+    reference: &str,
+    diff: &str,
+) -> Result<(String, bool), String> {
+    match crate::runner::resolve_entity(store, analysis, reference) {
+        Ok(entity) => Ok((entity, false)),
+        Err(error) => {
+            let parsed = patch::parse_unified_diff(diff).map_err(|e| e.to_string())?;
+            let wanted = reference.strip_prefix("file:").unwrap_or(reference);
+            let creates = parsed
+                .iter()
+                .filter(|file| file.form == patch::PatchForm::Create)
+                .count();
+            let names_it = parsed
+                .iter()
+                .any(|file| file.form == patch::PatchForm::Create && file.path == wanted);
+            if creates == parsed.len() && names_it {
+                Ok((format!("file:{wanted}"), true))
+            } else {
+                Err(error)
+            }
+        }
+    }
+}
+
 pub fn propose_from_diff(
     store: &Store,
     analysis: &str,
@@ -380,11 +417,10 @@ pub fn propose_from_diff(
     let snapshot = store.snapshot(snapshot_id).map_err(|e| e.to_string())?;
     let files = patch::snapshot_files(store, &snapshot).map_err(|e| e.to_string())?;
     let selection = atlas_engine::bridge::selection(analysis, entity, "entity");
-    let outcome = patch::parse_unified_diff(diff).and_then(|parsed| {
-        patch::apply(&files, &parsed).map(|(patched, report)| (parsed, patched, report))
-    });
+    let outcome = patch::parse_unified_diff(diff)
+        .and_then(|parsed| patch::apply(&files, &parsed).map(|applied| (parsed, applied)));
     let proposal = match outcome {
-        Ok((parsed, patched, report)) => json!({
+        Ok((parsed, applied)) => json!({
             "schema": patch::PATCH_SCHEMA,
             "analysis_id": analysis,
             "entity_id": entity,
@@ -394,11 +430,21 @@ pub fn propose_from_diff(
             "diff": diff,
             "intent": true,
             "code_exists": false,
+            // A proposal that creates a file names a path the analysis does not
+            // have. Saying so is the difference between "this file exists and
+            // would change" and "this file does not exist yet".
+            "target_exists": parsed.iter().all(|file| file.form != patch::PatchForm::Create),
             "validation": {
                 "ok": true,
-                "files": report,
+                "files": applied.report,
                 "hunks": parsed.iter().map(|file| file.hunks.len()).sum::<usize>(),
-                "patched_paths": patched.keys().collect::<Vec<_>>(),
+                "patched_paths": applied.files.keys().collect::<Vec<_>>(),
+                "deleted_paths": applied.deleted.iter().collect::<Vec<_>>(),
+                // The form of every file in the diff, so a reviewer sees that a
+                // proposal adds or removes a file rather than editing one.
+                "forms": parsed.iter().map(|file| json!({
+                    "path": file.path, "form": file.form.as_str(),
+                })).collect::<Vec<_>>(),
             },
             "note": "这是 Intent：一份提案。它还没有写进任何检出目录，也没有改变已发布的分析。",
         }),

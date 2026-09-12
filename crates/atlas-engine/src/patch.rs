@@ -203,7 +203,7 @@ impl Store {
 pub fn materialize(
     store: &Store,
     snapshot: &atlas_contract::Snapshot,
-    overrides: &BTreeMap<String, Vec<u8>>,
+    outcome: &PatchOutcome,
 ) -> Result<tempfile::TempDir> {
     let base = fs::canonicalize(std::env::temp_dir())?;
     let dir = tempfile::Builder::new()
@@ -218,17 +218,34 @@ pub fn materialize(
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent)?;
         }
-        match overrides.get(&entry.path) {
+        // A deleted file is simply not written into the copy. Nothing else in
+        // the copy changes: every byte still comes from a re-hashed blob.
+        if outcome.deleted.contains(&entry.path) {
+            continue;
+        }
+        match outcome.files.get(&entry.path) {
             Some(bytes) => fs::write(&target, bytes)?,
             None => fs::write(&target, store.read_blob(blob)?)?,
         }
     }
-    // A file that was overridden but is not a snapshot entry is a bug in the
-    // caller, not a feature: this slice cannot create files.
-    for path in overrides.keys() {
+    let in_snapshot = |path: &str| snapshot.entries.iter().any(|entry| entry.path == path);
+    // A written path must be either a snapshot entry (a modify) or a real
+    // creation. Anything else is a caller bug, and this is where it is caught
+    // rather than in a copy that silently has an extra file in it.
+    for entry in &outcome.report {
+        let path = entry.path.as_str();
         crate::exec::safe_relative(path)?;
-        if !snapshot.entries.iter().any(|entry| &entry.path == path) {
-            return Err(invalid(&format!("patched_path_not_in_snapshot:{path}")));
+        match entry.form.as_str() {
+            "modify" if !in_snapshot(path) => {
+                return Err(invalid(&format!("patched_path_not_in_snapshot:{path}")));
+            }
+            "create" if in_snapshot(path) => {
+                return Err(invalid(&format!("created_path_already_in_snapshot:{path}")));
+            }
+            "delete" if !in_snapshot(path) => {
+                return Err(invalid(&format!("deleted_path_not_in_snapshot:{path}")));
+            }
+            _ => {}
         }
     }
     #[cfg(unix)]
@@ -272,11 +289,71 @@ pub fn write_checked(root: &Path, relative: &str, bytes: &[u8], expect: &str) ->
     Ok(())
 }
 
+/// Create one file under a root, refusing if anything is already there.
+///
+/// The drift check for a creation is the absence itself: a file that appeared
+/// after review is somebody's work, and overwriting it would be the same loss
+/// `write_checked` exists to prevent.
+pub fn create_checked(root: &Path, relative: &str, bytes: &[u8]) -> Result<()> {
+    let relative_path = crate::exec::safe_relative(relative)?;
+    let target = root.join(relative_path);
+    if target.exists() {
+        return Err(invalid(&format!("create_target_already_exists:{relative}")));
+    }
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let temporary = target.with_extension("atlas-incoming");
+    fs::write(&temporary, bytes)?;
+    fs::rename(&temporary, &target)?;
+    Ok(())
+}
+
+/// Remove one file under a root, after checking the bytes currently there.
+pub fn remove_checked(root: &Path, relative: &str, expect: &str) -> Result<()> {
+    let relative_path = crate::exec::safe_relative(relative)?;
+    let target = root.join(relative_path);
+    let current = fs::read(&target)
+        .map_err(|error| invalid(&format!("target_unreadable:{relative}:{error}")))?;
+    if digest(&current) != expect {
+        return Err(invalid(&format!("target_changed_since_apply:{relative}")));
+    }
+    fs::remove_file(&target)?;
+    Ok(())
+}
+
+/// Restore a deleted file, refusing if something took its place.
+pub fn restore_checked(root: &Path, relative: &str, bytes: &[u8]) -> Result<()> {
+    let relative_path = crate::exec::safe_relative(relative)?;
+    let target = root.join(relative_path);
+    if target.exists() {
+        return Err(invalid(&format!(
+            "target_recreated_since_delete:{relative}"
+        )));
+    }
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let temporary = target.with_extension("atlas-incoming");
+    fs::write(&temporary, bytes)?;
+    fs::rename(&temporary, &target)?;
+    Ok(())
+}
+
 pub const PATCH_SCHEMA: &str = "atlas.patch-proposal.v1";
 
-/// The patched contents of every file the diff touched, keyed by path, plus one
-/// report entry per file.
-pub type PatchOutcome = (BTreeMap<String, Vec<u8>>, Vec<AppliedPatch>);
+/// What a whole diff does to a snapshot: the contents it writes, the paths it
+/// removes, and one report entry per file.
+///
+/// The three are kept apart on purpose. A deletion is not "a file whose new
+/// content is empty" -- that is a file edited to be empty, which is a different
+/// change and has a different revert.
+#[derive(Clone, Debug, Default)]
+pub struct PatchOutcome {
+    pub files: BTreeMap<String, Vec<u8>>,
+    pub deleted: std::collections::BTreeSet<String>,
+    pub report: Vec<AppliedPatch>,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DiffLine {
@@ -297,10 +374,35 @@ pub struct Hunk {
     pub new_no_newline: bool,
 }
 
+/// What a file patch does to the path it names.
+///
+/// The form is not inferred from the shape of the hunks alone: it is what the
+/// diff headers say (`--- /dev/null` creates, `+++ /dev/null` deletes), and the
+/// hunks are then checked to agree. Inferring it would let a diff that edits a
+/// file to empty read as a deletion.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PatchForm {
+    Modify,
+    Create,
+    Delete,
+}
+
+impl PatchForm {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PatchForm::Modify => "modify",
+            PatchForm::Create => "create",
+            PatchForm::Delete => "delete",
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FilePatch {
     /// Snapshot-relative path, with any `a/` or `b/` prefix removed.
     pub path: String,
+    pub form: PatchForm,
     pub hunks: Vec<Hunk>,
 }
 
@@ -315,7 +417,16 @@ pub fn parse_unified_diff(text: &str) -> Result<Vec<FilePatch>> {
     let mut current: Option<FilePatch> = None;
     let mut hunk: Option<Hunk> = None;
     let mut seen_old_header = false;
+    let mut old_path: Option<String> = None;
     for line in text.lines() {
+        // A rename is not expressible as a byte patch: `delete` plus `create`
+        // would lose the identity link between the two paths, and this project
+        // would rather refuse than model it as something it is not.
+        for marker in ["rename from ", "rename to ", "copy from ", "copy to "] {
+            if line.starts_with(marker) {
+                return Err(invalid("rename_not_expressible_in_unified_diff"));
+            }
+        }
         if let Some(rest) = line.strip_prefix("--- ") {
             // Close the previous file completely: its last hunk ends here, and
             // forgetting that made the first of two files carry zero hunks.
@@ -328,11 +439,7 @@ pub fn parse_unified_diff(text: &str) -> Result<Vec<FilePatch>> {
                 files.push(patch);
             }
             let path = header_path(rest).ok_or_else(|| invalid("diff_header_path_missing"))?;
-            if path == "/dev/null" {
-                return Err(invalid(
-                    "diff_creates_or_deletes_a_file_which_this_slice_refuses",
-                ));
-            }
+            old_path = Some(path.to_string());
             seen_old_header = true;
             continue;
         }
@@ -346,14 +453,26 @@ pub fn parse_unified_diff(text: &str) -> Result<Vec<FilePatch>> {
             {
                 patch.hunks.push(finished);
             }
-            let path = header_path(rest).ok_or_else(|| invalid("diff_header_path_missing"))?;
-            if path == "/dev/null" {
-                return Err(invalid(
-                    "diff_creates_or_deletes_a_file_which_this_slice_refuses",
-                ));
-            }
+            let new_path = header_path(rest).ok_or_else(|| invalid("diff_header_path_missing"))?;
+            let old = old_path
+                .take()
+                .ok_or_else(|| invalid("diff_missing_old_header"))?;
+            let (path, form) = match (old.as_str(), new_path) {
+                ("/dev/null", "/dev/null") => return Err(invalid("diff_has_no_path")),
+                // A create names the file only on the new side.
+                ("/dev/null", new) => (new.to_string(), PatchForm::Create),
+                // A delete names it only on the old side.
+                (old, "/dev/null") => (old.to_string(), PatchForm::Delete),
+                // Anything else must agree, or the patch would be applied to a
+                // path the reviewer never saw on the other header.
+                (old, new) if old != new => {
+                    return Err(invalid(&format!("diff_headers_disagree:{old}:{new}")));
+                }
+                (_, new) => (new.to_string(), PatchForm::Modify),
+            };
             current = Some(FilePatch {
-                path: path.to_string(),
+                path,
+                form,
                 hunks: Vec::new(),
             });
             continue;
@@ -587,36 +706,100 @@ pub fn apply_file(original: &str, patch: &FilePatch) -> std::result::Result<Stri
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct AppliedPatch {
     pub path: String,
+    /// What this patch does at that path: modify, create or delete.
+    pub form: String,
     pub hunks: usize,
-    /// sha256 of the patched bytes, so the outcome is content-addressed too.
+    /// sha256 of the bytes this change leaves at the path. A deletion leaves
+    /// nothing, so this is the digest of the empty byte string; `removed_digest`
+    /// carries what was there instead.
     pub patched_digest: String,
+    /// sha256 of the snapshot bytes this change removes, for a deletion. `None`
+    /// for a modify or a create, where nothing is removed.
+    pub removed_digest: Option<String>,
     pub added_lines: usize,
     pub removed_lines: usize,
 }
 
+/// The bytes a `create` patch installs: every line it adds, and nothing else.
+///
+/// A create that carries context or removal lines is not a create, and is
+/// refused rather than reinterpreted: it would mean the author's `--- /dev/null`
+/// disagreed with the body.
+fn create_contents(patch: &FilePatch) -> Result<Vec<u8>> {
+    let mut lines: Vec<String> = Vec::new();
+    let mut trailing_newline = true;
+    for hunk in &patch.hunks {
+        if hunk.old_len != 0 || hunk.old_start != 0 {
+            return Err(invalid(&format!(
+                "create_patch_touches_existing_lines:{}",
+                patch.path
+            )));
+        }
+        if hunk.new_no_newline {
+            trailing_newline = false;
+        }
+        for line in &hunk.lines {
+            match line {
+                DiffLine::Add(text) => lines.push(text.clone()),
+                DiffLine::Context(_) | DiffLine::Remove(_) => {
+                    return Err(invalid(&format!(
+                        "create_patch_has_non_added_lines:{}",
+                        patch.path
+                    )));
+                }
+            }
+        }
+    }
+    if lines.is_empty() {
+        return Err(invalid(&format!("create_patch_is_empty:{}", patch.path)));
+    }
+    let mut text = lines.join("\n");
+    if trailing_newline {
+        text.push('\n');
+    }
+    Ok(text.into_bytes())
+}
+
+/// Check that a `delete` patch really deletes: no added lines, no context, and a
+/// hunk that ends at line zero on the new side.
+fn check_delete(patch: &FilePatch) -> Result<()> {
+    for hunk in &patch.hunks {
+        if hunk.new_len != 0 || hunk.new_start != 0 {
+            return Err(invalid(&format!(
+                "delete_patch_leaves_lines_behind:{}",
+                patch.path
+            )));
+        }
+        for line in &hunk.lines {
+            if !matches!(line, DiffLine::Remove(_)) {
+                return Err(invalid(&format!(
+                    "delete_patch_has_context_or_added_lines:{}",
+                    patch.path
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Apply a parsed diff to snapshot contents.
 ///
-/// Every file it touches must already exist in the snapshot: this slice does
-/// not create or delete files, because a proposal that adds a file is a
-/// different kind of change than one that edits a function, and mixing them
-/// would make the review step ambiguous.
+/// A create must name a path the snapshot does not have, and a delete must name
+/// one it does: the form is the author's statement, and it is checked against
+/// what is really there rather than trusted. A path touched twice in one diff is
+/// refused, because the order two patches apply in would otherwise decide the
+/// result.
 pub fn apply(files: &BTreeMap<String, Vec<u8>>, patches: &[FilePatch]) -> Result<PatchOutcome> {
-    let mut patched = BTreeMap::new();
-    let mut report = Vec::new();
+    let mut outcome = PatchOutcome::default();
+    let mut seen: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
     for patch in patches {
         crate::exec::safe_relative(&patch.path)?;
-        let original = files
-            .get(&patch.path)
-            .ok_or_else(|| invalid(&format!("patch_target_not_in_snapshot:{}", patch.path)))?;
-        let text = std::str::from_utf8(original)
-            .map_err(|_| invalid(&format!("patch_target_not_utf8:{}", patch.path)))?;
-        let result = apply_file(text, patch).map_err(|failure| {
-            invalid(&format!(
-                "patch_does_not_apply:{}:{}",
-                failure.path,
-                serde_json::to_string(&failure).unwrap_or_default()
-            ))
-        })?;
+        if !seen.insert(patch.path.as_str()) {
+            return Err(invalid(&format!(
+                "diff_touches_a_path_twice:{}",
+                patch.path
+            )));
+        }
         let added = patch
             .hunks
             .iter()
@@ -629,17 +812,55 @@ pub fn apply(files: &BTreeMap<String, Vec<u8>>, patches: &[FilePatch]) -> Result
             .flat_map(|hunk| &hunk.lines)
             .filter(|line| matches!(line, DiffLine::Remove(_)))
             .count();
-        let bytes = result.into_bytes();
-        report.push(AppliedPatch {
+        let (bytes, removed_digest) = match patch.form {
+            PatchForm::Create => {
+                if files.contains_key(&patch.path) {
+                    return Err(invalid(&format!(
+                        "create_target_already_exists:{}",
+                        patch.path
+                    )));
+                }
+                (create_contents(patch)?, None)
+            }
+            PatchForm::Delete => {
+                let original = files.get(&patch.path).ok_or_else(|| {
+                    invalid(&format!("delete_target_not_in_snapshot:{}", patch.path))
+                })?;
+                check_delete(patch)?;
+                let removed_digest = crate::digest(original);
+                outcome.deleted.insert(patch.path.clone());
+                (Vec::new(), Some(removed_digest))
+            }
+            PatchForm::Modify => {
+                let original = files.get(&patch.path).ok_or_else(|| {
+                    invalid(&format!("patch_target_not_in_snapshot:{}", patch.path))
+                })?;
+                let text = std::str::from_utf8(original)
+                    .map_err(|_| invalid(&format!("patch_target_not_utf8:{}", patch.path)))?;
+                let result = apply_file(text, patch).map_err(|failure| {
+                    invalid(&format!(
+                        "patch_does_not_apply:{}:{}",
+                        failure.path,
+                        serde_json::to_string(&failure).unwrap_or_default()
+                    ))
+                })?;
+                (result.into_bytes(), None)
+            }
+        };
+        outcome.report.push(AppliedPatch {
             path: patch.path.clone(),
+            form: patch.form.as_str().to_string(),
             hunks: patch.hunks.len(),
             patched_digest: crate::digest(&bytes),
+            removed_digest,
             added_lines: added,
             removed_lines: removed,
         });
-        patched.insert(patch.path.clone(), bytes);
+        if patch.form != PatchForm::Delete {
+            outcome.files.insert(patch.path.clone(), bytes);
+        }
     }
-    Ok((patched, report))
+    Ok(outcome)
 }
 
 #[cfg(test)]
@@ -659,7 +880,7 @@ mod tests {
         let patches = parse_unified_diff(diff).unwrap();
         assert_eq!(patches.len(), 1);
         assert_eq!(patches[0].path, "src/a.js");
-        let (patched, report) = apply(
+        let outcome = apply(
             &files(&[(
                 "src/a.js",
                 "export function add(a, b) {\n  return a + b;\n}\n",
@@ -668,11 +889,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            String::from_utf8(patched["src/a.js"].clone()).unwrap(),
+            String::from_utf8(outcome.files["src/a.js"].clone()).unwrap(),
             "export function add(a, b) {\n  return a + b + 0;\n}\n"
         );
-        assert_eq!(report[0].added_lines, 1);
-        assert_eq!(report[0].removed_lines, 1);
+        assert_eq!(outcome.report[0].added_lines, 1);
+        assert_eq!(outcome.report[0].removed_lines, 1);
     }
 
     #[test]
@@ -680,9 +901,9 @@ mod tests {
         let source = "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\n";
         let diff = "--- a/x.txt\n+++ b/x.txt\n@@ -1,2 +1,3 @@\n one\n+one-and-a-half\n two\n@@ -7,2 +8,2 @@\n seven\n-eight\n+VIII\n";
         let patches = parse_unified_diff(diff).unwrap();
-        let (patched, _) = apply(&files(&[("x.txt", source)]), &patches).unwrap();
+        let outcome = apply(&files(&[("x.txt", source)]), &patches).unwrap();
         assert_eq!(
-            String::from_utf8(patched["x.txt"].clone()).unwrap(),
+            String::from_utf8(outcome.files["x.txt"].clone()).unwrap(),
             "one\none-and-a-half\ntwo\nthree\nfour\nfive\nsix\nseven\nVIII\n"
         );
     }
@@ -729,9 +950,93 @@ mod tests {
     }
 
     #[test]
-    fn creating_or_deleting_a_file_is_refused() {
-        let creation = "--- /dev/null\n+++ b/new.js\n@@ -0,0 +1,1 @@\n+hello\n";
-        assert!(parse_unified_diff(creation).is_err());
+    fn a_create_names_a_new_path_and_installs_exactly_its_added_lines() {
+        let creation = "--- /dev/null\n+++ b/new.js\n@@ -0,0 +1,2 @@\n+hello\n+world\n";
+        let patches = parse_unified_diff(creation).unwrap();
+        assert_eq!(patches[0].form, PatchForm::Create);
+        assert_eq!(patches[0].path, "new.js");
+        let outcome = apply(&files(&[("old.js", "x\n")]), &patches).unwrap();
+        assert_eq!(
+            String::from_utf8(outcome.files["new.js"].clone()).unwrap(),
+            "hello\nworld\n"
+        );
+        assert!(outcome.deleted.is_empty());
+        assert_eq!(outcome.report[0].form, "create");
+        assert_eq!(outcome.report[0].removed_digest, None);
+        // A create against a path that already exists would silently replace a
+        // file the analysis has; that is a different change and is refused.
+        let error = apply(&files(&[("new.js", "there\n")]), &patches)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("create_target_already_exists"), "{error}");
+        // `--- /dev/null` with context or removal lines contradicts itself.
+        let contradictory = "--- /dev/null\n+++ b/new.js\n@@ -0,0 +1,2 @@\n+hello\n world\n";
+        let patches = parse_unified_diff(contradictory).unwrap();
+        let error = apply(&files(&[]), &patches).unwrap_err().to_string();
+        assert!(
+            error.contains("create_patch_has_non_added_lines"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn a_delete_removes_the_path_and_is_not_an_edit_to_empty() {
+        let deletion = "--- a/gone.js\n+++ /dev/null\n@@ -1,2 +0,0 @@\n-a\n-b\n";
+        let patches = parse_unified_diff(deletion).unwrap();
+        assert_eq!(patches[0].form, PatchForm::Delete);
+        assert_eq!(patches[0].path, "gone.js");
+        let outcome = apply(
+            &files(&[("gone.js", "a\nb\n"), ("kept.js", "k\n")]),
+            &patches,
+        )
+        .unwrap();
+        assert!(outcome.deleted.contains("gone.js"));
+        assert!(
+            outcome.files.is_empty(),
+            "a deletion leaves no content behind, not empty content"
+        );
+        assert_eq!(outcome.report[0].form, "delete");
+        assert!(outcome.report[0].removed_digest.is_some());
+        // Deleting something that is not there is refused, not a no-op.
+        let error = apply(&files(&[]), &patches).unwrap_err().to_string();
+        assert!(error.contains("delete_target_not_in_snapshot"), "{error}");
+        // A hunk that leaves lines behind is not a deletion of the file.
+        let partial = "--- a/gone.js\n+++ /dev/null\n@@ -1,2 +1,1 @@\n a\n-b\n";
+        assert!(parse_unified_diff(partial).is_ok());
+        let error = apply(
+            &files(&[("gone.js", "a\nb\n")]),
+            &parse_unified_diff(partial).unwrap(),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(
+            error.contains("delete_patch_leaves_lines_behind"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn structure_that_would_change_which_bytes_are_meant_is_refused() {
+        // A rename is not a byte patch: delete+create would lose the link
+        // between the two paths, so it is refused by name.
+        let rename = "diff --git a/old.js b/new.js\nrename from old.js\nrename to new.js\n--- a/old.js\n+++ b/new.js\n@@ -1,1 +1,1 @@\n-a\n+b\n";
+        assert_eq!(
+            parse_unified_diff(rename).unwrap_err().to_string(),
+            "rename_not_expressible_in_unified_diff"
+        );
+        // Headers that name different files would apply a patch to a path the
+        // reviewer never saw on the other side.
+        let disagree = "--- a/one.js\n+++ b/two.js\n@@ -1,1 +1,1 @@\n-a\n+b\n";
+        let error = parse_unified_diff(disagree).unwrap_err().to_string();
+        assert!(error.contains("diff_headers_disagree"), "{error}");
+        // Two forms for one path in one diff: the order they apply in would
+        // decide the result.
+        let twice = "--- a/x.js\n+++ b/x.js\n@@ -1,1 +1,1 @@\n-a\n+b\n--- a/x.js\n+++ b/x.js\n@@ -1,1 +1,1 @@\n-b\n+c\n";
+        let patches = parse_unified_diff(twice).unwrap();
+        let error = apply(&files(&[("x.js", "a\n")]), &patches)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("diff_touches_a_path_twice"), "{error}");
     }
 
     #[test]
@@ -750,9 +1055,9 @@ mod tests {
             } else {
                 "one\ninserted\n"
             };
-            let (patched, _) = apply(&files(&[("x.txt", source)]), &patches).unwrap();
+            let outcome = apply(&files(&[("x.txt", source)]), &patches).unwrap();
             assert_eq!(
-                String::from_utf8(patched["x.txt"].clone()).unwrap(),
+                String::from_utf8(outcome.files["x.txt"].clone()).unwrap(),
                 expected
             );
         }
@@ -763,11 +1068,16 @@ mod tests {
         let diff = "--- a/a.js\n+++ b/a.js\n@@ -1,1 +1,1 @@\n-a\n+A\n--- a/b.js\n+++ b/b.js\n@@ -1,1 +1,1 @@\n-b\n+B\n";
         let patches = parse_unified_diff(diff).unwrap();
         assert_eq!(patches.len(), 2);
-        let (patched, report) =
-            apply(&files(&[("a.js", "a\n"), ("b.js", "b\n")]), &patches).unwrap();
-        assert_eq!(String::from_utf8(patched["a.js"].clone()).unwrap(), "A\n");
-        assert_eq!(String::from_utf8(patched["b.js"].clone()).unwrap(), "B\n");
-        assert_eq!(report.len(), 2);
+        let outcome = apply(&files(&[("a.js", "a\n"), ("b.js", "b\n")]), &patches).unwrap();
+        assert_eq!(
+            String::from_utf8(outcome.files["a.js"].clone()).unwrap(),
+            "A\n"
+        );
+        assert_eq!(
+            String::from_utf8(outcome.files["b.js"].clone()).unwrap(),
+            "B\n"
+        );
+        assert_eq!(outcome.report.len(), 2);
     }
 
     #[test]
@@ -785,9 +1095,9 @@ mod tests {
     fn the_final_newline_state_is_preserved() {
         let with_newline = "--- a/x.txt\n+++ b/x.txt\n@@ -1,1 +1,1 @@\n-one\n+ONE\n";
         let patches = parse_unified_diff(with_newline).unwrap();
-        let (patched, _) = apply(&files(&[("x.txt", "one\n")]), &patches).unwrap();
+        let outcome = apply(&files(&[("x.txt", "one\n")]), &patches).unwrap();
         assert_eq!(
-            String::from_utf8(patched["x.txt"].clone()).unwrap(),
+            String::from_utf8(outcome.files["x.txt"].clone()).unwrap(),
             "ONE\n"
         );
     }

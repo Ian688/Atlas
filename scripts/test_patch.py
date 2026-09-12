@@ -230,6 +230,97 @@ class Cli(Base):
         self.assertTrue(self.math.read_text(encoding="utf-8").startswith("# a later edit"),
                         "revert over a newer edit would delete that edit")
 
+    # -- create and delete ------------------------------------------------
+    def test_a_create_proposal_names_a_path_that_does_not_exist_yet(self):
+        created = self.project / "src" / "extra.js"
+        diff = self.diff_file("create.patch", (
+            "--- /dev/null\n"
+            "+++ b/src/extra.js\n"
+            "@@ -0,0 +1,2 @@\n"
+            "+export function triple(value) { return value * 3; }\n"
+            "+export const NAME = 'extra';\n"
+        ))
+        result = self.cli("patch", "propose", self.analysis, "src/extra.js", "--diff", diff)
+        self.assertEqual(result["outcome"], "proposed")
+        body = result["proposal"]["proposal"]
+        self.assertFalse(body["target_exists"], "a create names a path with no entity yet")
+        self.assertEqual([entry["form"] for entry in body["validation"]["forms"]], ["create"])
+        self.assertFalse(created.exists(), "a proposal is Intent: nothing is written")
+
+        self.cli("patch", "verify", result["proposal"]["id"])
+        applied = self.cli("patch", "apply", result["proposal"]["id"], "--target", self.project)
+        self.assertEqual(applied["state"], "applied")
+        self.assertEqual(created.read_text(encoding="utf-8"),
+                         "export function triple(value) { return value * 3; }\nexport const NAME = 'extra';\n")
+        # Undoing a create removes the file it wrote.
+        self.cli("patch", "revert", result["proposal"]["id"])
+        self.assertFalse(created.exists(), "reverting a create must remove the file")
+
+    def test_apply_of_a_create_refuses_if_the_path_appeared_after_verification(self):
+        created = self.project / "src" / "extra.js"
+        diff = self.diff_file("create2.patch", (
+            "--- /dev/null\n+++ b/src/extra.js\n@@ -0,0 +1,1 @@\n+export const X = 1;\n"
+        ))
+        proposal = self.cli("patch", "propose", self.analysis, "src/extra.js", "--diff", diff)["proposal"]
+        self.cli("patch", "verify", proposal["id"])
+        created.write_text("// somebody else got here first\n", encoding="utf-8")
+        self.cli("patch", "apply", proposal["id"], "--target", self.project, ok=False)
+        self.assertEqual(created.read_text(encoding="utf-8"), "// somebody else got here first\n",
+                         "a file that appeared after review must survive the refusal")
+
+    def test_a_delete_proposal_removes_the_file_and_revert_restores_the_exact_bytes(self):
+        pinned = self.math.read_text(encoding="utf-8")
+        diff = self.diff_file("delete.patch", (
+            "--- a/src/math.js\n"
+            "+++ /dev/null\n"
+            f"@@ -1,{len(pinned.splitlines())} +0,0 @@\n"
+            + "".join(f"-{line}\n" for line in pinned.splitlines())
+        ))
+        proposal = self.cli("patch", "propose", self.analysis, "src/math.js", "--diff", diff)["proposal"]
+        body = proposal["proposal"]
+        self.assertTrue(body["target_exists"])
+        self.assertEqual([entry["form"] for entry in body["validation"]["forms"]], ["delete"])
+        self.assertEqual(body["validation"]["deleted_paths"], ["src/math.js"])
+        self.assertEqual(body["validation"]["patched_paths"], [], "a deletion leaves no content behind")
+
+        self.cli("patch", "verify", proposal["id"])
+        self.cli("patch", "apply", proposal["id"], "--target", self.project)
+        self.assertFalse(self.math.exists(), "apply of a delete removes the file")
+        self.cli("patch", "revert", proposal["id"])
+        self.assertEqual(self.math.read_text(encoding="utf-8"), pinned,
+                         "revert must restore the exact pinned bytes, byte for byte")
+
+    def test_a_delete_whose_target_is_gone_is_refused_rather_than_ignored(self):
+        pinned = self.math.read_text(encoding="utf-8")
+        diff = self.diff_file("delete2.patch", (
+            "--- a/src/math.js\n+++ /dev/null\n"
+            f"@@ -1,{len(pinned.splitlines())} +0,0 @@\n"
+            + "".join(f"-{line}\n" for line in pinned.splitlines())
+        ))
+        proposal = self.cli("patch", "propose", self.analysis, "src/math.js", "--diff", diff)["proposal"]
+        self.cli("patch", "verify", proposal["id"])
+        self.math.unlink()
+        self.cli("patch", "apply", proposal["id"], "--target", self.project, ok=False)
+
+    def test_a_rename_is_refused_by_name(self):
+        diff = self.diff_file("rename.patch", (
+            "diff --git a/src/math.js b/src/sum.js\n"
+            "rename from src/math.js\n"
+            "rename to src/sum.js\n"
+            "--- a/src/math.js\n+++ b/src/sum.js\n@@ -1,1 +1,1 @@\n-a\n+b\n"
+        ))
+        result = self.cli("patch", "propose", self.analysis, "add", "--diff", diff, ok=False)
+        self.assertIn("rename_not_expressible_in_unified_diff", json.dumps(result))
+
+    def test_a_create_proposal_for_an_existing_path_is_refused(self):
+        diff = self.diff_file("bad-create.patch", (
+            "--- /dev/null\n+++ b/src/math.js\n@@ -0,0 +1,1 @@\n+export const X = 1;\n"
+        ))
+        # `src/math.js` does have an entity, so the diff's claim that it creates
+        # the file is refused at validation time.
+        result = self.cli("patch", "propose", self.analysis, "src/math.js", "--diff", diff, ok=False)
+        self.assertIn("create_target_already_exists", json.dumps(result))
+
     def test_the_proposal_survives_and_is_queryable_by_entity(self):
         proposal = self.propose()["proposal"]
         listed = self.cli("patch", "list", self.analysis)["proposals"]

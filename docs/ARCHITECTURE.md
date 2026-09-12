@@ -160,17 +160,20 @@ worker stdin ≤160 MiB、stdout ≤32 MiB、stderr ≤64 KiB，V8 old-space 为
 
 `propose → verify → apply/revert`，三步各自有一条硬边界。
 
-**propose**：统一 diff 先对固定快照的字节在内存里应用。位置不符就拒绝，并**带着不一致的那一行**（期望什么、实际是什么）。不做模糊搜索——模糊应用会把改动悄悄挪到另一个长得像的函数里，而固定版本的全部意义就是"讨论的就是这些字节"。CRLF 目标直接拒绝而不是规范化行尾；创建/删除文件不在本切片内。
+**propose**：统一 diff 先对固定快照的字节在内存里应用。位置不符就拒绝，并**带着不一致的那一行**（期望什么、实际是什么）。不做模糊搜索——模糊应用会把改动悄悄挪到另一个长得像的函数里，而固定版本的全部意义就是"讨论的就是这些字节"。CRLF 目标直接拒绝而不是规范化行尾。
+
+**三种形式，由表头声明、由 hunks 复核**：`PatchForm = modify | create | delete`。`--- /dev/null` 是新建、`+++ /dev/null` 是删除，两者都不是就从两侧表头取路径（两侧不一致即 `diff_headers_disagree`）。形式**不是**从 hunk 形状猜出来的：`--- /dev/null` 却带上下文行是自相矛盾（`create_patch_has_non_added_lines`），`+++ /dev/null` 却留下行也不是删除（`delete_patch_leaves_lines_behind`）。删除不是"编辑成空文件"——那是一次修改，两者的 revert 语义不同，所以 `PatchOutcome` 把 `files`（修改/新建后的内容）与 `deleted`（被移除的路径）分开，记录里每个文件带 `form` 与 `removed_digest`。新建必须指向快照里**没有**的路径（`create_target_already_exists`），删除必须指向**有**的路径（`delete_target_not_in_snapshot`）；同一条 diff 两次碰到同一路径被拒绝（`diff_touches_a_path_twice`），否则先后顺序会决定结果。git 的 `rename from/to` **具名拒绝**（`rename_not_expressible_in_unified_diff`）：把重命名表达成删除+新建会丢掉两个路径之间的身份联系，Atlas 宁可拒绝也不建模成它不是的东西。新建提案的 `entity_id` 是 `file:<path>`——一个还不存在的实体，所以提案里写明 `target_exists=false`。
 
 **verify**：从内容寻址 blob 物化一个 `0700` 隔离副本（补丁只写进副本），在副本上跑完整索引管线，于是补丁派生出一个**新的 analysis**，而用户检出目录一个字节都不动。图差异按 `path+name` 重新配对节点：节点 id 绑定源码字节区间，编辑函数会改变 id，按 id 比较会把每次编辑读成一次删除加一次新增（id 仍原样给出）。测试命令是**声明的 argv 数组**，不是 shell 字符串，超时按进程组杀死；没有声明就是"没有跑任何测试，这不是通过"，绝不渲染成通过。
 
-**apply/revert**：apply 先读目标当前字节并校验它仍等于提案所依据的固定快照 blob，不符即拒绝（`target_changed_since_apply`）；revert 校验当前字节等于 apply 写入的字节，否则拒绝——在别人更新的版本上回滚会删掉那份更新。状态迁移是单向的：`proposed → verified → applied → reverted`，每一步都要求前一个状态。
+**apply/revert 按形式各查各的**：修改与删除要求目标当前字节仍等于提案所依据的固定快照 blob（不符即 `target_changed_since_apply`），**新建要求那里什么都没有**（`create_target_already_exists`）——审查之后出现的文件是别人的工作，覆盖它和覆盖一次修改是同一种损失。撤销同样按形式：撤销修改写回钉住字节并校验"当前仍是 apply 写下的字节"；**撤销新建要删掉那个文件**（且它仍必须是 apply 写下的字节）；**撤销删除要按钉住字节恢复**，且目标路径必须仍然是空的（`target_recreated_since_delete`）。状态迁移是单向的：`proposed → verified → applied → reverted`，每一步都要求前一个状态。
+验证在隔离副本里进行时也必须按形式组装：新建的文件不在快照里、删除的文件不写入副本，`materialize` 从 outcome 而不是"快照+编辑"装配副本，并拒绝"声明为新建却已在快照里"这类自相矛盾。
 
 **审阅面**：`GET /api/patches`、`GET /api/patch?id=`、`POST /api/patch/propose` 与函数面板的提案面板。页面可以登记提案（Intent，什么都不改）并读到验证结果，但**验证与应用仍只在本机 CLI**——`/api/exec` 之外的写路径不通过 HTTP 暴露，因为页面无法让人看见将要写入哪个目录。HTTP 登记与 CLI 验证共用 `patchwork::propose_from_diff`，所以"对固定快照校验过"在两条传输上是同一件事，页面无法登记一个 CLI 会拒绝的 diff。
 
 **排队执行**：`patch verify --enqueue` 把验证登记为 `patch_verify` 作业。队列按行自身的 `kind` 分派（`index` / `patch_verify`），两种作业共用身份三元组、租约、心跳与崩溃收割；`job work` 用**同一个 `verify_proposal`** 执行，因此前台验证与排队验证不是两条路径。终态 artifact 是补丁树派生的新 analysis。一行描述不了自己怎么跑时（例如期限越界），作业**判失败**而不是用本 worker 的默认参数顶替别人的请求。
 
-**仍未实现**：除统一 diff 之外的建议形式（新建/删除文件、重命名）；图形化一键撤销。
+**仍未实现**：图形化一键撤销（页面能看到提案的形式与撤销语义，但 apply/revert 仍只在本机 CLI）；apply 没有备份/合并/文件锁。
 
 ### 7.4 宿主接缝（W10 首片）
 
@@ -197,7 +200,7 @@ worker stdin ≤160 MiB、stdout ≤32 MiB、stderr ≤64 KiB，V8 old-space 为
 | 执行画像与测试（0.2/W08：静态分类 + 隔离受控调用已接通；fixtures 只是声明标签） | pure/contextual/entry-only/unsupported 分类、fixtures、依赖切片、mock 和真依赖来源、RunSpec、Effect journal | 只在新的受控 Runner 中执行，经权限与执行环境合同；上下文合成、Effect journal 与依赖切片仍未实现 |
 | 场景与真实 Trace（0.2/W08：RunSpec + scenario 断言 + 入口观测已接通） | 用户业务步骤→入口/动作/断言；执行、source map、事件排序/因果链；未覆盖支路与丢失事件显式 | Observation 与 Static/Intent 分库或强类型隔离，不能凭颜色等价；行级覆盖与因果链仍未实现 |
 | 选区与 Agent Bridge（0.2/W09：共享选区带版本、跨版本拒绝、有界桥接已接通） | 稳定选区/标注、版本、最小披露、请求队列、租约/ACK、可恢复状态、宿主能力协商 | 选区只在同一 analysis 内互通；跨版本是拒绝而非重定位；owner 未认证；最小披露裁剪未做 |
-| AI Coding（0.2/W09：propose→隔离 verify→图 diff→apply/revert 已接通） | 意图占位→提议→补丁→隔离工作区验证→重新解析→图 diff→应用/撤销；冲突和旧版本拒绝 | 只支持统一 diff；verify 未进持久作业队列；无 Web 审阅界面；apply 无备份/合并/文件锁 |
+| AI Coding（0.2/W09：propose→隔离 verify→图 diff→apply/revert 已接通） | 意图占位→提议→补丁→隔离工作区验证→重新解析→图 diff→应用/撤销；冲突和旧版本拒绝 | 修改/新建（`--- /dev/null`）/删除（`+++ /dev/null`）三种形式，重命名具名拒绝；verify 可进持久作业队列；有 Web 审阅面；apply 无备份/合并/文件锁，无图形化一键撤销 |
 | 宿主接缝（0.2/W10：合同即数据 + 参考客户端 + 无存储访问检查已接通） | 宿主调用服务、不读数据库；能力协商与版本协商 | 旧 Modus 入口未切换（宿主检出不在本工作区，无法验证）；无远程/多租户认证与版本协商 |
 | 长期作业与大项目 | owner/项目/版本隔离、取消/截止/终态、增量失效、并发 worker、预算调度、磁盘事实/索引 | 新建正式服务作业 API；当前单次 CLI 非持久作业系统 |
 | 生产诊断（候选） | 只读遥测导入、部署/source version、trace/log/metric 关联、缺失证据与归因置信范围 | 先开发/测试资格，不能默认获得生产执行或写数据库权限 |

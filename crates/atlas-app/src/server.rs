@@ -388,8 +388,15 @@ async fn propose_patch(
     if !allowed(&app, &headers) {
         return (StatusCode::UNAUTHORIZED, "local session required").into_response();
     }
-    let entity = match crate::runner::resolve_entity(&app.store, &app.analysis, &body.entity) {
-        Ok(entity) => entity,
+    // A proposal that creates a file names a path with no entity yet; the same
+    // resolver the CLI uses decides whether the diff really creates it.
+    let entity = match crate::patchwork::resolve_proposal_entity(
+        &app.store,
+        &app.analysis,
+        &body.entity,
+        &body.diff,
+    ) {
+        Ok((entity, _adds_target)) => entity,
         Err(error) => {
             return (
                 StatusCode::BAD_REQUEST,
@@ -1010,7 +1017,7 @@ const CONTRACT: &[(&str, &str, &str, &str, &str, &str)] = &[
         "http",
         "登记一份统一 diff 提案并对固定快照校验",
         "与 CLI 同一校验路径；不匹配即拒绝",
-        "不写源码；验证与应用只在 CLI",
+        "不写源码；验证与应用只在 CLI；新建/删除与修改同一路径",
     ),
     (
         "patch propose",
@@ -1018,7 +1025,7 @@ const CONTRACT: &[(&str, &str, &str, &str, &str, &str)] = &[
         "cli",
         "把统一 diff 登记为提案并对固定快照校验",
         "不匹配即带行拒绝",
-        "仅统一 diff，不支持新建/删除文件",
+        "支持修改/新建（--- /dev/null）/删除（+++ /dev/null）；重命名拒绝 rename_not_expressible_in_unified_diff",
     ),
     (
         "patch verify",
