@@ -197,6 +197,16 @@ async fn query(
                 "requests": app.store.agent_requests(q.kind.as_deref(), q.limit.unwrap_or(50))?,
             }))
             .map_err(Into::into),
+            "run-markers" => {
+                let markers = app.store.run_markers(id, q.limit.unwrap_or(200))?;
+                serde_json::to_value(serde_json::json!({
+                    "schema": "atlas.run-markers.v1",
+                    "analysis_id": id,
+                    "markers": markers,
+                    "note": "这些是执行观测：某个入口被运行过并得到这个结论。它们不是调用路径，也不改变静态候选图。",
+                }))
+                .map_err(Into::into)
+            }
             "exec-records" => {
                 let reference = q.entity.as_deref().unwrap_or("");
                 let symbol = crate::runner::resolve_symbol(&app.store, id, reference)
@@ -294,6 +304,7 @@ endpoint!(flow, "flow");
 endpoint!(flows, "flows");
 endpoint!(profile, "profile");
 endpoint!(exec_records, "exec-records");
+endpoint!(run_markers, "run-markers");
 endpoint!(selection, "selection");
 endpoint!(annotations, "annotations");
 endpoint!(agent_requests, "agent-requests");
@@ -759,6 +770,14 @@ const CONTRACT: &[(&str, &str, &str, &str, &str, &str)] = &[
         "静态分类，不是执行结果",
     ),
     (
+        "run-markers",
+        "GET",
+        "http",
+        "已运行过的入口（投影给视图用）",
+        "只读投影，不改变静态候选图",
+        "单次上限 500；只说明入口运行结论，不是调用路径",
+    ),
+    (
         "exec-records",
         "GET",
         "http",
@@ -1037,6 +1056,7 @@ pub async fn serve(
         .route("/api/flows", get(flows))
         .route("/api/profile", get(profile))
         .route("/api/exec-records", get(exec_records))
+        .route("/api/run-markers", get(run_markers))
         .route("/api/exec", post(exec))
         .route("/api/selection", get(selection))
         .route("/api/annotations", get(annotations))

@@ -115,6 +115,12 @@ try {
   record('bad_token_rejected', error instanceof AtlasHostError && error.status === 401);
 }
 
+// Read last: the executed call above is itself an observation, so this also
+// checks that the projection sees it.
+const markers = await client.runMarkers();
+record('run_markers', markers.markers.length);
+record('run_markers_note', markers.note.includes('不是调用路径'));
+
 record('required_endpoints', AtlasHostClient.requiredEndpoints());
 process.stdout.write(JSON.stringify(out));
 """
@@ -216,6 +222,10 @@ class HostSeam(unittest.TestCase):
 
     def test_a_host_can_register_and_read_a_patch_proposal(self):
         report = self.drive()
+        # The executed call above is itself an observation, and the projection
+        # must say so without pretending it is a call path.
+        self.assertGreaterEqual(report["run_markers"], 1)
+        self.assertTrue(report["run_markers_note"])
         self.assertEqual(report["patches_before"], 0)
         self.assertEqual(report["proposal_state"], "proposed")
         self.assertFalse(report["proposal_exists"], "a proposal is an Intent, not code")

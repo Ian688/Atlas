@@ -1,0 +1,359 @@
+{
+  "schema": "atlas.verification.v2",
+  "label": "w09-observed-layer",
+  "time_utc": "2026-09-12T17:12:29.579996+00:00",
+  "platform": "macOS-15.7.9-x86_64-i386-64bit-Mach-O",
+  "cwd": "/Users/yinsijie/CodeRepo/Atlas",
+  "out_dir": "evidence/development/2026-09-12-w09-observed-layer",
+  "commands": [
+    {
+      "name": "rust-format",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.535,
+      "log": "rust-format.log"
+    },
+    {
+      "name": "rust-clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 0.345,
+      "log": "rust-clippy.log"
+    },
+    {
+      "name": "rust-tests",
+      "argv": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "seconds": 14.434,
+      "log": "rust-tests.log"
+    },
+    {
+      "name": "rust-build",
+      "argv": [
+        "cargo",
+        "build",
+        "--workspace",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "seconds": 0.174,
+      "log": "rust-build.log"
+    },
+    {
+      "name": "worker-tests",
+      "argv": [
+        "npm",
+        "test",
+        "--prefix",
+        "workers/typescript"
+      ],
+      "exit_code": 0,
+      "seconds": 1.359,
+      "log": "worker-tests.log"
+    },
+    {
+      "name": "integration",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_integration.py"
+      ],
+      "exit_code": 0,
+      "seconds": 49.247,
+      "log": "integration.log"
+    },
+    {
+      "name": "cancellation",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_cancellation.py"
+      ],
+      "exit_code": 0,
+      "seconds": 9.888,
+      "log": "cancellation.log"
+    },
+    {
+      "name": "jobs",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_jobs.py"
+      ],
+      "exit_code": 0,
+      "seconds": 15.348,
+      "log": "jobs.log"
+    },
+    {
+      "name": "incremental",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_incremental.py"
+      ],
+      "exit_code": 0,
+      "seconds": 18.747,
+      "log": "incremental.log"
+    },
+    {
+      "name": "semantic-contracts",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_semantic_contracts.py"
+      ],
+      "exit_code": 0,
+      "seconds": 6.1,
+      "log": "semantic-contracts.log"
+    },
+    {
+      "name": "execution",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_execution.py"
+      ],
+      "exit_code": 0,
+      "seconds": 34.996,
+      "log": "execution.log"
+    },
+    {
+      "name": "bridge",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_bridge.py"
+      ],
+      "exit_code": 0,
+      "seconds": 17.723,
+      "log": "bridge.log"
+    },
+    {
+      "name": "patch",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_patch.py"
+      ],
+      "exit_code": 0,
+      "seconds": 21.235,
+      "log": "patch.log"
+    },
+    {
+      "name": "host-adapter",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_host_adapter.py"
+      ],
+      "exit_code": 0,
+      "seconds": 6.699,
+      "log": "host-adapter.log"
+    },
+    {
+      "name": "calculator",
+      "argv": [
+        "node",
+        "examples/calculator/demo.mjs"
+      ],
+      "exit_code": 0,
+      "seconds": 0.095,
+      "log": "calculator.log"
+    },
+    {
+      "name": "web-syntax",
+      "argv": [
+        "node",
+        "--check",
+        "web/app.js"
+      ],
+      "exit_code": 0,
+      "seconds": 0.094,
+      "log": "web-syntax.log"
+    },
+    {
+      "name": "city3d-syntax",
+      "argv": [
+        "node",
+        "--check",
+        "web/city3d.js"
+      ],
+      "exit_code": 0,
+      "seconds": 0.086,
+      "log": "city3d-syntax.log"
+    },
+    {
+      "name": "web-behaviour",
+      "argv": [
+        "node",
+        "web/tests/app.behavior.test.mjs"
+      ],
+      "exit_code": 0,
+      "seconds": 0.154,
+      "log": "web-behaviour.log"
+    },
+    {
+      "name": "city3d-behaviour",
+      "argv": [
+        "node",
+        "web/tests/city3d.behavior.test.mjs"
+      ],
+      "exit_code": 0,
+      "seconds": 0.136,
+      "log": "city3d-behaviour.log"
+    },
+    {
+      "name": "whitespace",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.033,
+      "log": "whitespace.log"
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "entry-backfill-frontier",
+      "argv": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "scripts/test_semantic_contracts.py"
+      ],
+      "env": {
+        "ATLAS_FORCE_ENTRY_BACKFILL": "1"
+      },
+      "why": "forces the V-09 job-level entry backfill; the frontier assertions must go red",
+      "exit_code": 1,
+      "controlled": true,
+      "seconds": 6.1,
+      "log": "negative-entry-backfill-frontier.log"
+    }
+  ],
+  "qualification": "scoped to the checks listed; not full AL/ET/GE/MT/HI/DV or mature Atlas acceptance",
+  "rustc": "rustc 1.96.1 (31fca3adb 2026-06-26) (Homebrew)",
+  "cargo": "cargo 1.96.1 (356927216 2026-06-26) (Homebrew)",
+  "node": "v26.5.1",
+  "npm": "12.0.2",
+  "python": "Python 3.14.7",
+  "git": {
+    "head_exists": true,
+    "head": "9f4a2a8 http: the session is the owner and the author, not whatever the body says",
+    "whitespace_check_scope": "git diff --check covers uncommitted diffs of tracked files"
+  },
+  "concurrency": {
+    "lock": ".atlas-verify.lock",
+    "serialized": true,
+    "note": "serializes verify.py runs only. It cannot stop a writer editing sources mid-run; sources_changed_during_run is what covers that."
+  },
+  "fingerprint": {
+    "checked": true,
+    "match": true,
+    "expected": "06e84116cd353503909ddf9d469666bd20bfc3ab34865c553ab7d3165b64d7c1",
+    "actual": "06e84116cd353503909ddf9d469666bd20bfc3ab34865c553ab7d3165b64d7c1"
+  },
+  "source_hashes": {
+    "crates/.DS_Store": "2de118e858c4c8691832e5574192307a39b9019a07b6cdbfe969f00af50de4e4",
+    "crates/atlas-app/Cargo.toml": "3e725bddcf5bc2ff2d7b55e481a1217ec0e914216326a9c5c93b71c0a00f9ca1",
+    "crates/atlas-app/src/agent.rs": "5e07252e0f8c7c4bff5e6a99e3765c7c481094b08d4f6c146fb1e181a9b12a50",
+    "crates/atlas-app/src/main.rs": "4ad42eb2bfb4f90a84dcd1a4c3b97f41c70b7860a121200a7f0a5390ae1841e2",
+    "crates/atlas-app/src/patchwork.rs": "c3a517974e69bd6134b060b698125d556df4111148d7b47fe3e8700ec6984154",
+    "crates/atlas-app/src/runner.rs": "de68fbb911e280913682a19fe10968157b12908e5eef3105531b7a455d3eda30",
+    "crates/atlas-app/src/server.rs": "6d55e57599d484e7fafcd55d5d219e36dfe774d44f362a4b9f8a7d0409b0483b",
+    "crates/atlas-app/src/worker.rs": "29fef2ae428eb99d4d8b515f9f8990a8acb62f5eedaea6bb096fa0b04f82604c",
+    "crates/atlas-contract/Cargo.toml": "04d5fed2ea665298fc0d439e2a219ea1a660fb90441a64bf3773c0526f779a41",
+    "crates/atlas-contract/src/flow.rs": "7e568e5f7df777764916844e1bc52e272ef7ed9a372cea3d85b049fd104efca8",
+    "crates/atlas-contract/src/lib.rs": "6987fbcdab6a7653575139c1df252ac49cceb21f68f37bd2c85deccee08260b1",
+    "crates/atlas-engine/Cargo.toml": "7fad0689ee50e57fa3247b1a7399e2f61a3ed861ef4f7e5b5a1194e0c0cf289d",
+    "crates/atlas-engine/build.rs": "a462ee2a1bcecb273b9dd7456b39eafc7e25479cad6127ad7bd1474c4c1997c6",
+    "crates/atlas-engine/src/analyze.rs": "264063a113d28cc59cf42091707644746532c59eba2d059cbdd37c9db2bda395",
+    "crates/atlas-engine/src/bridge.rs": "0f8e9aeadd020db710bdbae33ba4606256a523afeb628c16a07bbb0b44c7d0a4",
+    "crates/atlas-engine/src/control.rs": "7a3e2d6d048ba20a948938f5d13dddca820ea8ff789ed4d487207c06680c7a18",
+    "crates/atlas-engine/src/exec.rs": "d227a8e16e067d8fa66196332f091131f2a07451ec7e2830cfd0fdc8142e68da",
+    "crates/atlas-engine/src/facts.rs": "74a3766d64ab75a6ca866b0a1e89c5fd0638b2e01f6a62c693ab72291e37d866",
+    "crates/atlas-engine/src/flow.rs": "85aab34cc6f4f95d8ea7167c687b2ba4039789475b817344769f125f3860ed8c",
+    "crates/atlas-engine/src/incremental.rs": "33176a7fb6eac1267d73cf1bcdf5f8d647fde2941eee3e11840badb988d1d63a",
+    "crates/atlas-engine/src/inter.rs": "43ed29958763cb36b9e81bd9b3ebbb86a781d1995486096866281bd283bb4e8c",
+    "crates/atlas-engine/src/job.rs": "2fd465d543a593d59884c2b657601d3b21c71c6f7bed40fb9d82d406a0353d62",
+    "crates/atlas-engine/src/lib.rs": "3e618f66ee5749ebc07dce468500d07cbaeb38dce6623d8905e25878d8f7ad46",
+    "crates/atlas-engine/src/patch.rs": "fbb94294acf921d222bdc39abe3bc1ebc815a1dc6a8b3aeb68a99e38764b862e",
+    "crates/atlas-engine/src/query.rs": "b9c0949603b1d9467b64420a5fb8f63b0aac59bcc6b7d0ff63065e9c715c2f84",
+    "crates/atlas-engine/src/scan.rs": "bea2c550515d1b4085561477300a670676bf20058fc82ff07d266103de43ef6f",
+    "crates/atlas-engine/src/solve.rs": "1d27b0ba8728f3f18bb7341d9539eee3493e792d6a9e7e5f2e89abfda762dbcf",
+    "crates/atlas-engine/src/store.rs": "8d53a4ba4695c5c5631a1f154712661cfcd6ce6104f8e7438172735806562f08",
+    "crates/atlas-engine/tests/cancellation.rs": "ca8b85d1e4be49f1db05a10a91881ecb144db25e8938ccd8a15d41532d204796",
+    "crates/atlas-engine/tests/flow_semantics.rs": "106ed8407a3416de0b24f3c80aed3e265269d7456239199914be10bde4cfc581",
+    "crates/atlas-engine/tests/foundation.rs": "d955a5ea3350304be03b5ef6206d6e2c98c85a1b129039f334d1c5742cbb2075",
+    "crates/atlas-engine/tests/interproc_context.rs": "1cd330c901e5de1c0d318bb05829075d9e62bc2cf7b442fe6717916c59ee13fc",
+    "workers/typescript/package-lock.json": "de737e95cf5db78a99014f6a9cafcc663aca8e0fe7e217e388ffba0a098af4cf",
+    "workers/typescript/package.json": "b24b7d09a5b158a0e9e5ec3cf17be3ef759ab71c2f2a9c93ae27a43ec9f036b7",
+    "workers/typescript/src/flow.mjs": "c9e8aaedf10dbd5945c2450d110b61d7f0c45e1e0f5c846ef25e37c762a05c5c",
+    "workers/typescript/src/parse.mjs": "862f158ba58be958fa64c9dcda713a2045006a563af3afc8ca957c1b8f3c9181",
+    "workers/typescript/tests/flow.test.mjs": "de6e96d0392fb5854ae9db87b21323f3d7b7c8642be8a9809c56d6b4e0d40855",
+    "workers/typescript/tests/parse.test.mjs": "4680f555e21a7d9153045f0bac4599d8365c07eccad224d66abe85b624d81807",
+    "workers/typescript/worker.mjs": "076c4ef9fc5237bddbceaf791ce9ddcde8cd175ca0b3a8bd3e5af34ed6f3a586",
+    "web/app.js": "6af873e1d5b4c8f308cadb98a0c9e6b9b02237c977378411b0fb21e6089d5a1c",
+    "web/city3d.html": "d55fa465f35170d988d8d7c2f2b5c56502a171012f663e37b918f628ba3f8c95",
+    "web/city3d.js": "ce060163f0e397c25ed50776f5ec8d99af7612c6483e5071d7526179198a388c",
+    "web/index.html": "9d87f9a2a4bc10e7f1ab58e372776794b15ddbb048c66857311b11a78cdc2a6b",
+    "web/style.css": "fb07221702c21e3cf697c96ea90bf2da4a96f246695bd4fdc79400c2d4d92b5a",
+    "web/tests/app.behavior.test.mjs": "3f0cbb9237b1d807384a5cd156b92c94b01b904ef6dc50e78eaee13de93e4917",
+    "web/tests/city3d.behavior.test.mjs": "d8d40fea7720c5355651b494788f269ccec04254f0e7678b8343c69e7496a86e",
+    "examples/.DS_Store": "689ee7820e60f1c71e1b7c0ee534ab306ef696c4ab68deac43f0d2b524eca7f7",
+    "examples/calculator/.gitignore": "48a5d69ced95acba3b51635040c664e84e79d6ec7f91d7c02927065fc3dc9e2a",
+    "examples/calculator/README.md": "061b16d98c700007e588b69f2494ca2e509d3d332ac8cf795cba3cb7fed6994a",
+    "examples/calculator/demo.mjs": "cff0c35934621b282893bfa1a773dfef9269ca797dcc59cfeee11faa16eee170",
+    "examples/calculator/package.json": "c2abd626db4f519925ad38b72892cfe5d8c8c3535b3498fdbbad6067a2fb04d9",
+    "examples/calculator/src/calculator.js": "0afcaff7359a56df83327eef88d07ee970f0e4146ffdd747668bac38ab202bcf",
+    "examples/calculator/src/input.js": "2772513957918467a339c49809266743b5d67a77d573510c2a4fc8ec61d8d277",
+    "examples/calculator/src/math.js": "fb7e55d09f200ba621a410e03568c2673bf133de5eced1c41d9dbc0ec53f4f9d",
+    "examples/flow-lab/README.md": "0e34296db5addd3c8bb19f26824588c3ae298cdcd2f451d61d177fc8f7ff8e65",
+    "examples/flow-lab/src/pipeline.js": "5aebefe8e5a88ee9ed0af2cff73b157e947dcf8a2c1d3d00bf427bc44c618a2c",
+    "scripts/bench_real_project.py": "7c5dedfb82029b31c48cebbe4ac14984d7c9fc7123839b5ee152f45d9908f2cd",
+    "scripts/demo.py": "25c6d6862c3f404ede40951bf65fe6fd882aae8b58483d19f5a4e8a33fcb1fd4",
+    "scripts/test_bridge.py": "36a567d6bd92d7fbdf8d648374b9799a9bd4c0d12b90875399828a90dcf315b8",
+    "scripts/test_cancellation.py": "9a5fb9cb260a6c528a34d2430137c836700b961d6894ae4d0b67b11270a9c68a",
+    "scripts/test_execution.py": "2404dadeb8136de7c3c8c52f0e8ab3ff4ed8971e8c9a2d429a5019f49edec1a8",
+    "scripts/test_host_adapter.py": "b8915ac321f24162e07b7ee51b600ac597bdd0fd3bd07b2b258c022441459915",
+    "scripts/test_incremental.py": "1c470f38182dbd400cada3ab12c09c90abbb7634c7c2dceb2cfcc3e75984f71f",
+    "scripts/test_integration.py": "b3ae09d9928335f4a0d8ef8562000c6525948b1f670518c3feb77636e303a164",
+    "scripts/test_jobs.py": "9b98eb4e7353d9b88ce55bdbc3a0ff2b8b93a018ee2de65c76c8fbd0ae9a1d36",
+    "scripts/test_patch.py": "40a024f84a61c2b11f359ca6d7e0d92a264a068cc268b089a14563874c8ccb4e",
+    "scripts/test_semantic_contracts.py": "4b8b35bca9fb62266369504eefe9ac9a67d2bac373aaf0a36c4803e7a15eeea6",
+    "scripts/verify.py": "a13264f10cb2b44057c0e0df0572169d32c0e7e72d7bf151d460625d7c1bbbb2",
+    "Cargo.toml": "79776f36dc675c16f978e32dcb1ae8a4a342ccec008d614a25b62ec4565a98c9",
+    "Cargo.lock": "b03737eada5ff870cc6ec164d71a53d7c28a805aae09c7f03f6652ee5bdb7934",
+    "AGENTS.md": "b4b7f3b7285397745460cf33d365e3e9c8045459ee74758d34f4acb0095c1fe9",
+    "README.md": "d39da6107fd39e85325fb4b93d9d6ca69ea934d100c26fc9a4264590ebbfa717"
+  },
+  "modus_protected_files": {
+    "checked": false
+  },
+  "current_document_links": {
+    "errors": [],
+    "scope": "new current entry docs only; original imported requirement links retain Modus context"
+  },
+  "sources_changed_during_run": {
+    "count": 0,
+    "paths": [],
+    "meaning": "sources moved while this run compiled them, so the result describes no single revision; a pass is refused and a failure may not reproduce. Re-run against a still tree."
+  },
+  "binary": {
+    "path": "target/debug/atlas",
+    "sha256": "4b90d26034eb4b8eecda3a3c1c7c493fb5f74fd92d91c859b7ef7869a385d1bb",
+    "sources_newer_than_binary": [],
+    "meaning": "the artifact behind every CLI-derived number in this run"
+  },
+  "status": "PASS"
+}

@@ -88,6 +88,8 @@ export class AtlasHostClient {
     return this.request('exec-records', { params: { entity, limit } });
   }
   selection({ entity }) { return this.request('selection', { params: { entity } }); }
+  /** Which entries have actually been run, and how each run ended. */
+  runMarkers({ limit = 200 } = {}) { return this.request('run-markers', { params: { limit } }); }
   annotations({ entity, limit = 50 } = {}) {
     return this.request('annotations', { params: { entity, limit } });
   }
@@ -146,6 +148,6 @@ export class AtlasHostClient {
     return ['report', 'nodes', 'edges', 'reach', 'flow', 'flows', 'source', 'context',
       'profile', 'exec-records', 'exec', 'selection', 'annotations', 'annotation',
       'agent/requests', 'agent/request', 'agent/work', 'contract',
-      'patches', 'patch', 'patch/propose'];
+      'patches', 'patch', 'patch/propose', 'run-markers'];
   }
 }

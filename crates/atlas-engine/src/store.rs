@@ -607,6 +607,38 @@ impl Store {
             .map_err(Into::into)
     }
 
+    /// Published execution records projected for a projection view: which
+    /// entries were actually run, with the verdict each run reached.
+    ///
+    /// This is deliberately a projection and not a second query language: a
+    /// marker says "this symbol was run and ended like this", never "this call
+    /// path was taken". The static call candidates stay exactly what they were.
+    pub fn run_markers(&self, analysis: &str, limit: usize) -> Result<Vec<serde_json::Value>> {
+        let limit = limit.clamp(1, 500);
+        let conn = self.connection()?;
+        let mut statement = conn.prepare(
+            "SELECT body FROM exec_records WHERE analysis=?1 ORDER BY created_at DESC, id DESC LIMIT ?2",
+        )?;
+        let rows = statement.query_map(params![analysis, limit as i64], |row| {
+            row.get::<_, String>(0)
+        })?;
+        let mut markers = Vec::new();
+        for row in rows {
+            let body: serde_json::Value = serde_json::from_str(&row?)?;
+            markers.push(serde_json::json!({
+                "record_id": body["id"],
+                "symbol": body["symbol"],
+                "path": body["path"],
+                "name": body["name"],
+                "verdict": body["verdict"],
+                "duration_ms": body["duration_ms"],
+                "mocked": body["isolation"]["mocks"],
+                "denied_effects": body["effect_journal"]["denied_count"],
+            }));
+        }
+        Ok(markers)
+    }
+
     /// Execution records for one symbol, newest first, bounded by `limit`.
     pub fn exec_records(
         &self,

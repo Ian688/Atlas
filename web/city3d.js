@@ -221,6 +221,49 @@ function buildCityLayout(nodes, edges, options) {
 
 /// One line that states what the picture covers. A visual that cannot say how
 /// much of the analysis it left out is not evidence, so this is always shown.
+// Map published execution records onto the layout.
+//
+// Pure, so the mapping is testable without a GPU -- and so it is obvious that
+// it only *reads* the static layout: an observation never adds a file, changes
+// a height, or turns an unresolved call into a resolved one. A record whose file
+// is not in the layout is reported as unplaced rather than dropped, because
+// "we ran something not shown here" is information.
+function cityRunMarkers(markers, layout) {
+  const perPath = new Map();
+  const unplaced = [];
+  const verdicts = {};
+  for (const marker of markers || []) {
+    const verdict = String(marker.verdict || 'unknown');
+    verdicts[verdict] = (verdicts[verdict] || 0) + 1;
+    const path = marker.path;
+    const column = layout && layout.columns.find(entry => entry.path === path);
+    if (!column) { unplaced.push(path || marker.symbol || '(unknown)'); continue; }
+    if (!perPath.has(path)) perPath.set(path, { path, runs: 0, verdicts: {}, entries: [] });
+    const record = perPath.get(path);
+    record.runs += 1;
+    record.verdicts[verdict] = (record.verdicts[verdict] || 0) + 1;
+    record.entries.push({ symbol: marker.symbol, name: marker.name, verdict });
+  }
+  const placed = [...perPath.values()].sort((a, b) => b.runs - a.runs || a.path.localeCompare(b.path));
+  return {
+    paths: new Set(perPath.keys()),
+    records: placed,
+    counts: verdicts,
+    total: (markers || []).length,
+    placed: placed.reduce((sum, record) => sum + record.runs, 0),
+    unplaced,
+  };
+}
+
+function cityObservedLine(observed) {
+  if (!observed || !observed.total) return null;
+  const parts = Object.entries(observed.counts)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([verdict, count]) => `${verdict} ${count}`);
+  const line = `观测（运行入口）${observed.total}：${parts.join(' · ')} · 落在 ${observed.records.length} 个文件`;
+  return observed.unplaced.length ? `${line} · 未落在当前布局 ${observed.unplaced.length}` : line;
+}
+
 function cityCoverageLine(stats) {
   if (!stats) return '尚未加载';
   const parts = [
@@ -554,6 +597,10 @@ const CITY_PALETTE = {
   selected: [0.05, 0.46, 0.58],
   wire: [0.48, 0.64, 0.74, 0.75],
   wireSelected: [0.05, 0.42, 0.54, 1],
+  // Observed, not static: a file whose functions Atlas has actually run. Kept
+  // visually separate from `pipeHot` (a resolved static candidate) because
+  // "we ran this" and "this may call that" are different kinds of claim.
+  wireObserved: [0.10, 0.62, 0.42, 1],
 };
 
 /// One solid instance list for the whole city: slabs, their base plinth, and
@@ -619,15 +666,17 @@ function cityColumnInstances(layout, mode, selectedPath) {
   }
   return list;
 }
-function cityWireInstances(layout, selectedPath) {
+function cityWireInstances(layout, selectedPath, runPaths) {
   const list = [];
   for (const column of layout.columns) {
     const selected = column.path === selectedPath;
+    const observed = runPaths ? runPaths.has(column.path) : false;
     list.push({
       offset: [column.x, column.height / 2, column.z],
       scale: [column.w * 1.02, column.height, column.d * 1.02],
       color: selected ? CITY_PALETTE.wireSelected
-        : (column.analyzed ? CITY_PALETTE.wire : CITY_PALETTE.plateWire),
+        : (observed ? CITY_PALETTE.wireObserved
+          : (column.analyzed ? CITY_PALETTE.wire : CITY_PALETTE.plateWire)),
     });
   }
   for (const district of layout.districts) {
@@ -842,6 +891,7 @@ async function city3dStart(canvas) {
     camera: cityDefaultCamera({ radius: 40 }),
     shape: 'box', mode: 'function', selected: null,
     analysisId: null, selection: null, pendingSelection: null,
+    observed: null, runPaths: null,
     meshes: { solid: null, wire: null, grid: null, pipes: null },
     labels: [],
     dragging: null, moved: 0,
@@ -853,7 +903,7 @@ async function city3dStart(canvas) {
     if (!state.layout) return;
     const columns = cityColumnInstances(state.layout, state.mode, state.selected);
     state.meshes.solid = citySolidMesh(gl, solidProgram, solidGeometry[state.shape], columns);
-    state.meshes.wire = cityWireMesh(gl, wireProgram, wireGeometry[state.shape], cityWireInstances(state.layout, state.selected));
+    state.meshes.wire = cityWireMesh(gl, wireProgram, wireGeometry[state.shape], cityWireInstances(state.layout, state.selected, state.runPaths));
     state.meshes.grid = cityLineMesh(gl, lineProgram, cityGridSegments(state.layout));
     state.meshes.pipes = cityLineMesh(gl, lineProgram, cityPipeSegments(state.layout, state.selected));
     if (labelHost) {
@@ -1060,12 +1110,30 @@ async function city3dStart(canvas) {
       const edges = await cityLoadPages(state.api, 'edges', { kind: 'call_candidate' }, 4);
       state.analysisId = report.id;
       state.layout = buildCityLayout(nodes.items, edges.items);
+      // Observed runs are a separate query and a separate channel. If it fails,
+      // the view says so rather than showing an empty observed layer, which
+      // would read as "nothing has ever been run".
+      try {
+        const observedPage = await state.api('run-markers', { limit: 200 });
+        state.observed = cityRunMarkers(observedPage.markers, state.layout);
+        state.runPaths = state.observed.paths;
+      } catch (error) {
+        state.observed = null;
+        state.runPaths = null;
+        cityText('city-observed', '观测层不可用：运行记录查询失败，未显示任何"已运行"标记');
+      }
       state.camera = cityDefaultCamera(state.layout);
       state.mode = 'function';
       rebuildScene();
       cityText('city-analysis', `分析版本 ${String(report.id).slice(0, 12)} · 文件 ${report.file_count} · 函数 ${report.function_count} · 调用点 ${report.call_count}`);
       const bounded = nodes.complete && edges.complete ? '' : '（分页达到上限，视图基于已加载的部分事实）';
       cityText('city-coverage', cityCoverageLine(state.layout.stats) + bounded);
+      const observedLine = cityObservedLine(state.observed);
+      if (observedLine) {
+        cityText('city-observed', observedLine);
+      } else if (state.observed) {
+        cityText('city-observed', '观测（运行入口）0：还没有入口被运行过。管线是静态调用候选，与运行无关。');
+      }
       cityText('city-status', '已连接 · 固定版本 · 本地只读查询');
       await cityApplySelection(state.pendingSelection, nodes);
       if (field) field.value = '';

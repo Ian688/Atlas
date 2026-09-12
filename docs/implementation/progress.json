@@ -248,6 +248,16 @@
       ],
       "note": "HTTP 上的 owner 与作者改由服务端按会话写入；请求体里的 owner/proposed_by 不被采信。CLI 保留显式声明（本机自我声明，非认证）。",
       "report": "evidence/development/2026-09-12-w09-session-identity/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/w09-observed-layer",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09-run-markers-projection",
+        "W09-observed-vs-static-legend"
+      ],
+      "note": "3D 城市加入观测层：已运行入口单独描边色 + 独立图例与结论分布；映射是纯函数且不改变静态布局；不可放置与查询失败都如实呈现。",
+      "report": "evidence/development/2026-09-12-w09-observed-layer/REPORT.md"
     }
   ],
   "next_work_item": "宿主侧 E2E 与旧入口切换（需要 Modus 检出）；或回到 W08/W09 的深化项",
@@ -691,7 +701,8 @@
         "提案审阅面：GET /api/patches、GET /api/patch?id=、POST /api/patch/propose 与函数面板提案面板；页面可登记（Intent）并读校验结果/图差异/测试退出码，验证与应用仍只在 CLI",
         "HTTP 与 CLI 共用 patchwork::propose_from_diff：同一校验路径，页面无法登记一个 CLI 会拒绝的 diff；跨分析的提案查询被拒绝",
         "补丁验证可排队：patch verify --enqueue --owner X 生成 kind=patch_verify 作业，job work 用同一个 verify_proposal 执行（前台与排队不是两条路径）；终态 artifact 是补丁树派生的 analysis；同一 (owner,project,request_key) 幂等，完成后重排报告 already_completed",
-        "HTTP 身份：注解与提案的作者由服务端按会话写入（请求类型无 proposed_by），页面无法把提案归到别人名下"
+        "HTTP 身份：注解与提案的作者由服务端按会话写入（请求类型无 proposed_by），页面无法把提案归到别人名下",
+        "观测层与静态层分开：GET /api/run-markers 由已发布执行记录投影；3D 用独立描边色与独立图例行（结论分布 + 落点文件数），cityRunMarkers 为纯函数且测试断言不改变布局，落不进布局的记录报数不丢弃，查询失败显示不可用"
       ],
       "evidence": [
         "crates/atlas-engine/src/patch.rs（11 个 diff 单测 + 提案存储与状态迁移）",
@@ -704,12 +715,14 @@
         "adapters/modus/atlas_host_client.mjs（patches/patch/proposePatch）",
         "scripts/test_patch.py（25 个用例：CLI 16 + 排队 5 + HTTP 3 + 共享基类去重）",
         "scripts/test_bridge.py（22 个用例，新增 2 项身份用例）",
-        "scripts/test_host_adapter.py（8 个用例，作者断言改为会话）"
+        "scripts/test_host_adapter.py（8 个用例，作者断言改为会话）",
+        "web/tests/city3d.behavior.test.mjs（17 项，新增 3 项观测层用例）",
+        "scripts/test_host_adapter.py（run-markers 纳入合同覆盖检查）"
       ],
       "blockers": [
         "AI Coding 链没有图形化的一键撤销：apply/revert 只有 CLI；提案形式只支持统一 diff（新建/删除/重命名文件不支持）",
         "选区只在同一 analysis 内互通；跨版本选区被拒绝而不是重定位（relocation 需要实体级重命名/移动追踪，未做）",
-        "LOD 与正式 3D 层级未实现：城市仍按固定规则投影，没有细节层级切换，也没有「激活路径来自 Run」的图例分离（因为还没有 Run 轨迹）",
+        "LOD（细节层级切换）未实现：城市仍按固定规则投影，没有随距离改变几何密度。观测层已接通，但它标的是**已运行的入口**，不是运行路径——Atlas 没有行级/调用级采样，所以「激活路径来自 Run」仍无法诚实地画出来",
         "Agent Bridge 没有 owner 认证：owner 是调用者声明；服务端验证权限与版本仍未实现（与 W06 同一缺口）",
         "bridge 的 inspect 直接展开已发布上下文，没有按请求方做最小披露裁剪；请求预算与配额未实现",
         "没有被同一 analysis 之外的投影状态持久化：选区只在 fragment 与内存里，刷新页面依赖 URL",

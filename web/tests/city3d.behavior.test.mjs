@@ -280,6 +280,72 @@ check('a selection for an entity this projection does not have is refused, not a
   assert.equal(outside.path, 'other/z.js', 'the refusal must still say which file it was about');
 });
 
+// --- W09: observed runs, kept separate from static candidates -----------------
+// The work order asks for run-derived paths to be shown under their own legend
+// and for LOD to never change fact counts. These check the mapping: it reads the
+// layout, never changes it, and reports a record it cannot place instead of
+// dropping it.
+check('run markers map onto the layout without changing the static picture', () => {
+  const t = boot();
+  const nodes = [fileNode('src/a.js', 2), fnNode('src/a.js', 'fnA', 0), fileNode('web/c.js', 1)];
+  const edges = [call('call:1', 'file:src/a.js', 'file:web/c.js')];
+  const layout = t.run(`buildCityLayout(${JSON.stringify(nodes)}, ${JSON.stringify(edges)})`);
+  const before = JSON.stringify(layout);
+  const markers = [
+    { symbol: 'symbol:src/a.js:0:10', path: 'src/a.js', name: 'fnA', verdict: 'returned' },
+    { symbol: 'symbol:src/a.js:20:30', path: 'src/a.js', name: 'fnB', verdict: 'threw' },
+    { symbol: 'symbol:gone.js:0:1', path: 'src/gone.js', name: 'ghost', verdict: 'refused' },
+  ];
+  const observed = t.run(`cityRunMarkers(${JSON.stringify(markers)}, ${JSON.stringify(layout)})`);
+  assert.equal(observed.total, 3);
+  assert.equal(observed.placed, 2, 'two markers belong to a file in the layout');
+  // Objects from the vm realm have their own Array/Object prototypes, so these
+  // are compared as JSON rather than by identity.
+  assert.equal(JSON.stringify(observed.unplaced), JSON.stringify(['src/gone.js']),
+    'an unplaceable record must be reported, not dropped');
+  assert.equal(JSON.stringify(observed.counts), JSON.stringify({ returned: 1, threw: 1, refused: 1 }));
+  assert.equal(observed.records.length, 1, 'both runs are on one file');
+  assert.equal(observed.records[0].runs, 2);
+  assert.equal(JSON.stringify(observed.records[0].verdicts), JSON.stringify({ returned: 1, threw: 1 }));
+  assert.equal(JSON.stringify(layout), before,
+    'mapping observations must not add a file, change a height, or resolve a call');
+});
+
+check('the observed line names the verdicts and admits what it could not place', () => {
+  const t = boot();
+  const nodes = [fileNode('src/a.js', 1)];
+  const layout = t.run(`buildCityLayout(${JSON.stringify(nodes)}, [])`);
+  const markers = [
+    { path: 'src/a.js', name: 'fnA', verdict: 'returned' },
+    { path: 'src/a.js', name: 'fnB', verdict: 'timeout' },
+    { path: 'src/other.js', name: 'x', verdict: 'returned' },
+  ];
+  const observed = t.run(`cityRunMarkers(${JSON.stringify(markers)}, ${JSON.stringify(layout)})`);
+  const line = t.run(`cityObservedLine(${JSON.stringify(observed)})`);
+  assert.match(line, /观测（运行入口）3/);
+  assert.match(line, /returned 2/);
+  assert.match(line, /timeout 1/);
+  assert.match(line, /落在 1 个文件/);
+  assert.match(line, /未落在当前布局 1/, 'a record outside the layout must be visible');
+  // And with nothing run, there is no line to misread.
+  assert.equal(t.run('cityObservedLine(cityRunMarkers([], ' + JSON.stringify(layout) + '))'), null);
+});
+
+check('observed runs and static candidates use different wire colours', () => {
+  const t = boot();
+  const nodes = [fileNode('src/a.js', 1), fileNode('src/b.js', 1)];
+  const layout = t.run(`buildCityLayout(${JSON.stringify(nodes)}, [])`);
+  const plain = t.run(`cityWireInstances(${JSON.stringify(layout)}, null, null)`);
+  const withRuns = t.run(`cityWireInstances(${JSON.stringify(layout)}, null, new Set(['src/a.js']))`);
+  assert.notEqual(JSON.stringify(withRuns[0].color), JSON.stringify(plain[0].color),
+    'a file with observed runs must not be drawn like one without');
+  assert.equal(JSON.stringify(withRuns[1].color), JSON.stringify(plain[1].color),
+    'other files are unaffected');
+  const selected = t.run(`cityWireInstances(${JSON.stringify(layout)}, 'src/a.js', new Set(['src/a.js']))`);
+  assert.notEqual(JSON.stringify(selected[0].color), JSON.stringify(withRuns[0].color),
+    'selection and "has been run" are different claims and must not share a colour');
+});
+
 let failed = 0;
 for (const [name, fn] of checks) {
   try {
