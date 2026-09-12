@@ -1,0 +1,36 @@
+✔ flow IR carries version, profile and per-function anchors (28.257989ms)
+✔ block shadowing produces distinct binding ids (D01) (5.896346ms)
+✔ TDZ use-before-declare still resolves to the real binding (D01) (17.01764ms)
+✔ short-circuit and conditional operators become structured control (D02) (1.993556ms)
+✔ try/catch/finally lowers with catch param binding and anchors (D03/D04) (2.403437ms)
+✔ labeled break/continue keep labels (D05) (3.129496ms)
+✔ unsupported constructs are explicit unknowns with reasons (profile boundary) (1.830229ms)
+✔ module peers resolve to bindings and are recorded as captures (D14 setup) (2.085787ms)
+✔ object and array literals keep field names and element anchors (4.064657ms)
+✔ destructuring declarations become explicit unknowns, not silent copies (profile) (2.33479ms)
+✔ alpha-renaming preserves flow structure modulo identity (D21) (6.781825ms)
+✔ a folded global name loses to a shadowing binding (V-08b) (5.316033ms)
+✔ the unshadowed global undefined still folds to a constant (V-08b) (1.257442ms)
+✔ non-finite numeric literals are explicit unknowns, not unwireable constants (0.98618ms)
+✔ finite numeric literals are unaffected by the non-finite guard (1.009603ms)
+✔ a nested function keeps its own declarations out of the enclosing function (GE-2 regression) (6.156071ms)
+✔ runtime imports are named on every function, and type-only imports are not (17.64879ms)
+✔ cross-file alias and re-export resolve using captured sources (51.821975ms)
+✔ lexical shadowing does not bind to a global namesake (3.821093ms)
+✔ reassigned function declarations are marked; indirect and constructor calls stay unknown (7.940295ms)
+✔ duplicate script declarations are ambiguous, not first-declaration wins (3.661418ms)
+✔ UTF-8 byte spans retain Chinese and emoji source anchors (2.543878ms)
+✔ nested calls with identical start offsets have distinct full-span IDs (1.649542ms)
+✔ compiler host never falls back to ambient source or config reads (2.650719ms)
+✔ syntax failures and dynamic language features are explicit (2.564581ms)
+✔ request isolation rejects traversal and duplicates; source is never evaluated (3.020181ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 542.038639
+npm notice run @atlas/typescript-worker@0.1.0 test
+npm notice run node --test tests/*.test.mjs
