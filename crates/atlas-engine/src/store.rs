@@ -110,7 +110,37 @@ impl Store {
             spec_digest TEXT NOT NULL,
             body TEXT NOT NULL,
             created_at INTEGER NOT NULL);
-          CREATE INDEX IF NOT EXISTS exec_records_symbol ON exec_records(analysis,symbol,created_at);")?;
+          CREATE INDEX IF NOT EXISTS exec_records_symbol ON exec_records(analysis,symbol,created_at);
+          CREATE TABLE IF NOT EXISTS annotations(
+            id TEXT PRIMARY KEY,
+            analysis_id TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
+            selection_id TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            body TEXT NOT NULL,
+            proposed_by TEXT NOT NULL,
+            intent_exists INTEGER NOT NULL,
+            created_at INTEGER NOT NULL);
+          CREATE INDEX IF NOT EXISTS annotations_entity ON annotations(analysis_id,entity_id,created_at);
+          CREATE TABLE IF NOT EXISTS agent_requests(
+            id TEXT PRIMARY KEY,
+            owner TEXT NOT NULL,
+            request_key TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            state TEXT NOT NULL,
+            attempt INTEGER NOT NULL DEFAULT 0,
+            analysis_id TEXT NOT NULL,
+            entity_id TEXT,
+            payload TEXT,
+            result TEXT,
+            terminal_reason TEXT,
+            lease_holder TEXT,
+            lease_expires_at INTEGER,
+            ack_at INTEGER,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            UNIQUE(owner,request_key));
+          CREATE INDEX IF NOT EXISTS agent_requests_state ON agent_requests(state,created_at);")?;
             Ok(())
         })?;
         // Additive migration. A store created before the queue existed has a

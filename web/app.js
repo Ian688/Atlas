@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id);
-const state = {token:'',nodes:[],edges:[],nodePage:null,edgePage:null,selected:null,focus:null,request:0,exportUrl:null,execProfile:null};
+const state = {token:'',nodes:[],edges:[],nodePage:null,edgePage:null,selected:null,focus:null,request:0,exportUrl:null,execProfile:null,report:null,selection:null,pendingSelection:null,annotations:[]};
 const ns='http://www.w3.org/2000/svg';
 function svg(tag, attrs={}, text) {const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));if(text!==undefined)e.textContent=text;return e;}
 function text(tag,value,cls) {const e=document.createElement(tag);e.textContent=value;if(cls)e.className=cls;return e;}
@@ -17,14 +17,84 @@ async function apiJson(name, body) {
 }
 function status(message){$('status').textContent=message;}
 function clearContext(){if(state.exportUrl)URL.revokeObjectURL(state.exportUrl);state.exportUrl=null;$('context-panel').hidden=true;$('context-json').value='';$('context-download').removeAttribute('href');}
+// A selection is the unit the two projections share: an entity plus the
+// analysis version it was chosen in. It travels in the fragment (never in an
+// HTTP request, never to a server log) and is written back on every selection
+// so the URL is a pinned reference rather than a screenshot of one.
+function parseFragment(){
+  if(typeof location==='undefined'||!location.hash)return {};
+  return Object.fromEntries(new URLSearchParams(location.hash.slice(1)));
+}
+function publishSelection(node){
+  state.selection=node?{analysis_id:state.report?.id||'',entity_id:node.id}:null;
+  const inspector=$('inspector');
+  if(inspector){
+    if(node){inspector.setAttribute('data-selection-entity',node.id);inspector.setAttribute('data-analysis-id',state.report?.id||'');}
+    else{inspector.removeAttribute('data-selection-entity');inspector.removeAttribute('data-analysis-id');}
+  }
+  const link=$('open-3d');
+  if(link)link.setAttribute('href',node?`/city3d#selection=${encodeURIComponent(node.id)}&analysis=${encodeURIComponent(state.report?.id||'')}`:'/city3d');
+  if(typeof history!=='undefined'){
+    const hash=node?`#selection=${encodeURIComponent(node.id)}&analysis=${encodeURIComponent(state.report?.id||'')}`:'';
+    history.replaceState(null,'',location.pathname+hash);
+  }
+}
+function renderAnnotations(annotations){
+  const panel=$('annotation-panel'),body=$('annotation-body');if(!panel||!body)return;
+  if(!state.selected){panel.hidden=true;body.replaceChildren();return;}
+  panel.hidden=false;body.replaceChildren();
+  body.append(flowNode('flow-line','Intent 与提案是声明，不是事实，也不是已存在的代码。'));
+  if(!annotations.length){body.append(flowNode('flow-line','当前选区还没有 Intent。'));return;}
+  for(const item of annotations.slice(0,12)){
+    body.append(flowNode(item.exists?'flow-line':'flow-unknown',
+      `${item.kind} · ${item.proposed_by} · ${item.exists?'标记为已存在':'提案（尚未存在）'} · ${item.body}`));
+  }
+}
+async function loadAnnotations(node){
+  state.annotations=[];
+  if(!node){renderAnnotations([]);return;}
+  try{const page=await api('annotations',{entity:node.id,limit:50});state.annotations=page.annotations||[];}
+  catch{state.annotations=[];}
+  renderAnnotations(state.annotations);
+}
+async function proposeAnnotation(){
+  const selected=state.selected;
+  if(!selected){status('先选择一个对象');return;}
+  const body=$('annotation-input').value.trim();
+  if(!body){status('先写下要登记的意图');return;}
+  try{
+    const result=await apiJson('annotation',{entity:selected.id,kind:'constraint',body,proposed_by:'human'});
+    $('annotation-input').value='';
+    await loadAnnotations(selected);
+    status(result.outcome==='created'?'Intent 已登记为提案（不是代码）':'这条 Intent 已经登记过');
+  }catch(e){status(`Intent 未登记：${e.message}`);}
+}
+// The semantic surface an external agent is meant to use, instead of driving a
+// private chat window or scraping pixels. Every entry is bounded: read the
+// selection, read annotations, select, propose an Intent, or open the other
+// projection. There is no action here that writes source or runs anything the
+// static profile has not already allowed.
+function installBridge(){
+  if(typeof globalThis==='undefined')return;
+  globalThis.atlasBridge={
+    version:'atlas.agent-bridge.v1',
+    bounded_actions:['getSelection','getAnnotations','select','propose','openProjection','runControlled'],
+    getSelection(){return state.selection?{...state.selection}:null;},
+    getAnnotations(){return state.annotations;},
+    async select(entityId){const node=state.nodes.find(n=>n.id===entityId);if(!node)return {ok:false,error:'entity_not_loaded'};await select(node);return {ok:true,entity_id:node.id};},
+    async propose(kind,body){if(!state.selected)return {ok:false,error:'no_selection'};const result=await apiJson('annotation',{entity:state.selected.id,kind:kind||'constraint',body,proposed_by:'agent'});await loadAnnotations(state.selected);return {ok:true,annotation:result.annotation,exists:false};},
+    openProjection(view){const target=view==='3d'?($('open-3d')?.getAttribute('href')||'/city3d'):'/';if(typeof location!=='undefined')location.href=target;return target;},
+    runControlled(){return runControlled();},
+  };
+}
 // The inspector is one unit: name, path, source and flow must always describe
 // the same selection. Clearing it in one place is what keeps a stale flow fact
 // from sitting under a freshly selected name.
 function resetDetail(){
-  state.request++;state.selected=null;state.focus=null;state.execProfile=null;$('export').disabled=true;clearContext();
+  state.request++;state.selected=null;state.focus=null;state.execProfile=null;state.annotations=[];$('export').disabled=true;clearContext();
   $('selection-name').textContent='选择一个函数';$('selection-path').textContent='固定分析版本';
   $('selection-facts').textContent='选择对象以查询关联候选。';$('source').textContent='尚未选择对象';$('source-status').textContent='';
-  renderFlow(null);renderExecution(null,null);render();
+  publishSelection(null);renderAnnotations([]);renderFlow(null);renderExecution(null,null);render();
 }
 function metric(value,label){const box=text('div','');box.append(text('b',value),text('span',label));return box;}
 async function loadNodes(){const page=await api('nodes',{limit:100,...(state.nodePage?.next_cursor?{cursor:state.nodePage.next_cursor}:{})});state.nodes.push(...page.items);state.nodePage=page;$('more').hidden=!page.next_cursor;render();}
@@ -45,6 +115,20 @@ async function connect(){
     $('metrics').replaceChildren(metric(report.file_count,'文件'),metric(report.function_count,'函数'),metric(report.call_count,'调用点'));
     $('revision').textContent=`分析版本 ${report.id.slice(0,12)}`;$('revision').title=report.id;
     $('token').value='';status('已连接 · 固定版本 · 本地只读查询');
+    const pending=state.pendingSelection;
+    if(pending&&pending.entity_id){
+      // A selection carries the version it was made in. If this server is
+      // serving a different analysis the fragment is refused, not re-anchored:
+      // silently pointing an old name at a new function is how a stale
+      // conclusion gets attached to code nobody looked at.
+      if(pending.analysis&&pending.analysis!==report.id){
+        status('该选区固定在另一个分析版本上，未自动选中。请在这里重新选择，或打开那个版本。');
+      }else{
+        const node=state.nodes.find(n=>n.id===pending.entity_id);
+        if(node)await select(node);
+        else status('选区指向的对象不在当前已加载的节点里，未自动选中。');
+      }
+    }
   }catch(e){
     // A stored token that no longer authenticates is genuinely dead: drop it so
     // the next attempt asks for a fresh one instead of retrying forever.
@@ -417,6 +501,7 @@ async function runControlled(){
 async function select(node){
   const request=++state.request;state.selected=node;state.focus=null;state.execProfile=null;$('export').disabled=true;clearContext();
   $('selection-name').textContent=node.name;$('selection-path').textContent=node.path;$('source').textContent='读取固定快照…';$('selection-facts').textContent='查询关联候选…';
+  publishSelection(node);loadAnnotations(node);
   // Clear the previous selection's facts before the new ones arrive. Leaving
   // them up made the panel show function A's conclusion under function B's
   // name whenever the query failed.
@@ -454,10 +539,14 @@ async function select(node){
       :'该对象可能没有可读取的源码，或查询不可用。';
   }
 }
-$('exec-run').onclick=()=>runControlled();$('connect-button').onclick=connect;$('token').onkeydown=e=>{if(e.key==='Enter')connect();};$('search').oninput=renderTree;
+$('annotation-add').onclick=()=>proposeAnnotation();
+$('exec-run').onclick=()=>runControlled();installBridge();$('connect-button').onclick=connect;$('token').onkeydown=e=>{if(e.key==='Enter')connect();};$('search').oninput=renderTree;
 $('more').onclick=()=>loadNodes().catch(e=>status(e.message));$('more-edges').onclick=()=>loadEdges().catch(e=>status(e.message));
 $('reset').onclick=resetDetail;
 $('export').onclick=async()=>{try{const selected=state.selected,request=state.request;if(!selected)return;const context=await api('context',{entity:selected.id},'POST');if(request!==state.request)return;clearContext();const json=JSON.stringify(context,null,2);state.exportUrl=URL.createObjectURL(new Blob([json],{type:'application/json'}));$('context-json').value=json;$('context-download').href=state.exportUrl;$('context-download').download=`atlas-context-${context.selection_id.slice(0,12)}.json`;$('context-panel').hidden=false;$('context-panel').open=true;status('选区上下文已在本地生成，可复制或下载；未发送给 LLM');}catch(e){status(e.message);}};
 $('context-copy').onclick=async()=>{try{await navigator.clipboard.writeText($('context-json').value);status('上下文已复制；未发送给 LLM');}catch{status('浏览器未允许剪贴板写入，可在 JSON 文本框中手动复制');}};
-// A fragment never travels in an HTTP request. Remove it before further navigation.
-if(location.hash.startsWith('#token=')){const token=new URLSearchParams(location.hash.slice(1)).get('token');history.replaceState(null,'',location.pathname);$('token').value=token||'';connect();}
+// A fragment never travels in an HTTP request. It carries the token and,
+// optionally, the selection another projection was looking at.
+{const fragment=parseFragment();
+ if(fragment.selection||fragment.analysis){state.pendingSelection={entity_id:fragment.selection||'',analysis:fragment.analysis||''};}
+ if(fragment.token){history.replaceState(null,'',location.pathname);$('token').value=fragment.token;connect();}}

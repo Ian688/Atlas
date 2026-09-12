@@ -39,6 +39,10 @@ CHECKS = [
     # cases require each denial to come from the operating system through Node,
     # and check that the side effect did not happen.
     ("execution", [sys.executable, "scripts/test_execution.py"]),
+    # The bridge is where a model is allowed to act. These cases pin the two
+    # things that keep that safe: a selection is refused rather than re-anchored
+    # across versions, and only a closed set of actions is ever performed.
+    ("bridge", [sys.executable, "scripts/test_bridge.py"]),
     ("calculator", ["node", "examples/calculator/demo.mjs"]),
     ("web-syntax", ["node", "--check", "web/app.js"]),
     ("city3d-syntax", ["node", "--check", "web/city3d.js"]),

@@ -1,8 +1,10 @@
+mod agent;
 mod runner;
 mod server;
 mod worker;
 
 use atlas_contract::{ParseRequest, ScanLimits};
+use atlas_engine::bridge;
 use atlas_engine::exec::{Grants, RunSpec};
 use atlas_engine::job::{self, Lease, STATE_COMPLETED, STATE_FAILED};
 use atlas_engine::{analyze, control::ExecutionControl, incremental, scan, store::Store};
@@ -158,6 +160,92 @@ enum Action {
         #[command(subcommand)]
         command: JobAction,
     },
+    /// Pin a selection: an entity plus the analysis version it was chosen in.
+    Select {
+        analysis: String,
+        entity: String,
+    },
+    /// Register an Intent against a selection. An annotation is never code.
+    Annotate {
+        analysis: String,
+        entity: String,
+        #[arg(long, default_value = "intent")]
+        kind: String,
+        #[arg(long)]
+        body: String,
+        #[arg(long, default_value = "human")]
+        proposed_by: String,
+    },
+    /// List annotations for one entity, or for the whole analysis.
+    Annotations {
+        analysis: String,
+        #[arg(long)]
+        entity: Option<String>,
+        #[arg(long, default_value_t = 50)]
+        limit: usize,
+    },
+    /// Bounded Agent Bridge: queued requests, leases, ACKs, and the bounded
+    /// actions themselves.
+    Agent {
+        #[command(subcommand)]
+        command: AgentAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum AgentAction {
+    /// Enqueue a bounded request. The analysis is pinned into the request.
+    Request {
+        analysis: String,
+        #[arg(long)]
+        owner: String,
+        #[arg(long)]
+        key: String,
+        #[arg(long, default_value = "inspect")]
+        kind: String,
+        #[arg(long)]
+        entity: Option<String>,
+        /// JSON payload for the action.
+        #[arg(long)]
+        payload: Option<String>,
+    },
+    /// Claim the oldest queued request and perform its bounded action.
+    Work {
+        #[arg(long)]
+        once: bool,
+        #[arg(long, default_value_t = 0)]
+        max: usize,
+        #[arg(long, default_value_t = 60)]
+        lease_seconds: u64,
+    },
+    /// Claim without performing: the claim is the acknowledgement.
+    Claim {
+        #[arg(long, default_value_t = 60)]
+        lease_seconds: u64,
+    },
+    /// Finish a claimed request. Only its lease holder may.
+    Complete {
+        id: String,
+        #[arg(long)]
+        holder: String,
+        #[arg(long, default_value = "done")]
+        state: String,
+        #[arg(long)]
+        result: Option<String>,
+        #[arg(long)]
+        reason: Option<String>,
+    },
+    Status {
+        id: String,
+    },
+    List {
+        #[arg(long)]
+        state: Option<String>,
+        #[arg(long, default_value_t = 50)]
+        limit: usize,
+    },
+    /// Return expired leases to the queue.
+    Reap,
 }
 
 #[derive(Args)]
@@ -939,6 +1027,171 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                 }
+            }
+        },
+        Action::Select { analysis, entity } => {
+            // A selection must name something that exists. Returning a pin for
+            // an invented id would make "no such object" indistinguishable from
+            // a real selection.
+            let entity = runner::resolve_entity(&store, &analysis, &entity)?;
+            print(bridge::selection(&analysis, &entity, "entity"))?
+        }
+        Action::Annotate {
+            analysis,
+            entity,
+            kind,
+            body,
+            proposed_by,
+        } => {
+            let entity = runner::resolve_entity(&store, &analysis, &entity)?;
+            let selection = bridge::selection(&analysis, &entity, "entity");
+            let (annotation, created) =
+                store.create_annotation(&selection, &kind, &body, &proposed_by)?;
+            print(
+                json!({"outcome": if created {"created"} else {"already_proposed"}, "annotation": annotation}),
+            )?
+        }
+        Action::Annotations {
+            analysis,
+            entity,
+            limit,
+        } => {
+            let entity = match entity {
+                Some(reference) => Some(runner::resolve_entity(&store, &analysis, &reference)?),
+                None => None,
+            };
+            print(json!({
+                "analysis_id": analysis,
+                "entity_id": entity,
+                "annotations": store.annotations(&analysis, entity.as_deref(), limit)?,
+            }))?
+        }
+        Action::Agent { command } => match command {
+            AgentAction::Request {
+                analysis,
+                owner,
+                key,
+                kind,
+                entity,
+                payload,
+            } => {
+                // Resolve the entity only when the analysis exists. A request
+                // against an unknown analysis must be *recorded* as rejected
+                // rather than die in argument parsing, or the refusal would be
+                // invisible to whoever is waiting for the answer.
+                let known = store.metadata(&analysis).is_ok();
+                let entity = match entity {
+                    Some(reference) if known => {
+                        Some(runner::resolve_entity(&store, &analysis, &reference)?)
+                    }
+                    other => other,
+                };
+                let spec = bridge::AgentRequestSpec {
+                    owner: &owner,
+                    request_key: &key,
+                    kind: &kind,
+                    analysis_id: &analysis,
+                    entity_id: entity.as_deref(),
+                    payload: payload.as_deref(),
+                };
+                let (request, created) = store.enqueue_agent_request(&spec)?;
+                print(
+                    json!({"outcome": if created {"enqueued"} else {"already_requested"}, "request": request}),
+                )?;
+                if request.state == bridge::STATE_REJECTED {
+                    return Err(format!(
+                        "request rejected: {}",
+                        request.terminal_reason.unwrap_or_else(|| "unknown".into())
+                    )
+                    .into());
+                }
+            }
+            AgentAction::Claim { lease_seconds } => {
+                if !(5..=3600).contains(&lease_seconds) {
+                    return Err("lease must be 5..3600 seconds".into());
+                }
+                let holder = new_holder();
+                let claimed = store.claim_agent_request(&holder, (lease_seconds as i64) * 1000)?;
+                print(json!({"holder": holder, "request": claimed}))?
+            }
+            AgentAction::Complete {
+                id,
+                holder,
+                state,
+                result,
+                reason,
+            } => {
+                let recorded = store.finish_agent_request(
+                    &id,
+                    &holder,
+                    &state,
+                    result.as_deref(),
+                    reason.as_deref(),
+                )?;
+                print(json!({"recorded": recorded, "request": store.agent_request(&id)?}))?;
+                if !recorded {
+                    return Err(
+                        "only the current lease holder can finish a request; a stale holder cannot"
+                            .into(),
+                    );
+                }
+            }
+            AgentAction::Status { id } => print(store.agent_request(&id)?)?,
+            AgentAction::List { state, limit } => {
+                print(json!({"requests": store.agent_requests(state.as_deref(), limit)?}))?
+            }
+            AgentAction::Reap => {
+                let reaped = store.reap_agent_requests(job::now_ms())?;
+                print(json!({"reaped": reaped, "count": reaped.len()}))?
+            }
+            AgentAction::Work {
+                once,
+                max,
+                lease_seconds,
+            } => {
+                if !(5..=3600).contains(&lease_seconds) {
+                    return Err("lease must be 5..3600 seconds".into());
+                }
+                let lease_ms = (lease_seconds as i64) * 1000;
+                let mut outcomes = Vec::new();
+                loop {
+                    if max > 0 && outcomes.len() >= max {
+                        break;
+                    }
+                    let holder = new_holder();
+                    let Some(request) = store.claim_agent_request(&holder, lease_ms)? else {
+                        break;
+                    };
+                    let outcome = match agent::perform(&store, &request) {
+                        Ok(result) => {
+                            let encoded = serde_json::to_string(&result)?;
+                            let recorded = store.finish_agent_request(
+                                &request.id,
+                                &holder,
+                                bridge::STATE_DONE,
+                                Some(&encoded),
+                                None,
+                            )?;
+                            json!({"outcome":"done","recorded":recorded,"request":store.agent_request(&request.id)?,"result":result})
+                        }
+                        Err(error) => {
+                            let recorded = store.finish_agent_request(
+                                &request.id,
+                                &holder,
+                                bridge::STATE_FAILED,
+                                None,
+                                Some(&error),
+                            )?;
+                            json!({"outcome":"failed","recorded":recorded,"request":store.agent_request(&request.id)?,"error":error})
+                        }
+                    };
+                    outcomes.push(outcome);
+                    if once {
+                        break;
+                    }
+                }
+                let ran = outcomes.len();
+                print(json!({"ran": ran, "outcomes": outcomes}))?
             }
         },
         Action::Serve { analysis, port } => {

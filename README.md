@@ -41,7 +41,9 @@ target/debug/atlas --store local-state serve <上一步返回的id>
 - 索引可以作为**持久作业**提交：身份由 (owner, project, request_key) 三元组定义，同一请求幂等——已完成的请求重放原分析而不重跑，失败的可以重试并计入下一次 attempt。作业持有带心跳的租约；租约停止续期就是进程死亡的证据，`job reap` 收割它并判失败，`job work` 则换个人接着跑——崩溃不该让队列停摆，重跑在这里是安全的（发布幂等且不可变）。陈旧持有者无法伪造终态。
 - 作业可以**排队**而不是只能即刻执行：`job enqueue` 只登记请求（runner 参数随行存储，所以排队请求描述自己怎么跑），工人按优先级降序、同级最旧优先认领。排队中的作业可以取消；运行中的不行——它属于租约持有者。
 - `index --incremental` 在字节与版本都没变时直接返回已发布的分析，并报告一次局部改动会失效什么：每个文件按自身内容与依赖闭包（在导入图 SCC 凝聚上折叠）得到一个键，因此失效**不需要**额外的一遍扫描，且改叶子不会反向失效共享模块。`withdrawn` 列出上次分析过、这次已不存在的文件。**承重断言**：增量与全量必须发布同一个 analysis id，冷/热/编辑/删除四条路径都有测试。已知边界：局部改动仍需重新派生全部函数（Rust 侧是全程序 SCC 不动点）。
-- 外部 Agent 可以调用 CLI/本地 HTTP，或操作有语义标签的网页；导出上下文不会自动发送给任何模型。
+- **一个选区，两种投影**：选区 = 实体 + 它被选中时的分析版本，随 URL fragment 传递（fragment 不进入 HTTP 请求）。2D 与 `/city3d` 共享同一个选区；投影若在服务另一个版本，会**拒绝**这个选区并说明原因，而不是把它悄悄改指到当前版本的某个对象上。语义 DOM（`data-selection-entity` / `data-analysis-id`）与 `globalThis.atlasBridge` 是给外部 Agent 用的接口，不依赖向任何私有聊天窗口注入。
+- **Intent 与提案**：`atlas annotate` / `/api/annotation` 把约束、场景、补丁登记为注解，`exists:false`、带 `proposed_by`。注解是声明，不是事实，也不是已存在的代码；补丁提案只登记为占位对象（`applied:false`），本切片没有应用/重解析/测试/撤销的代码路径。
+- **有界 Agent Bridge**：`atlas agent request/work/claim/complete/reap` 与 `/api/agent/*`。请求身份 = (owner, request_key)，幂等；认领即 ACK 并带租约，过期租约被收割回队列；只有当前租约持有者能写终态。动作集合是**封闭**的（`inspect` / `annotate` / `propose_patch`），请求其它动作在入队时就被持久地拒绝并记录原因。页面不能自己指定 Node 二进制、环境或分析版本。
 - **执行画像**（`atlas profile` / `/api/profile`）把每个函数按已发布事实分成 `pure_callable` / `needs_context` / `needs_entry_driver` / `unsupported`，每条降级理由都指回它读的那个字段。partial 分析一律降级：frontier 就是事实缺失的块，「没有副作用」没有被证明。
 - **受控运行**（`atlas exec` / `/api/exec`）只对通过画像的函数生效：它把快照字节物化成隔离副本，用调用者指定的**目标 Node** 在 `--permission` 下启动，只授予副本只读与显式声明的项。权限是强制的而不是声明式的——每个进程首次运行前先跑一次能力探针，要求一次真实写入被 `ERR_ACCESS_DENIED` 拒绝，否则拒绝执行。目标函数按**源码同一性**选定（命名空间里某个值的 `toString()` 必须等于快照中该符号的字节），因此同名的另一个函数不会被静默执行，导不出的函数直接报 `target_not_exported`。超时/取消按进程组 `SIGKILL` 回收。
 - **观测边界写在记录里**：`coverage=not_sampled`、`unknown_paths=not_observed`。只观测入口调用的返回/抛出、运行时报告的源码位置、进程输出与退出码；没有行级覆盖，没有运行期调用图，静态 BFS 不作为执行顺序。`--scenario` 可对一组用例断言返回/抛出/被拒绝，`refused` 与「断言失败」是两种结果。声明 `--fixtures` 的运行会在记录里标为 mock，结果不得读作真实环境观测。
@@ -76,6 +78,7 @@ python3 scripts/test_jobs.py
 python3 scripts/test_incremental.py
 python3 scripts/test_semantic_contracts.py
 python3 scripts/test_execution.py
+python3 scripts/test_bridge.py
 node examples/calculator/demo.mjs
 node web/tests/app.behavior.test.mjs
 node web/tests/city3d.behavior.test.mjs
@@ -83,4 +86,4 @@ node web/tests/city3d.behavior.test.mjs
 
 自动化分别覆盖存储/遍历/边界、真实编译器材料、完整 CLI/HTTP 链路和独立计算器断言。`web/tests/app.behavior.test.mjs` 在 `node:vm` 的 DOM 里真正驱动 `web/app.js`（会话保持、失败路径清空、事实与选中的 symbol 一致性），因此工作台的行为不再只靠 `node --check` 的语法检查。
 
-自动化分别覆盖存储/遍历/边界、真实编译器材料、完整 CLI/HTTP 链路、独立计算器断言、持久作业与队列、增量等价性、CLI/HTTP 受控执行，以及网页行为。120 文件、1,200 函数是合成分页与预算样本；10,000 节点 SCC 是图算法样本；两者均不构成大型真实项目资格。真实第三方项目的成本记录见 [GE-2/GE-3 证据](evidence/development/2026-09-12-real-project/REPORT.md)，它证明的是单机单项目成本，不是大仓库或多语言资格。
+自动化分别覆盖存储/遍历/边界、真实编译器材料、完整 CLI/HTTP 链路、独立计算器断言、持久作业与队列、增量等价性、CLI/HTTP 受控执行、选区跨版本拒绝与有界 Agent Bridge，以及网页行为。120 文件、1,200 函数是合成分页与预算样本；10,000 节点 SCC 是图算法样本；两者均不构成大型真实项目资格。真实第三方项目的成本记录见 [GE-2/GE-3 证据](evidence/development/2026-09-12-real-project/REPORT.md)，它证明的是单机单项目成本，不是大仓库或多语言资格。

@@ -240,6 +240,46 @@ check('without WebGL2 it says so rather than showing an empty stage', async () =
   assert.match(status, /2D 工作台/, 'and must say the 2D workbench is unaffected');
 });
 
+// --- W09: the second projection must agree about the same selection ---------
+// These exercise the pure decision, so every refusal is asserted rather than
+// hoped for. A "yes" here highlights a column; a "no" leaves the view alone and
+// says why, which is the only honest outcome for a selection from a version
+// this projection is not showing.
+check('a shared selection resolves to the column that really holds that entity', () => {
+  const t = boot();
+  const nodes = [fileNode('src/a.js', 2), fnNode('src/a.js', 'fnA', 0), fileNode('web/c.js', 1)];
+  const layout = t.run(`buildCityLayout(${JSON.stringify(nodes)}, [])`);
+  const target = t.run(`citySelectionTarget(${JSON.stringify({ entity_id: 'symbol:src/a.js:0:10', analysis: 'A1' })}, "A1", ${JSON.stringify(nodes)}, ${JSON.stringify(layout)})`);
+  assert.equal(target.ok, true, JSON.stringify(target));
+  assert.equal(target.path, 'src/a.js');
+  assert.equal(target.name, 'fnA');
+});
+
+check('a selection from another analysis is refused with its version named', () => {
+  const t = boot();
+  const nodes = [fileNode('src/a.js', 1)];
+  const layout = t.run(`buildCityLayout(${JSON.stringify(nodes)}, [])`);
+  const target = t.run(`citySelectionTarget(${JSON.stringify({ entity_id: 'file:src/a.js', analysis: 'OLD' })}, "NEW", ${JSON.stringify(nodes)}, ${JSON.stringify(layout)})`);
+  assert.equal(target.ok, false);
+  assert.equal(target.code, 'stale_selection_version');
+  assert.equal(target.selection_analysis, 'OLD');
+  assert.equal(target.served_analysis, 'NEW');
+  assert.equal(target.path, undefined, 'a refused selection must not name a column to highlight');
+});
+
+check('a selection for an entity this projection does not have is refused, not approximated', () => {
+  const t = boot();
+  const nodes = [fileNode('src/a.js', 1)];
+  const layout = t.run(`buildCityLayout(${JSON.stringify(nodes)}, [])`);
+  const unknown = t.run(`citySelectionTarget(${JSON.stringify({ entity_id: 'symbol:gone.js:0:1', analysis: 'A1' })}, "A1", ${JSON.stringify(nodes)}, ${JSON.stringify(layout)})`);
+  assert.equal(unknown.ok, false);
+  assert.equal(unknown.code, 'entity_not_loaded');
+  const outside = t.run(`citySelectionTarget(${JSON.stringify({ entity_id: 'file:other/z.js', analysis: 'A1' })}, "A1", ${JSON.stringify([fileNode('other/z.js', 1)])}, ${JSON.stringify(layout)})`);
+  assert.equal(outside.ok, false);
+  assert.equal(outside.code, 'entity_not_in_layout');
+  assert.equal(outside.path, 'other/z.js', 'the refusal must still say which file it was about');
+});
+
 let failed = 0;
 for (const [name, fn] of checks) {
   try {

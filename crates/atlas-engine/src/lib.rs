@@ -1,4 +1,5 @@
 pub mod analyze;
+pub mod bridge;
 pub mod control;
 pub mod exec;
 pub mod facts;

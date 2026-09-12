@@ -920,6 +920,40 @@ pub async fn run_scenario(
     }))
 }
 
+/// Resolve any published entity: a function by id/`path:name`/name, or a file by
+/// path/name. Unlike a display lookup this never falls back to the raw string:
+/// a selection that names something the analysis does not have is an error, and
+/// inventing an entity id for it would make an empty answer look like a fact.
+pub fn resolve_entity(store: &Store, analysis: &str, reference: &str) -> Result<String, String> {
+    if let Ok(node) = store.node(analysis, reference) {
+        return Ok(node.id);
+    }
+    if let Ok(symbol) = resolve_symbol(store, analysis, reference) {
+        return Ok(symbol);
+    }
+    let mut cursor: Option<String> = None;
+    let mut files: Vec<String> = Vec::new();
+    for _ in 0..20 {
+        let page = store
+            .nodes(analysis, "file", 500, cursor.as_deref())
+            .map_err(|e| e.to_string())?;
+        for node in &page.items {
+            if node.path == reference || node.name == reference || node.id == reference {
+                files.push(node.id.clone());
+            }
+        }
+        cursor = page.next_cursor;
+        if cursor.is_none() {
+            break;
+        }
+    }
+    match files.len() {
+        0 => Err(format!("entity_not_found:{reference}")),
+        1 => Ok(files[0].clone()),
+        _ => Err(format!("ambiguous_entity:{reference}:{}", files.len())),
+    }
+}
+
 /// Resolve a symbol id, or a `path:name` / bare `name` reference, to a symbol.
 pub fn resolve_symbol(store: &Store, analysis: &str, reference: &str) -> Result<String, String> {
     if reference.starts_with("symbol:") {

@@ -75,12 +75,12 @@ function makeFetch(routes, requests) {
   };
 }
 
-function boot(routes) {
+function boot(routes, options = {}) {
   const { document, el } = makeDom();
   const requests = [];
   const sandbox = {
     document,
-    location: { hash: '', pathname: '/' },
+    location: { hash: options.hash || '', pathname: options.pathname || '/' },
     history: { replaceState() {} },
     navigator: { clipboard: { writeText: async () => {} } },
     URL, URLSearchParams, Blob, TextEncoder, console,
@@ -481,6 +481,86 @@ check('a missing profile leaves the run button disabled and says why', async () 
   assert.equal(t.el('exec-panel').hidden, true, 'no profile means no execution panel');
   assert.equal(t.el('exec-run').disabled, true, 'no profile means no run');
   if (t.evalIn('state.execProfile') !== null) throw new Error('a failed profile query must clear the profile');
+});
+
+// --- W09: one selection, two projections -----------------------------------
+// The cases that matter are the refusals. A selection carries the analysis it
+// was made in; a projection must not re-anchor it to whatever analysis it
+// happens to be serving, because that silently attaches an old name to a new
+// function. The bridge is checked for the same reason: it must expose bounded
+// actions and no way to write source.
+check('selecting publishes a pinned selection and points the other projection at it', async () => {
+  const t = boot(routeBase());
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  const published = t.el('inspector');
+  assert.equal(published['data-selection-entity'], FN_A.id, 'the semantic DOM must carry the selection');
+  assert.equal(published['data-analysis-id'], report.id, 'and the version it was pinned to');
+  const href = t.el('open-3d')['href'] || '';
+  assert.match(href, /^\/city3d#selection=/, 'the 3D link must carry the same selection');
+  assert.match(href, /analysis=/, 'and the analysis version');
+  const bridgeSelection = t.run('atlasBridge.getSelection()');
+  assert.equal(bridgeSelection.entity_id, FN_A.id);
+  assert.equal(bridgeSelection.analysis_id, report.id);
+});
+
+check('an Intent is registered as a proposal, never as existing code', async () => {
+  const t = boot(routeBase());
+  t.routes.annotation = { outcome: 'created', annotation: {
+    id: 'n'.repeat(64), schema: 'atlas.annotation.v1', analysis_id: report.id,
+    entity_id: FN_A.id, selection_id: 's', kind: 'constraint', body: 'must not raise',
+    proposed_by: 'human', exists: false, created_at: 1,
+  } };
+  t.routes.annotations = { analysis_id: report.id, entity_id: FN_A.id, annotations: [{
+    id: 'n'.repeat(64), kind: 'constraint', body: 'must not raise', proposed_by: 'human', exists: false,
+  }] };
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  t.el('annotation-input').value = 'must not raise';
+  await t.run('proposeAnnotation()');
+  const posted = t.requests.filter((r) => r.name === 'annotation');
+  assert.equal(posted.length, 1, 'exactly one Intent must be posted');
+  assert.equal(JSON.parse(posted[0].body).entity, FN_A.id, 'the Intent is pinned to the selection');
+  const shown = t.el('annotation-body').textContent;
+  assert.match(shown, /must not raise/, 'the Intent must be visible');
+  assert.match(shown, /提案（尚未存在）/, 'a proposal must not read as existing code');
+  assert.match(shown, /不是已存在的代码|不是事实/, 'the panel must say what an Intent is');
+});
+
+check('a shared selection from the same analysis is applied on connect', async () => {
+  const t = boot(routeBase(), { hash: `#selection=${encodeURIComponent(FN_B.id)}&analysis=${report.id}` });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  assert.match(t.el('selection-name').textContent, /fnB/, 'the shared selection must be selected');
+  assert.equal(t.el('inspector')['data-selection-entity'], FN_B.id);
+});
+
+check('a shared selection from another analysis is refused, not re-anchored', async () => {
+  const t = boot(routeBase(), { hash: `#selection=${encodeURIComponent(FN_A.id)}&analysis=${'f'.repeat(64)}` });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  assert.doesNotMatch(t.el('selection-name').textContent, /fnA/,
+    'an object from another version must not be silently re-anchored here');
+  assert.match(t.el('status').textContent, /另一个分析版本/, 'the refusal must be explained');
+});
+
+check('the bridge exposes bounded actions only, and none of them writes code', async () => {
+  const t = boot(routeBase());
+  const bridge = t.run('atlasBridge');
+  assert.equal(bridge.version, 'atlas.agent-bridge.v1');
+  for (const name of ['getSelection', 'getAnnotations', 'select', 'propose', 'openProjection']) {
+    assert.ok(bridge.bounded_actions.includes(name), `${name} must be declared bounded`);
+  }
+  const forbidden = ['write', 'apply', 'patch', 'exec', 'delete', 'index'];
+  for (const action of bridge.bounded_actions) {
+    for (const word of forbidden) {
+      assert.ok(!action.toLowerCase().includes(word), `${action} looks like a code-writing action`);
+    }
+  }
+  const missing = await t.run('atlasBridge.select("symbol:not-loaded:0:1")');
+  assert.equal(missing.ok, false, 'selecting an unloaded entity must fail loudly');
 });
 
 let failed = 0;

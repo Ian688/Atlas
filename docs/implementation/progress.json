@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w08-execution",
+    "window": "2026-09-12/w09-selection-and-bridge",
     "status": "DELIVERED",
-    "note": "W08 从 NOT_IMPLEMENTED 推进到 PARTIAL：静态执行画像（pure_callable/needs_context/needs_entry_driver/unsupported，每条理由带 evidence 字段）、RunSpec 固定、隔离副本、目标 Node 权限模型（强制探针验证）、源码同一性选目标、入口观测记录与 scenario 断言接通。顺带在真实 rxjs@7.8.1 上找到并修复两个 worker 缺陷（同一错误码 flow_reference_unknown_binding 的两个独立来源）。",
-    "evidence_dir": "evidence/development/2026-09-12-w08",
-    "verification": "evidence/development/2026-09-12-w08/verification.json"
+    "note": "W09 首片：共享选区对象与跨版本拒绝、2D/3D 选区互通、语义 DOM 与有界桥接面、Intent 注解、带租约与 ACK 的有界 Agent Bridge。AI Coding 补丁链仍未实现。",
+    "evidence_dir": "evidence/development/2026-09-12-w09",
+    "verification": "evidence/development/2026-09-12-w09/verification.json"
   },
   "windows": [
     {
@@ -145,10 +145,24 @@
       ],
       "note": "受控执行只对静态画像允许且 spec 显式授权的函数生效；权限由 Node 权限模型强制（能力探针要求一次真实写入被 ERR_ACCESS_DENIED 拒绝），不是 Atlas 的声明。记录身份 = digest(固定问题+观测答案)，刻意排除耗时与临时路径。观测边界写进每条记录：coverage=not_sampled、unknown_paths=not_observed。",
       "report": "evidence/development/2026-09-12-w08/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/w09-selection-and-bridge",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09-shared-selection-object",
+        "W09-version-check-and-refusal",
+        "W09-projection-interop-2d-3d",
+        "W09-semantic-dom-and-bridge-surface",
+        "W09-annotations-as-proposals",
+        "W09-bounded-agent-bridge-with-lease-ack"
+      ],
+      "note": "选区 = 实体 + 分析版本，经 fragment 在 2D 与 3D 之间传递，跨版本一律拒绝而不是重指。注解是 Intent（exists=false）。Agent Bridge 请求身份 (owner,request_key) 幂等、认领即 ACK 带租约、只有租约持有者能写终态、动作集合封闭且越界动作在入队时被持久拒绝。AI Coding 补丁链未实现。",
+      "report": "evidence/development/2026-09-12-w09/REPORT.md"
     }
   ],
-  "next_work_item": "W08 深化：上下文实例化 + Effect journal + 依赖切片",
-  "next_action": "W08 首片（静态画像 + 隔离受控运行 + 观测记录 + scenario + HTTP 边界 + Web 面板）已接通并纳入验证门。下一步按依赖顺序：先做 needs_context 的上下文实例化（captures/this/模块态的最小可用合成，仍要求显式声明），再做 Effect journal（执行期真实读写/网络/子进程清单位于权限模型之上）与依赖切片（只物化目标闭包而不是整个快照）。真实项目 GE-2/GE-3 证据待 rxjs 基准重跑完成后回填；该基准已经在第一轮就暴露了两个真实 worker 缺陷并已修复。",
+  "next_work_item": "W09 续：AI Coding 第一条完整链（Intent → 提案 → 隔离应用 → 重新解析 → 测试 → 图 diff → 审阅/撤销）",
+  "next_action": "W09 首片已接通：共享选区（带版本、跨版本拒绝）、2D/3D 选区互通、语义 DOM 与有界桥接面、Intent 注解、带租约/ACK/幂等身份的有界 Agent Bridge（动作集合封闭）。下一步做 AI Coding 第一条完整链，必须沿用同一纪律：补丁只在隔离工作副本中应用，应用前校验固定版本与权限，应用后本地重新解析并跑测试，产出图 diff 供审阅，可撤销；且 Intent/Static/Observed 三类证据始终分开。W10（Modus 接缝）依赖 W09 的稳定 API，应在补丁链之后进行。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
@@ -546,13 +560,46 @@
         "HI",
         "MT"
       ],
-      "implementation": "NOT_IMPLEMENTED",
-      "automated_checks": "NOT_RUN",
+      "implementation": "PARTIAL",
+      "automated_checks": "PASS",
       "qualification": "NOT_QUALIFIED",
-      "review_status": "NOT_REQUESTED",
-      "features": [],
-      "evidence": [],
-      "blockers": []
+      "review_status": "NEEDS_INDEPENDENT_REVIEW",
+      "features": [
+        "共享选区对象 atlas.selection.v1：{id, analysis_id, entity_id, entity_kind, version}；version 就是 analysis id，所以版本相同是可判定的等式",
+        "版本拒绝：投影服务另一个分析时返回 stale_selection_version 并说明，不把旧选区重指到当前版本的某个对象（2D 与 3D 各自实现并有测试）",
+        "跨投影互通：2D 选中即更新 fragment 与 data-* 属性，并给出携带选区与版本的 /city3d 链接；3D 读取同一 fragment 并高亮同一文件列，2D/3D 都暴露 globalThis.atlasBridge",
+        "语义 DOM 与桥接面：data-selection-entity / data-analysis-id；bridge 声明 bounded_actions 且测试断言其中没有写码类动作",
+        "注解即 Intent：kind 限 intent/constraint/scenario/patch，exists 恒为 false，带 proposed_by；id 为内容摘要，同内容幂等、不同作者不同提案、不能被就地改写",
+        "Intent UI：函数面板可登记与查看 Intent，提案明确标注「提案（尚未存在）」而不是已存在代码",
+        "有界 Agent Bridge：请求身份 (owner,request_key) 幂等；状态 queued/leased/done/failed/rejected；越界动作与未知分析在入队时即被拒绝并记录 terminal_reason",
+        "认领即 ACK：认领记 ack_at 并带租约；过期租约收割回队列（不是判失败），attempt 递增可见；只有当前租约持有者能写终态，旁观者与陈旧持有者都被拒绝",
+        "三个有界动作：inspect 读取已发布上下文；annotate 登记 Intent；propose_patch 只登记占位对象（applied=false，带「没有应用」说明），没有任何写源码路径",
+        "HTTP 边界：GET /api/selection、/api/annotations、/api/agent/requests，POST /api/annotation、/api/agent/request、/api/agent/work；页面不能指定 analysis_id（不在请求类型里），未授权 401",
+        "CLI：atlas select/annotate/annotations 与 atlas agent request|work|claim|complete|status|list|reap",
+        "实体解析不再静默兜底：select/annotate/annotations/agent 使用 resolve_entity（函数与文件），解析不到即报错，不给不存在的对象造一个选区"
+      ],
+      "evidence": [
+        "crates/atlas-engine/src/bridge.rs（6 个单测：版本钉定/注解幂等与 exists/越界动作拒绝/未知分析拒绝/身份三元组/租约持有者纪律）",
+        "crates/atlas-app/src/agent.rs（三个有界动作）",
+        "crates/atlas-app/src/server.rs（/api/selection、/api/annotation、/api/annotations、/api/agent/*）",
+        "scripts/test_bridge.py（20 个用例：CLI 15 + HTTP 5，含跨版本拒绝、越界动作、租约过期回收、提案不改源码）",
+        "web/tests/app.behavior.test.mjs（新增 5 项：选区发布与 3D 链接、Intent 提案、同版本选区应用、跨版本选区拒绝、bridge 有界动作）",
+        "web/tests/city3d.behavior.test.mjs（新增 3 项：选择目标解析、跨版本拒绝、实体缺失拒绝）",
+        "evidence/development/2026-09-12-w09/verification.json"
+      ],
+      "blockers": [
+        "AI Coding 完整链未实现：没有隔离应用补丁、重新解析、运行测试、图 diff、审阅/应用/撤销。当前只有提案占位与拒绝，没有任何写源码路径",
+        "选区只在同一 analysis 内互通；跨版本选区被拒绝而不是重定位（relocation 需要实体级重命名/移动追踪，未做）",
+        "LOD 与正式 3D 层级未实现：城市仍按固定规则投影，没有细节层级切换，也没有「激活路径来自 Run」的图例分离（因为还没有 Run 轨迹）",
+        "Agent Bridge 没有 owner 认证：owner 是调用者声明；服务端验证权限与版本仍未实现（与 W06 同一缺口）",
+        "bridge 的 inspect 直接展开已发布上下文，没有按请求方做最小披露裁剪；请求预算与配额未实现",
+        "没有被同一 analysis 之外的投影状态持久化：选区只在 fragment 与内存里，刷新页面依赖 URL"
+      ],
+      "independent_review": {
+        "id": "pending",
+        "findings": [],
+        "note": "W09 首片待独立复审。"
+      }
     },
     {
       "id": "W10",

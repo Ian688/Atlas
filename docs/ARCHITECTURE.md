@@ -123,6 +123,16 @@ worker stdin ≤160 MiB、stdout ≤32 MiB、stderr ≤64 KiB，V8 old-space 为
 
 **记录身份**：`exec_records.id = digest(固定问题 + 观测到的答案)`，其中刻意排除耗时与绝对临时路径。因此同一问题得到同一答案就是同一行（可重复运行、可幂等查询），而答案不同会产生第二条记录——两条不同的观测结果，而不是静默覆盖。mock/fixture 运行必须在记录里标为 `isolation.mocks=true`，它的结果不得被读作真实环境观测。
 
+### 7.2 共享选区、Intent 与有界 Agent Bridge（W09 首片）
+
+**选区对象** `{id, analysis_id, entity_id, entity_kind, version}`，其中 `version` 就是 analysis id。analysis id 是整份 Analysis 内容的摘要，所以"版本相同"是可判定的等式而不是时间戳猜测。选区经 URL fragment 在 2D 与 `/city3d` 之间传递；投影在服务另一个版本时**拒绝**它（`stale_selection_version`），因为把旧名字静默改指到新函数，与一个正确答案在被人据以行动之前是无法区分的。
+
+**Intent 不是事实。** 注解存储时带 `exists:false` 与 `proposed_by`；`kind` 限于 `intent/constraint/scenario/patch`。补丁提案额外带 `applied:false` 与说明文字。渲染层必须显式说"提案（尚未存在）"。id 是内容的摘要，所以同一条 Intent 提两次是一行，不同作者是不同提案，且不能被后来者就地改写。
+
+**有界 Agent Bridge。** 请求身份 = `(owner, request_key)`，与作业同一套幂等纪律；认领即 ACK（记 `ack_at`）并带租约；过期租约被收割**回到队列**而不是判失败——桥接动作便宜且幂等，让等待中的人丢掉请求没有道理；终态只能由当前租约持有者写入。动作集合是封闭的（`inspect` / `annotate` / `propose_patch`），不在集合内的请求在**入队时**就被拒绝并记录 `action_not_in_bounded_set`，因此一次非法动作是持久可见的拒绝，而不是静默忽略。HTTP 侧 `analysis_id` 不在请求类型里——页面无法把工作钉到本服务没有在服务的版本上。
+
+**仍未实现**：AI Coding 的完整链（隔离应用补丁 → 本地重新解析 → 测试 → 图 diff → 审阅/应用/撤销）。本切片只有占位与拒绝，没有写入源码的路径。
+
 ## 8. 接下来构建的实际子系统
 
 以下为设计要求。"语言中立流 IR"与"本地数据流"在 0.2 已有 JS/TS 声明 profile 内的首个纵向切片（见第 5 节），其余能力与下表完整方向仍是目标，不添加空方法冒充可调用能力。

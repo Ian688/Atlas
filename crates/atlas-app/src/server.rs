@@ -1,3 +1,4 @@
+use atlas_engine::bridge;
 use atlas_engine::exec::{Grants, RunSpec};
 use atlas_engine::store::Store;
 use axum::{
@@ -105,6 +106,35 @@ async fn query(
                 )
                 .map_err(Into::into)
             }
+            // A selection is pinned to the analysis this server is serving, so
+            // a page cannot ask about a version it was not opened on.
+            "selection" => {
+                let reference = q.entity.as_deref().unwrap_or("");
+                let symbol = crate::runner::resolve_symbol(&app.store, id, reference)
+                    .map_err(|error| atlas_engine::invalid(&error))?;
+                serde_json::to_value(bridge::selection(id, &symbol, "entity")).map_err(Into::into)
+            }
+            "annotations" => {
+                let entity = q.entity.as_deref().unwrap_or("");
+                let entity = if entity.is_empty() {
+                    None
+                } else {
+                    Some(
+                        crate::runner::resolve_symbol(&app.store, id, entity)
+                            .map_err(|error| atlas_engine::invalid(&error))?,
+                    )
+                };
+                serde_json::to_value(serde_json::json!({
+                    "analysis_id": id,
+                    "entity_id": entity,
+                    "annotations": app.store.annotations(id, entity.as_deref(), q.limit.unwrap_or(50))?,
+                }))
+                .map_err(Into::into)
+            }
+            "agent-requests" => serde_json::to_value(serde_json::json!({
+                "requests": app.store.agent_requests(q.kind.as_deref(), q.limit.unwrap_or(50))?,
+            }))
+            .map_err(Into::into),
             "exec-records" => {
                 let reference = q.entity.as_deref().unwrap_or("");
                 let symbol = crate::runner::resolve_symbol(&app.store, id, reference)
@@ -161,6 +191,206 @@ endpoint!(flow, "flow");
 endpoint!(flows, "flows");
 endpoint!(profile, "profile");
 endpoint!(exec_records, "exec-records");
+endpoint!(selection, "selection");
+endpoint!(annotations, "annotations");
+endpoint!(agent_requests, "agent-requests");
+
+#[derive(Deserialize)]
+struct AnnotationRequest {
+    entity: String,
+    #[serde(default = "default_intent")]
+    kind: String,
+    body: String,
+    #[serde(default = "default_human")]
+    proposed_by: String,
+}
+
+fn default_intent() -> String {
+    "intent".into()
+}
+fn default_human() -> String {
+    "human".into()
+}
+
+/// Register an Intent. This is the only write the page can make, and it writes
+/// a proposal -- never source, never a fact.
+async fn annotate(
+    State(app): State<App>,
+    headers: HeaderMap,
+    axum::Json(request): axum::Json<AnnotationRequest>,
+) -> Response {
+    if !allowed(&app, &headers) {
+        return (StatusCode::UNAUTHORIZED, "local session required").into_response();
+    }
+    let symbol = match crate::runner::resolve_symbol(&app.store, &app.analysis, &request.entity) {
+        Ok(symbol) => symbol,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({"error": error})),
+            )
+                .into_response();
+        }
+    };
+    let selection = bridge::selection(&app.analysis, &symbol, "entity");
+    match app.store.create_annotation(
+        &selection,
+        &request.kind,
+        &request.body,
+        &request.proposed_by,
+    ) {
+        Ok((annotation, created)) => axum::Json(serde_json::json!({
+            "outcome": if created {"created"} else {"already_proposed"},
+            "annotation": annotation,
+        }))
+        .into_response(),
+        Err(error) => (
+            StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({"error": error.to_string()})),
+        )
+            .into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+struct AgentRequestBody {
+    owner: String,
+    request_key: String,
+    #[serde(default = "default_inspect")]
+    kind: String,
+    entity: Option<String>,
+    payload: Option<String>,
+}
+
+fn default_inspect() -> String {
+    "inspect".into()
+}
+
+/// Enqueue a bounded bridge request. The analysis is the server's, not the
+/// caller's: a page cannot pin work to a version this service is not serving.
+async fn agent_request(
+    State(app): State<App>,
+    headers: HeaderMap,
+    axum::Json(body): axum::Json<AgentRequestBody>,
+) -> Response {
+    if !allowed(&app, &headers) {
+        return (StatusCode::UNAUTHORIZED, "local session required").into_response();
+    }
+    let entity = match body.entity {
+        Some(reference) => {
+            match crate::runner::resolve_symbol(&app.store, &app.analysis, &reference) {
+                Ok(symbol) => Some(symbol),
+                Err(error) => {
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        axum::Json(serde_json::json!({"error": error})),
+                    )
+                        .into_response();
+                }
+            }
+        }
+        None => None,
+    };
+    let spec = bridge::AgentRequestSpec {
+        owner: &body.owner,
+        request_key: &body.request_key,
+        kind: &body.kind,
+        analysis_id: &app.analysis,
+        entity_id: entity.as_deref(),
+        payload: body.payload.as_deref(),
+    };
+    match app.store.enqueue_agent_request(&spec) {
+        Ok((request, created)) => {
+            let rejected = request.state == bridge::STATE_REJECTED;
+            let payload = serde_json::json!({
+                "outcome": if created {"enqueued"} else {"already_requested"},
+                "request": request,
+            });
+            if rejected {
+                (StatusCode::BAD_REQUEST, axum::Json(payload)).into_response()
+            } else {
+                axum::Json(payload).into_response()
+            }
+        }
+        Err(error) => (
+            StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({"error": error.to_string()})),
+        )
+            .into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+struct AgentWorkBody {
+    #[serde(default)]
+    max: usize,
+}
+
+/// Perform queued bounded actions. The server decides what a bounded action is;
+/// the caller only decides how many to run, so this cannot be used to make the
+/// service do something the CLI could not.
+async fn agent_work(
+    State(app): State<App>,
+    headers: HeaderMap,
+    axum::Json(body): axum::Json<AgentWorkBody>,
+) -> Response {
+    if !allowed(&app, &headers) {
+        return (StatusCode::UNAUTHORIZED, "local session required").into_response();
+    }
+    let limit = body.max.clamp(1, 32);
+    let store = app.store.clone();
+    let holder = format!("http-{}", uuid::Uuid::new_v4().simple());
+    let outcome = tokio::task::spawn_blocking(move || -> Result<serde_json::Value, String> {
+        let mut outcomes = Vec::new();
+        for _ in 0..limit {
+            let Some(request) = store
+                .claim_agent_request(&holder, 30_000)
+                .map_err(|e| e.to_string())?
+            else {
+                break;
+            };
+            let outcome = match crate::agent::perform(&store, &request) {
+                Ok(result) => {
+                    let encoded = serde_json::to_string(&result).map_err(|e| e.to_string())?;
+                    store
+                        .finish_agent_request(
+                            &request.id,
+                            &holder,
+                            bridge::STATE_DONE,
+                            Some(&encoded),
+                            None,
+                        )
+                        .map_err(|e| e.to_string())?;
+                    serde_json::json!({"outcome":"done","request_id":request.id,"result":result})
+                }
+                Err(error) => {
+                    store
+                        .finish_agent_request(
+                            &request.id,
+                            &holder,
+                            bridge::STATE_FAILED,
+                            None,
+                            Some(&error),
+                        )
+                        .map_err(|e| e.to_string())?;
+                    serde_json::json!({"outcome":"failed","request_id":request.id,"error":error})
+                }
+            };
+            outcomes.push(outcome);
+        }
+        Ok(serde_json::json!({"holder": holder, "ran": outcomes.len(), "outcomes": outcomes}))
+    })
+    .await;
+    match outcome {
+        Ok(Ok(value)) => axum::Json(value).into_response(),
+        Ok(Err(error)) => (
+            StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({"error": error})),
+        )
+            .into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "agent work failed").into_response(),
+    }
+}
 
 /// The body a local page may send to start a controlled run.
 ///
@@ -371,6 +601,12 @@ pub async fn serve(
         .route("/api/profile", get(profile))
         .route("/api/exec-records", get(exec_records))
         .route("/api/exec", post(exec))
+        .route("/api/selection", get(selection))
+        .route("/api/annotations", get(annotations))
+        .route("/api/annotation", post(annotate))
+        .route("/api/agent/requests", get(agent_requests))
+        .route("/api/agent/request", post(agent_request))
+        .route("/api/agent/work", post(agent_work))
         .with_state(app);
     axum::serve(listener, router)
         .with_graceful_shutdown(async {

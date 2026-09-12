@@ -239,6 +239,25 @@ function cityCoverageLine(stats) {
 }
 
 /// What a column click should ask the engine for.
+// Decide what a shared selection points at, without touching the DOM or the
+// GPU. Kept pure so the decision -- including every refusal -- is testable:
+// a wrong "yes" here would highlight the wrong column, and a wrong "no" would
+// look like the two projections disagree when they do not.
+function citySelectionTarget(pending, analysisId, nodes, layout) {
+  if (!pending || !pending.entity_id) return { ok: false, code: 'no_selection' };
+  if (pending.analysis && pending.analysis !== analysisId) {
+    return {
+      ok: false, code: 'stale_selection_version',
+      selection_analysis: pending.analysis, served_analysis: analysisId || null,
+    };
+  }
+  const node = (nodes || []).find(entry => entry.id === pending.entity_id);
+  if (!node) return { ok: false, code: 'entity_not_loaded' };
+  const column = layout && layout.columns.find(entry => entry.path === node.path);
+  if (!column) return { ok: false, code: 'entity_not_in_layout', path: node.path };
+  return { ok: true, path: column.path, entity_id: node.id, name: node.name };
+}
+
 function citySelectionQuery(column) {
   if (!column) return null;
   return { entity: column.id, path: column.path, name: column.name };
@@ -822,6 +841,7 @@ async function city3dStart(canvas) {
     // scheduled, which killed the loop for the rest of the session.
     camera: cityDefaultCamera({ radius: 40 }),
     shape: 'box', mode: 'function', selected: null,
+    analysisId: null, selection: null, pendingSelection: null,
     meshes: { solid: null, wire: null, grid: null, pipes: null },
     labels: [],
     dragging: null, moved: 0,
@@ -901,6 +921,48 @@ async function city3dStart(canvas) {
     cityDrawInstances(gl, state.meshes.solid, cityFrame(solidProgram, projection, view, eye, false));
     cityDrawInstances(gl, state.meshes.wire, cityFrame(wireProgram, projection, view, eye, true));
     updateLabels(view, projection);
+  }
+
+  // A shared selection: an entity id plus the analysis version it was chosen
+  // in. The city is a second projection of the same analysis, so it is the
+  // right place to prove the two views agree -- and the right place to refuse
+  // when they do not.
+  function cityPublishSelection(entityId) {
+    state.selection = entityId ? { analysis_id: state.analysisId || '', entity_id: entityId } : null;
+    const note = typeof document === 'undefined' ? null : document.getElementById('city-selection-note');
+    const stage = typeof document === 'undefined' ? null : document.getElementById('city-stage');
+    if (stage) {
+      if (entityId) { stage.setAttribute('data-selection-entity', entityId); stage.setAttribute('data-analysis-id', state.analysisId || ''); }
+      else { stage.removeAttribute('data-selection-entity'); stage.removeAttribute('data-analysis-id'); }
+    }
+    if (note && entityId) note.textContent = '共享选区：' + entityId;
+    if (typeof history !== 'undefined') {
+      const hash = entityId ? `#selection=${encodeURIComponent(entityId)}&analysis=${encodeURIComponent(state.analysisId || '')}` : '';
+      history.replaceState(null, '', location.pathname + hash);
+    }
+  }
+
+  async function cityApplySelection(pending, nodes) {
+    const note = typeof document === 'undefined' ? null : document.getElementById('city-selection-note');
+    if (!pending || !pending.entity_id) return;
+    const target = citySelectionTarget(pending, state.analysisId, nodes.items, state.layout);
+    if (!target.ok) {
+      // Refuse rather than re-anchor. Highlighting something here would say
+      // "this is the object you selected" about an object that may not exist in
+      // the version this projection is serving.
+      const message = {
+        stale_selection_version: `该选区固定在另一个分析版本（${String(target.selection_analysis).slice(0, 12)}），未在此视图中高亮。请在此重新选择，或打开那个版本。`,
+        entity_not_loaded: '选区指向的对象不在当前已加载的节点里，未高亮。',
+        entity_not_in_layout: `选区属于 ${target.path}，但该文件不在当前已加载的布局里，未高亮。`,
+        no_selection: '',
+      }[target.code] || `选区无法应用（${target.code}），未高亮。`;
+      if (note) note.textContent = message;
+      return;
+    }
+    if (note) note.textContent = `共享选区来自 2D：${target.name} · ${target.path}`;
+    const column = state.layout.columns.find(entry => entry.path === target.path);
+    await selectColumn(column);
+    cityPublishSelection(target.entity_id);
   }
 
   async function selectColumn(column) {
@@ -996,6 +1058,7 @@ async function city3dStart(canvas) {
       const report = await state.api('report');
       const nodes = await cityLoadPages(state.api, 'nodes', { kind: 'all' }, 8);
       const edges = await cityLoadPages(state.api, 'edges', { kind: 'call_candidate' }, 4);
+      state.analysisId = report.id;
       state.layout = buildCityLayout(nodes.items, edges.items);
       state.camera = cityDefaultCamera(state.layout);
       state.mode = 'function';
@@ -1004,6 +1067,7 @@ async function city3dStart(canvas) {
       const bounded = nodes.complete && edges.complete ? '' : '（分页达到上限，视图基于已加载的部分事实）';
       cityText('city-coverage', cityCoverageLine(state.layout.stats) + bounded);
       cityText('city-status', '已连接 · 固定版本 · 本地只读查询');
+      await cityApplySelection(state.pendingSelection, nodes);
       if (field) field.value = '';
     } catch (error) {
       cityText('city-status', `${error.message} · 无法读取分析`);
@@ -1014,13 +1078,42 @@ async function city3dStart(canvas) {
   const tokenField = typeof document === 'undefined' ? null : document.getElementById('city-token');
   if (tokenField) tokenField.addEventListener('keydown', (event) => { if (event.key === 'Enter') connect(); });
 
+  // The semantic surface for an external agent. Read-only plus highlight: the
+  // city cannot write anything, and it must not pretend to.
+  if (typeof globalThis !== 'undefined') {
+    globalThis.atlasBridge = {
+      version: 'atlas.agent-bridge.v1',
+      bounded_actions: ['getSelection', 'highlight', 'openProjection'],
+      getSelection() { return state.selection ? { ...state.selection } : null; },
+      async highlight(entityId) {
+        if (!state.layout) return { ok: false, error: 'no_layout' };
+        const column = state.layout.columns.find(c => c.path === entityId || c.path === String(entityId).replace(/^file:/, ''));
+        if (!column) return { ok: false, error: 'entity_not_in_layout' };
+        await selectColumn(column);
+        cityPublishSelection(entityId);
+        return { ok: true, path: column.path };
+      },
+      openProjection(view) {
+        const target = view === '2d' ? '/' : '/city3d';
+        if (typeof location !== 'undefined') location.href = target;
+        return target;
+      },
+    };
+  }
+
   requestAnimationFrame(frame);
-  // A fragment never travels in an HTTP request; remove it before navigating.
-  if (typeof location !== 'undefined' && location.hash.startsWith('#token=')) {
-    const token = new URLSearchParams(location.hash.slice(1)).get('token');
-    history.replaceState(null, '', location.pathname);
-    if (tokenField) tokenField.value = token || '';
-    connect();
+  // A fragment never travels in an HTTP request. It carries the token and,
+  // optionally, the selection the 2D workbench was looking at.
+  if (typeof location !== 'undefined' && location.hash) {
+    const fragment = Object.fromEntries(new URLSearchParams(location.hash.slice(1)));
+    if (fragment.selection || fragment.analysis) {
+      state.pendingSelection = { entity_id: fragment.selection || '', analysis: fragment.analysis || '' };
+    }
+    if (fragment.token) {
+      history.replaceState(null, '', location.pathname);
+      if (tokenField) tokenField.value = fragment.token;
+      connect();
+    }
   }
 }
 
