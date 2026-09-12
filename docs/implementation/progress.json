@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-unlock-age-guard",
+    "window": "2026-09-12/handoff-consolidation",
     "status": "DELIVERED",
-    "note": "patch unlock 默认只清理足够老的锁（--stale-after 默认 300s）；年轻或时间未知的锁必须 --force 才能清，避免把仍在写入的锁清掉。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-unlock-age-guard",
-    "verification": "evidence/development/2026-09-12-w09-unlock-age-guard/verification.json"
+    "note": "交接状态固化：docs/HANDOFF.md 增加当前实际状态（已交付能力表、下一轮起点排序、已知真实限制、复验入口），与 evidence/ 窗口和 Git 提交一一对应。",
+    "evidence_dir": "evidence/development/2026-09-12-handoff-consolidation",
+    "verification": "evidence/development/2026-09-12-handoff-consolidation/verification.json"
   },
   "windows": [
     {
@@ -418,10 +418,19 @@
       ],
       "note": "清锁加年龄门：patch unlock --stale-after（默认 300s）只清理达到该年龄的锁，年轻或时间未知的锁以 lock_not_stale:<path>:holder=...:age_ms=...:use --force 拒绝；--force 是唯一越过方式，并且仍然报出（可能为 unknown 的）年龄而不猜。用例：新鲜锁被拒且 apply 仍被挡 → --force 清除 → 10 分钟前的锁无需 --force 清除并报出持有者 → 无锁时报 no_apply_lock → 提案随后可 apply。",
       "report": "evidence/development/2026-09-12-w09-unlock-age-guard/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/handoff-consolidation",
+      "status": "DELIVERED",
+      "work_items": [
+        "handoff-state"
+      ],
+      "note": "把当前状态写进 docs/HANDOFF.md：本会话交付的 8 组能力与对应门禁窗口、按价值排序的下一轮起点（2D 层级 / 大仓库资格 / 合并备份 / 采样 / Modus 宿主侧阻塞）、已知限制清单、复验入口。这一轮是**状态固化**，不是能力切片，不声称新增能力。",
+      "report": "evidence/development/2026-09-12-handoff-consolidation/REPORT.md"
     }
   ],
   "next_work_item": "2D 画布的正式层级与空间索引，或大仓库/monorepo 的规模资格",
-  "next_action": "本轮交付清锁的年龄门（W09）。剩余按价值：(1) 2D 画布的正式层级与空间索引；(2) 大仓库/monorepo 的规模资格；(3) 合并与逐文件备份；(4) 行级/调用级采样；(5) Modus 宿主侧 E2E（环境性阻塞）。",
+  "next_action": "本会话上下文预算已耗尽；下一轮（建议新会话）起点按价值：2D 画布正式层级与空间索引 → 大仓库/monorepo 资格 → 合并与逐文件备份 → 行级采样 → Modus 宿主侧（环境性阻塞）。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",

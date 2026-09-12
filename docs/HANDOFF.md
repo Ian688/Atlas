@@ -60,3 +60,45 @@ AI Coding 第一条完整链应做到：选函数标注新增约束 → 导出�
 公开 schema/golden/兼容性；依赖许可/分发；Windows/Linux 与 Node24 实际资格；超深 AST 的 worker 栈预算；更强路径竞争防护；查询响应的细化预算与取消；断电耐久、GC、存储迁移；更多语言/框架；源码隐私/披露规则；完整真实大仓库基准；远程服务认证；持久工作台状态；Modus adapter。生产诊断仍是候选拓展，不能默认接入生产数据库。
 
 这些是接力任务，不是永久放弃。允许替换框架和目录，要求保留身份、授权、本地数据、明确未知、终止和真实验收。不要为了沿用旧代码而保留错误，也不要为展示进度而把未实现功能画成可用按钮。
+
+## 交接状态（2026-09-12，第 16 轮结束时）
+
+本节是**当前实际状态**，不是目标描述。全部数字都有 `evidence/development/` 下的窗口目录（`REPORT.md` + `verification.json` + 各检查日志）与 Git 提交对应。
+
+### 已完成并有证据的能力（本会话交付）
+
+| 主题 | 交付 | 门禁窗口 |
+|---|---|---|
+| W08 嵌套闭包 | `--via` 一层：包含函数真实产生实例 + 源码同一性核对 | `2026-09-12-w08-closure-via` |
+| W08 多层闭包 | `--via-chain`：逐环调用、逐环核对、失败环节记录 `failed_stage` | `2026-09-12-w08-via-chain` |
+| W08 副本范围 | `--materialise snapshot\|dependencies`：静态 import 闭包 + package.json；真实项目 2277→7 文件 | `2026-09-12-w08-materialise-slice` |
+| W09 3D 层级 | `project→district→file` 形式层级 + LOD，聚合守恒可失败可显示 | `2026-09-12-w09-city-lod` |
+| W09 补丁形式 | 修改/新建（`--- /dev/null`）/删除（`+++ /dev/null`），重命名具名拒绝 | `2026-09-12-w09-patch-forms` |
+| W09 一键撤销 | `serve --allow-writes <DIR>` 才开放 HTTP 写；单目录 + 路径回显 | `2026-09-12-w09-http-writes` |
+| W09 写入锁 | `.atlas-apply.lock`（持有者 + 取锁时刻），`patch unlock` + 年龄门 | `2026-09-12-w09-apply-lock`、`-patch-unlock`、`-unlock-age-guard`、`-lock-timestamp` |
+| W07/W06 并发 | 写锁等待可取消 + 具名超时；3 并发同 id（真实 rxjs）；`job work --parallel 1..=4` 每槽位独立租约 | `2026-09-12-ge3-concurrency`、`2026-09-12-w06-bounded-parallel-jobs` |
+
+门禁状态：`python3 scripts/verify.py` = **22 项检查 + 1 项受控负对照 + 指纹配对**，最新为全绿（见 `evidence/development/2026-09-12-final-r15/verification.json`）。
+
+### 下一轮起点（按价值排序）
+
+1. **2D 画布的正式层级与空间索引**（W09）：3D 已有 `project→district→file` 与 LOD；2D 仍按 12 文件 / 每文件 20 函数的可读性预算绘制，且没有层级概念。可从 `web/city3d.js` 的 `buildCityHierarchy`/`cityLevelView` 借鉴同一套事实计数与守恒检查，让两个投影共享同一层级定义（当前是两份实现，存在漂移风险）。
+2. **大仓库 / monorepo 规模资格**（W07 GE-2/GE-3）：目前只有 rxjs@7.8.1（1255 源文件）的单包测量；需要另一个更大或 monorepo 形状的真实项目，记录冷/热/增量与并发数字。`scripts/bench_real_project.py` 与 `scripts/bench_concurrency.py` 可直接复用（`--package/--sha256/--project/--store`）。
+3. **合并与逐文件备份**（W09）：撤销来源是内容寻址的钉住 blob；检出被改动时 apply/revert 是拒绝而不是合并。
+4. **行级 / 调用级采样**（W09 城市运行层）：现在只有入口调用观测，因此城市里的运行信息是"哪些入口被跑过"，不是运行路径；这条需要真正的插桩设计。
+5. **Modus 宿主侧 E2E 与旧入口切换**（W10）：**环境性硬阻塞**——Modus 检出不在本工作区，无法构建或测试宿主侧；前置条件与回滚已写在 `docs/HOST_API.md`。
+
+### 已知的真实限制（不得读成已实现）
+
+- 并发资格只到单机单语言 N=3~4；无跨机器、多语言、Windows 资格；`--parallel` 上限 4 是策略不是测量。
+- apply 无合并、无逐文件磁盘备份；锁是单机文件锁、不约束人工编辑、无租约/心跳。
+- 依赖切片是**静态**闭包：计算型动态 `import()` 与运行时数据文件不在副本里（记录里 `known_risk` 事先列出）。
+- 单文件超大模块（实测 14000 函数 / 1.15 MB）在 1 GiB heap 下 10 分钟未完成：按文件粒度的派生代价在该形状下不可接受。
+- `incremental_runs` / patch 派生的 analysis 只增不删，无回收策略。
+- W00–W10 的 `implementation` 多为 PARTIAL：自动化检查 PASS，但**资格（qualification）一律 NOT_QUALIFIED，且独立评审未做**。
+
+### 复验入口（一条命令）
+
+```bash
+cargo build && python3 scripts/verify.py --label <label> --out evidence/development/<date>-<label> --keep-going
+```
