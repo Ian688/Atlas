@@ -110,16 +110,24 @@ worker stdin ≤160 MiB、stdout ≤32 MiB、stderr ≤64 KiB，V8 old-space 为
 
 ### 7.1 执行画像与受控运行（W08 首片）
 
-**执行画像**是从已发布的 flow 事实派生的静态充分性分类，不是执行结果。分类顺序是 `unsupported` → `needs_entry_driver` → `needs_context` → `pure_callable`，每条降级理由都带 `code/detail/evidence`，`evidence` 指回它读的那个字段（`effects.unknown_call`、`block_states[].bindings[].value.origins` 等）。关键保守点：`status != complete_within_profile` 一律降级——partial 分析的 frontier 恰恰是事实缺失的块，"没有未知副作用"没有被证明。`needs_context` 在本切片不可运行，因为不合成上下文。
+**执行画像**是从已发布的 flow 事实派生的静态充分性分类，不是执行结果。分类顺序是 `unsupported` → `needs_entry_driver` → `needs_context` → `pure_callable`，每条降级理由都带 `code/detail/evidence`，`evidence` 指回它读的那个字段（`effects.unknown_call`、`block_states[].bindings[].value.origins` 等）。关键保守点：`status != complete_within_profile` 一律降级——partial 分析的 frontier 恰恰是事实缺失的块，"没有未知副作用"没有被证明。`needs_context` 不是"永远不可运行"：可声明的输入（`this`、具名全局）由调用者给出后即可运行，捕获绑定则只能经 `--via` 由包含函数真实产生实例。
 
 **"外部"分三类，而且必须分开**：函数自己的运行时 **import** 是模块状态（模块整体被复制，导入时就在，不需要声明）；**运行时内建与宿主全局**（`Error`/`Math`/`JSON`/`console`/`process`…）由运行时提供，Atlas 不要求声明——把 `Error` 当成"要声明的输入"会诱导调用者用 JSON 覆盖真构造器，实测就是这个后果（`--global Error=null` 之后 `new Error(...)` 抛 TypeError）；只有**真正的自由标识符**会被要求声明，并在拒绝里具名。这条区分要在 worker 侧就能表达：`FlowFunction.imports` 列出运行时可导入名（`import type` 不算，它被擦除），engine 的 `ReadExternal` 只有在该名字不在 imports 里时才算全局访问。版本用单一常量 `WORKER_PRODUCER` 对齐：`imports` 缺席的旧 worker 无法表达"这是导入还是全局"，它的输出会被**具名拒绝**（`worker_producer_not_supported`）而不是被读成相反的结论。`FLOW_SCHEMA` 保持 `atlas.flow-ir.v1`：新增字段带 `serde(default)`，形状兼容；改变的是**语义**，语义由 producer 声明。
 
-画像把要求分成两类，混在一起会让"缺什么"变得不可行动：**可声明的输入**（`this` 与具名全局；调用者用 `--this` / `--global NAME=<json>` 给出，记录里写明声明了什么）与**必须承认的未知**（未建模构造、未完成事实、堆近似、未知调用；用 `unknown_calls` 这一条明确承认）。没有任何名字可指的全局读取不会被要求"声明某个值"——那不可行动；它落在承认项里。读取**模块级状态**不需要声明：模块整体被复制，导入时它就在。嵌套函数的外层绑定无法用数据声明，因此那类函数直接不可运行。
+画像把要求分成两类，混在一起会让"缺什么"变得不可行动：**可声明的输入**（`this` 与具名全局；调用者用 `--this` / `--global NAME=<json>` 给出，记录里写明声明了什么）与**必须承认的未知**（未建模构造、未完成事实、堆近似、未知调用；用 `unknown_calls` 这一条明确承认）。没有任何名字可指的全局读取不会被要求"声明某个值"——那不可行动；它落在承认项里。读取**模块级状态**不需要声明：模块整体被复制，导入时它就在。
+
+**嵌套函数：闭包实例只能被真实产生，不能被声明（`--via`）**。嵌套函数捕获的外层绑定不是可声明的值——它只在包含它的那个函数运行期间存在。Atlas 因此既不构造作用域、也不接受任何"函数值"输入，而是提供一条唯一的入口：`--via <enclosing-symbol>`。画像给出 `enclosing_symbol`（以及给人读的 `enclosing_name`）与 `captures`（捕获绑定的名字，来自 `Capture(<binding id>)` 与已发布的 `binding_names`）。
+
+- `--via` 必须**恰好等于**目标的真实包含符号；给别的符号一律拒绝（`via_not_the_enclosing_symbol`），因为"某个大概会返回相似函数的符号"不是同一个作用域。
+- 运行分两阶段，记录里按顺序各有一条 `call` 事件（`stage: enclosing` / `stage: target`）。阶段 1 调包含函数（它自己的 `--via-args` / `--via-this`）；阶段 2 只调用返回值的 `Function.toString()` 与目标符号钉住字节**源码同一性**匹配的那个函数，匹配不上就是 `closure_identity_mismatch`（同时保留观测到的源码）。返回的不是函数则是 `closure_not_returned`：包含函数确实跑了，它的返回值原样保留，但目标没有被调用。两者都是**观测**，不是失败的调用。
+- 只支持一层。包含函数自身也是嵌套的时静态拒绝（`closure_depth_not_supported`，并具名下一层），而不是在命名空间里找不到才失败。
+- 包含函数的字节同样从内容寻址 blob 读取并重新哈希校验（`via.source_binding`），因此两阶段的源码绑定都是构造性的。
+- 拒绝时不会启动进程：`context_required` 的 detail 会点出捕获的绑定名与应当使用的 `--via` 符号。
 
 **受控运行**只在一个条件下发生：静态画像允许，且 spec 已显式授予/声明所需项。执行路径：
 
 1. 从**不可变快照**的内容寻址 blob 逐个读取并重新哈希校验，物化到一个 `0700` 的隔离副本（临时目录先 canonicalize，否则 Node 的 loader 会在 `/var → /private/var` 上触发一次未被授权的读而死在 loader 里而不是被测代码里）。
-2. 生成 harness，用**源码同一性**而不是名字来选定目标：模块命名空间里每个可调用值的 `Function.toString()` 归一化后必须与快照中该符号的字节切片一致，唯一命中才调用。因此改名、遮蔽导出、同名不同函数都不会被静默执行；命中不了就是 `target_not_exported`，不猜测。
+2. 生成 harness，用**源码同一性**而不是名字来选定目标：模块命名空间里每个可调用值的 `Function.toString()` 归一化后必须与快照中该符号的字节切片一致，唯一命中才调用。因此改名、遮蔽导出、同名不同函数都不会被静默执行；命中不了就是 `target_not_exported`，不猜测。`--via` 运行的命名空间查找针对的是**包含函数**（那才是命名空间里可能存在的那个），闭包本身从不按名字查找；解析不到时结论是 `enclosing_not_exported`，与应用到目标上的 `target_not_exported` 分开。
 3. 用**目标 Node**（由调用者指定，不是 Atlas 自己的运行时）以 `--permission` 启动，只授予隔离副本的读权限，以及 spec 里显式声明的项。权限模型不是"接受了 flag"就算数：每次进程内首次使用都会先跑一个能力探针，要求一次真实的写被拒绝（`ERR_ACCESS_DENIED`），否则拒绝执行。
 4. 子进程自成进程组，超时或取消按组 `SIGKILL` 并回收；stdin/stdout/stderr 都有预算；harness 报告带每轮唯一标记并最后写入、显式退出，因此目标自己写到 stdout 的内容不会被误当作报告。
 

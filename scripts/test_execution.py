@@ -17,12 +17,14 @@ Standard-library only.
 import json
 import os
 from pathlib import Path
+import selectors
 import shutil
 import signal
 import subprocess
 import tempfile
 import time
 import unittest
+import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 BIN = ROOT / "target/debug/atlas"
@@ -105,6 +107,39 @@ export function useModuleConst(x) { return x + BASE; }
 # declared with `--global` rather than granted.
 GRANTS = "unknown_calls"
 
+# Nested functions. `increment` captures `value`, which exists only while
+# `makeCounter` runs; the other modules cover the two ways a `via` run can be
+# honest about not getting the target: the enclosing call returned something
+# else entirely, or it returned a different function whose source does not match.
+CLOSURES = """export function makeCounter(start) {
+  let value = start;
+  return function increment(step) {
+    value = value + step;
+    return value;
+  };
+}
+
+export function factory(pick) {
+  const value = 1;
+  function alpha(step) { return value + step; }
+  function beta(step) { return value * step; }
+  return pick ? alpha : beta;
+}
+
+export function maybe(flag) {
+  const base = 7;
+  if (flag) { return function whenTrue(x) { return base + x; }; }
+  return 2;
+}
+
+export function outerFactory(start) {
+  const base = start;
+  return function middle() {
+    return function inner(x) { return base + x; };
+  };
+}
+"""
+
 
 def decode(value):
     """Mirror of the harness' tagged encoding, for readable assertions."""
@@ -132,6 +167,10 @@ class Execution(unittest.TestCase):
         (self.project / "package.json").write_text(PACKAGE, encoding="utf-8")
         self.basic = self.project / "src" / "basic.js"
         self.basic.write_text(BASIC, encoding="utf-8")
+        # A second module for the closure cases: a nested function is only
+        # reachable through the function that actually encloses it.
+        self.closures = self.project / "src" / "closures.js"
+        self.closures.write_text(CLOSURES, encoding="utf-8")
         self.store = self.base / "store"
         self.analysis = self.index()
         self.escape = Path("/tmp/atlas-exec-escape.txt")
@@ -165,6 +204,23 @@ class Execution(unittest.TestCase):
 
     def profile(self, entity):
         return self.cli("profile", self.analysis, entity)
+
+    def closure(self, entity, args=None, via=None, via_args=None, extra=()):
+        """Run a nested function through its enclosing function.
+
+        `via` is a symbol reference. Nothing here fabricates a scope: the
+        enclosing function is a real published symbol, and the flags say exactly
+        which one and with what arguments.
+        """
+        command = [
+            "exec", self.analysis, entity,
+            "--args", json.dumps(args if args is not None else []),
+            "--allow-effects", GRANTS,
+        ]
+        if via is not None:
+            command += ["--via", via, "--via-args", json.dumps(via_args if via_args is not None else [])]
+        command += list(extra)
+        return self.cli(*command)
 
     def declared_context(self, entity):
         """The flags a caller must supply for this function, from its profile.
@@ -575,6 +631,125 @@ class Execution(unittest.TestCase):
         self.assertEqual(record["verdict"], "returned", record.get("thrown"))
         self.assertEqual(decode(record["value"]), 2)
 
+    # -- nested functions -------------------------------------------------
+    def test_a_nested_closure_cannot_be_run_directly_and_says_how_it_can(self):
+        profile = self.profile("src/closures.js:increment")
+        self.assertEqual(profile["classification"], "needs_context")
+        self.assertFalse(profile["runnable"])
+        self.assertEqual(profile["unsatisfiable_context"], ["captures"])
+        self.assertEqual(profile["captures"], ["value"],
+                         "the captured binding must be named, not just counted")
+        enclosing = profile["enclosing_symbol"]
+        self.assertTrue(enclosing and enclosing.startswith("symbol:src/closures.js:"), enclosing)
+
+        refused = self.exec("src/closures.js:increment", [1], grants=GRANTS)
+        self.assertEqual(refused["verdict"], "refused")
+        self.assertEqual(refused["refusal"]["code"], "context_required")
+        self.assertIn("value", refused["refusal"]["detail"])
+        self.assertIn(enclosing, refused["refusal"]["detail"],
+                      "the refusal must name the function that can produce the instance")
+        self.assertFalse(refused["isolation"]["started"],
+                         "no process may start for a context Atlas cannot declare")
+
+    def test_a_closure_runs_through_the_function_that_encloses_it(self):
+        profile = self.profile("src/closures.js:increment")
+        record = self.closure("src/closures.js:increment", [5],
+                              via=profile["enclosing_symbol"], via_args=[100])
+        self.assertEqual(record["verdict"], "returned", record.get("thrown"))
+        self.assertEqual(decode(record["value"]), 105,
+                         "the closure must see the scope the enclosing call really created")
+
+        stage = record["via"]["stage_report"]
+        self.assertEqual(stage["stage"], "enclosing")
+        self.assertEqual(stage["export_name"], "makeCounter")
+        self.assertEqual(stage["closure"]["name"], "increment")
+        self.assertEqual(stage["closure"]["matched_by"], "source_identity",
+                         "the returned function must be accepted by source, not by name")
+        # Both stages are in the record, in order, and each says which call it
+        # was: a reader must never have to infer where the instance came from.
+        stages = [event.get("stage") for event in record["trace"]["events"] if event["kind"] == "call"]
+        self.assertEqual(stages, ["enclosing", "target"])
+        self.assertTrue(record["via"]["source_binding"]["bytes_verified"])
+        self.assertEqual(record["via"]["source_binding"]["path"], record["source_binding"]["path"])
+        self.assertNotEqual(record["via"]["source_binding"]["start"],
+                            record["source_binding"]["start"],
+                            "the enclosing function is a different slice of the same file")
+
+    def test_a_via_symbol_that_is_not_the_enclosing_function_is_refused(self):
+        foreign = self.profile("factory")["symbol"]
+        refused = self.exec("src/closures.js:increment", [1], grants=GRANTS,
+                            extra=["--via", foreign])
+        self.assertEqual(refused["verdict"], "refused")
+        self.assertEqual(refused["refusal"]["code"], "via_not_the_enclosing_symbol")
+        self.assertFalse(refused["isolation"]["started"])
+
+    def test_an_enclosing_call_that_returns_a_different_function_is_not_a_target_call(self):
+        # `factory(true)` returns `alpha`; the pinned target is `beta`. Both are
+        # real functions with similar shapes, so accepting the value by name or
+        # position would silently run the wrong one.
+        beta = "src/closures.js:beta"
+        profile = self.profile(beta)
+        mismatch = self.closure(beta, [3], via=profile["enclosing_symbol"], via_args=[True])
+        self.assertEqual(mismatch["verdict"], "closure_identity_mismatch")
+        self.assertIsNone(mismatch["value"], "no target call happened, so there is no target value")
+        stage = mismatch["via"]["stage_report"]
+        self.assertEqual(stage["value"]["kind"], "function")
+        self.assertIsNone(stage["closure"]["matched_by"])
+        self.assertIn("alpha", stage["closure"]["observed_source"],
+                      "the observed source must be shown so the mismatch is checkable")
+        # The same run with the pick that does return the target works, so the
+        # refusal is about identity and not about the closure being unrunnable.
+        matching = self.closure(beta, [3], via=profile["enclosing_symbol"], via_args=[False])
+        self.assertEqual(matching["verdict"], "returned", matching.get("thrown"))
+        self.assertEqual(decode(matching["value"]), 3)
+
+    def test_an_enclosing_call_that_returns_a_non_function_is_recorded_as_such(self):
+        target = "src/closures.js:whenTrue"
+        via = self.profile(target)["enclosing_symbol"]
+        not_returned = self.closure(target, [1], via=via, via_args=[False])
+        self.assertEqual(not_returned["verdict"], "closure_not_returned")
+        self.assertEqual(decode(not_returned["via"]["stage_report"]["value"]), 2,
+                         "what the enclosing call really returned must be kept")
+        self.assertTrue(not_returned["isolation"]["started"],
+                        "the enclosing call did run, so a process did exist")
+        ran = self.closure(target, [7], via=via, via_args=[True])
+        self.assertEqual(ran["verdict"], "returned", ran.get("thrown"))
+        self.assertEqual(decode(ran["value"]), 14)
+
+    def test_a_chain_deeper_than_one_level_is_refused_by_name(self):
+        profile = self.profile("src/closures.js:inner")
+        refused = self.closure("src/closures.js:inner", [3], via="src/closures.js:middle")
+        self.assertEqual(refused["verdict"], "refused")
+        self.assertEqual(refused["refusal"]["code"], "closure_depth_not_supported")
+        self.assertIn("middle", refused["refusal"]["detail"])
+        self.assertIn("outerFactory", refused["refusal"]["detail"],
+                      "the refusal must name the function that could produce the missing level")
+        self.assertNotEqual(profile["enclosing_symbol"], None)
+        # One level is real: `outerFactory()` returns `middle`, and the run says
+        # so instead of pretending the returned function was called.
+        middle = self.closure("src/closures.js:middle", [],
+                              via=self.profile("src/closures.js:middle")["enclosing_symbol"],
+                              via_args=[4])
+        self.assertEqual(middle["verdict"], "returned", middle.get("thrown"))
+        self.assertEqual(middle["value"], {"kind": "function", "name": "inner"},
+                         "the value is the function `middle` returned, reported as a value")
+
+    def test_the_plan_for_a_via_run_names_both_stages(self):
+        plan = self.cli("exec", self.analysis, "src/closures.js:increment",
+                        "--args", "[1]", "--plan", "--allow-effects", GRANTS,
+                        "--via", self.profile("src/closures.js:increment")["enclosing_symbol"])
+        self.assertTrue(plan["decision"]["allowed"])
+        self.assertTrue(plan["via"]["decision"]["allowed"])
+        self.assertEqual(plan["via"]["name"], "makeCounter")
+        self.assertTrue(plan["will_start_process"])
+        # A wrong enclosing symbol is refused at plan time, before any process.
+        bad = self.cli("exec", self.analysis, "src/closures.js:increment",
+                       "--args", "[1]", "--plan", "--allow-effects", GRANTS,
+                       "--via", self.profile("factory")["symbol"])
+        self.assertFalse(bad["decision"]["allowed"])
+        self.assertEqual(bad["decision"]["refusal"]["code"], "via_not_the_enclosing_symbol")
+        self.assertFalse(bad["will_start_process"])
+
     # -- scenarios --------------------------------------------------------
     def scenario(self, cases):
         path = self.base / "scenario.json"
@@ -655,6 +830,91 @@ class Execution(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("invalid_scenario_schema", result.stderr)
+
+
+class HttpClosure(unittest.TestCase):
+    """A closure run over the local HTTP boundary.
+
+    The page can offer "run this through the function that encloses it", so the
+    server has to resolve that symbol in this analysis and carry the two stages
+    through the same decision the CLI uses. Only the closure module is indexed
+    here: a run that needs nothing else should not depend on anything else.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="atlas-exec-http-")
+        self.addCleanup(self.tmp.cleanup)
+        self.base = Path(self.tmp.name)
+        self.project = self.base / "project"
+        (self.project / "src").mkdir(parents=True)
+        (self.project / "package.json").write_text(PACKAGE, encoding="utf-8")
+        (self.project / "src" / "closures.js").write_text(CLOSURES, encoding="utf-8")
+        self.store = self.base / "store"
+        indexed = subprocess.run(
+            [str(BIN), "--store", str(self.store), "index", str(self.project)],
+            cwd=ROOT, capture_output=True, text=True, timeout=300,
+        )
+        self.assertEqual(indexed.returncode, 0, indexed.stderr)
+        self.analysis = json.loads(indexed.stdout)["id"]
+        self.proc = subprocess.Popen(
+            [str(BIN), "--store", str(self.store), "serve", self.analysis],
+            cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        self.addCleanup(self.stop)
+        with selectors.DefaultSelector() as ready:
+            ready.register(self.proc.stdout, selectors.EVENT_READ)
+            self.assertTrue(ready.select(15), "HTTP server readiness deadline")
+        boot = json.loads(self.proc.stdout.readline())
+        session = json.loads(Path(boot["session_file"]).read_text())
+        self.base_url = session["url"]
+        self.auth = {
+            "Authorization": "Bearer " + session["token"],
+            "Content-Type": "application/json",
+        }
+        self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+    def stop(self):
+        if self.proc.poll() is None:
+            self.proc.kill()
+            self.proc.wait(timeout=10)
+
+    def post(self, path, body, headers=None):
+        return self.opener.open(urllib.request.Request(
+            self.base_url + path, headers=headers or self.auth,
+            data=json.dumps(body).encode(), method="POST"), timeout=60)
+
+    def test_a_closure_runs_over_http_through_its_enclosing_function(self):
+        record = json.load(self.post("api/exec", {
+            "symbol": "src/closures.js:increment",
+            "args": [5],
+            "allow_effects": ["unknown_calls"],
+            "via": {"symbol": "makeCounter", "args": [100]},
+        }))
+        self.assertEqual(record["verdict"], "returned", record.get("thrown"))
+        self.assertEqual(record["value"], {"kind": "number", "value": 105})
+        self.assertEqual(record["via"]["stage_report"]["closure"]["matched_by"], "source_identity")
+        self.assertTrue(record["via"]["source_binding"]["bytes_verified"])
+
+    def test_an_http_via_that_is_not_the_enclosing_function_is_refused(self):
+        record = json.load(self.post("api/exec", {
+            "symbol": "src/closures.js:increment",
+            "args": [5],
+            "allow_effects": ["unknown_calls"],
+            "via": {"symbol": "factory", "args": [True]},
+        }))
+        self.assertEqual(record["verdict"], "refused")
+        self.assertEqual(record["refusal"]["code"], "via_not_the_enclosing_symbol")
+        self.assertFalse(record["isolation"]["started"])
+
+    def test_an_http_via_run_without_the_acknowledgement_is_refused_not_run(self):
+        record = json.load(self.post("api/exec", {
+            "symbol": "src/closures.js:increment",
+            "args": [5],
+            "via": {"symbol": "makeCounter", "args": [100]},
+        }))
+        self.assertEqual(record["verdict"], "refused")
+        self.assertEqual(record["refusal"]["code"], "missing_requirements")
+        self.assertFalse(record["isolation"]["started"])
 
 
 if __name__ == "__main__":

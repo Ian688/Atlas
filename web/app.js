@@ -539,15 +539,37 @@ function renderExecution(profile,record){
   if(profile.required_grants.length)body.append(flowNode('flow-line',`需要显式授权：${profile.required_grants.join(', ')}`));
   const context=profile.required_context||[];
   if(context.length)body.append(flowNode('flow-unknown',`需要调用者声明的输入：${context.join(', ')}${(profile.required_globals||[]).length?`（全局：${profile.required_globals.join(', ')}）`:''}。Atlas 不发明这些值，页面也没有为它们提供输入框；请在 CLI 上用 --this / --global 声明。`));
-  if((profile.unsatisfiable_context||[]).length)body.append(flowNode('flow-unknown',`Atlas 无法用数据声明：${profile.unsatisfiable_context.join(', ')}，因此该函数不可运行。`));
+  if((profile.unsatisfiable_context||[]).length)body.append(flowNode('flow-unknown',`Atlas 无法用数据声明：${profile.unsatisfiable_context.join(', ')}，因此该函数不可直接运行。`));
+  // A capture is not a value anybody can type in. It exists only while the
+  // enclosing function runs, so the only honest way to obtain one is to call
+  // that function and take the function it returns. The page offers exactly
+  // that, names the exported enclosing function, and never fabricates a scope.
+  const enclosing=profile.enclosing_symbol||null;
+  const viaRow=$('exec-via-row');
+  if(viaRow){
+    viaRow.hidden=!enclosing;
+    if(enclosing){
+      $('exec-via-label').textContent=`包含函数 ${enclosing}`;
+      body.append(flowNode('flow-line',`包含函数 ${enclosing}：闭包实例只能由它真实产生，页面不凭空构造作用域。`));
+      const viaEnable=$('exec-via-enable');
+      // Direct execution is impossible precisely because of the captures, so
+      // the through-enclosing path is pre-selected whenever it is the only one.
+      const captures=(profile.unsatisfiable_context||[]).includes('captures');
+      viaEnable.checked=captures;
+      if(captures)body.append(flowNode('flow-line',`捕获的绑定：${(profile.captures||[]).join(', ')||'（未命名）'}。勾选「经由包含函数」后，Atlas 会先调用 ${enclosing}，并只接受它返回、且源码与目标钉住字节一致的那个函数实例。`));
+    }
+  }
   body.append(flowNode('flow-line',`参数：${profile.params.map(p=>`${p.index}:${p.name}`).join(', ')||'无'}`));
   for(const note of profile.notes.slice(0,4))body.append(flowNode('flow-line',note));
   if(record)renderExecRecord(body,record);
   // The run button is only enabled where the static profile allows a run and
   // the arity is known, so the page cannot promise what the engine will refuse.
+  // A nested function is runnable *through its enclosing function* and nowhere
+  // else, so the button follows the checkbox, not the classification alone.
+  const viaWanted=Boolean(enclosing&&$('exec-via-enable')?.checked);
   const known=profile.arity!==null;
-  $('exec-run').disabled=!(runnable&&known);
-  $('exec-run').title=runnable?(known?'在隔离副本中以目标 Node 的权限模型执行一次固定调用':'参数个数未知，页面不猜测实参'):'静态画像拒绝执行';
+  $('exec-run').disabled=!(((runnable)||viaWanted)&&known);
+  $('exec-run').title=runnable?(known?'在隔离副本中以目标 Node 的权限模型执行一次固定调用':'参数个数未知，页面不猜测实参'):(viaWanted?`经由 ${enclosing} 取得闭包实例后执行`:'静态画像拒绝执行');
 }
 function renderExecRecord(body,record){
   const verdict=record.verdict;
@@ -555,9 +577,24 @@ function renderExecRecord(body,record){
   if(verdict==='refused'){
     body.append(flowNode('flow-unknown',`拒绝执行：${record.refusal?.code} — ${record.refusal?.detail}`));
     body.append(flowNode('flow-line','没有进程被启动；这不是一次失败的执行。'));
+    // A `via` refusal names which stage refused: the enclosing call has its own
+    // profile and its own conclusion, and hiding it would leave the reader
+    // blaming the target for a refusal that belongs to the enclosing function.
+    const viaRefusal=record.via&&record.via.decision&&record.via.decision.allowed===false?record.via.decision.refusal:null;
+    if(viaRefusal)body.append(flowNode('flow-unknown',`包含函数 ${record.via.name}（${record.via.symbol}）自己的结论：${viaRefusal.code} — ${viaRefusal.detail}`));
     return;
   }
   if(record.isolation&&record.isolation.mocks)body.append(flowNode('exec-note',`本次运行声明使用了 mock/fixture：${record.isolation.fixture_note||'未注明'}；结果不得当作真实环境观测。`));
+  // A `via` run has two stages and both are shown, because "the enclosing
+  // function returned something that is not this closure" is a real observation
+  // that must not be hidden behind a single target verdict.
+  if(record.via){
+    const stage=record.via.stage_report||{};
+    body.append(flowNode('flow-line',`阶段 1 包含函数 ${record.via.name}（${record.via.path}）· 匹配 ${stage.matched_by||'未匹配'} · 返回值 ${stage.value===null||stage.value===undefined?'无':JSON.stringify(decodeEncoded(stage.value))}`));
+    if(stage.thrown)body.append(flowNode('flow-unknown',`包含函数抛出 ${stage.thrown.name}: ${stage.thrown.message}`));
+    if(stage.closure)body.append(flowNode(stage.closure.matched_by?'flow-line':'flow-unknown',`阶段 2 闭包实例 ${stage.closure.name||'（匿名）'} · 源码同一性 ${stage.closure.matched_by||'不匹配'}${stage.closure.matched_by?'':` · 观测到 ${String(stage.closure.observed_source||'').slice(0,160)}`}`));
+    body.append(flowNode('flow-line',`包含函数绑定 blob ${String(record.via.source_binding?.blob||'').slice(0,12)}（读取时重新哈希校验）；目标绑定的仍是本次 analysis 的 snapshot。`));
+  }
   if(record.value!==null&&record.value!==undefined){
     const decoded=decodeEncoded(record.value);
     body.append(flowNode('flow-line',`返回值 ${typeof decoded==='string'?decoded:JSON.stringify(decoded)}`));
@@ -593,9 +630,21 @@ async function runControlled(){
   // The page can only forward the acknowledgement. A receiver or a global is an
   // input the caller states, and there is no field for it here on purpose.
   const allow_effects=state.execProfile.required_grants.filter(name=>name==='unknown_calls');
-  const request=state.request;$('exec-run').disabled=true;status('在隔离副本中执行…');
+  // A `via` run states the enclosing function and its arguments. The page never
+  // picks the enclosing function itself: it comes from the published profile,
+  // which is the analysis' own answer about where this closure is declared.
+  const enclosing=state.execProfile.enclosing_symbol||null;
+  const viaWanted=Boolean(enclosing&&$('exec-via-enable')?.checked);
+  let via=null;
+  if(viaWanted){
+    let viaArgs;
+    try{viaArgs=JSON.parse($('exec-via-args').value||'[]');}catch{status('包含函数的实参不是合法 JSON 数组');return;}
+    if(!Array.isArray(viaArgs)){status('包含函数的实参必须是 JSON 数组');return;}
+    via={symbol:enclosing,args:viaArgs};
+  }
+  const request=state.request;$('exec-run').disabled=true;status(via?'先调用包含函数取得闭包实例，再在隔离副本中执行…':'在隔离副本中执行…');
   try{
-    const record=await apiJson('exec',{symbol:selected.id,args,allow_effects});
+    const record=await apiJson('exec',{symbol:selected.id,args,allow_effects,via});
     if(request!==state.request)return;
     renderExecution(state.execProfile,record);
     status(`受控运行结束：${record.verdict}`);
@@ -603,7 +652,7 @@ async function runControlled(){
     if(request!==state.request)return;
     status(`受控运行未开始或失败：${e.message}`);
     renderExecution(state.execProfile,null);
-  }finally{if(request===state.request&&state.execProfile)$('exec-run').disabled=!state.execProfile.runnable;}
+  }finally{if(request===state.request&&state.execProfile)$('exec-run').disabled=!(((state.execProfile.runnable)||viaWanted)&&state.execProfile.arity!==null);}
 }
 async function select(node){
   const request=++state.request;state.selected=node;state.focus=null;state.execProfile=null;$('export').disabled=true;clearContext();
@@ -649,6 +698,9 @@ async function select(node){
 $('patch-propose').onclick=()=>proposePatch();
 $('annotation-add').onclick=()=>proposeAnnotation();
 $('exec-run').onclick=()=>runControlled();installBridge();$('connect-button').onclick=connect;$('token').onkeydown=e=>{if(e.key==='Enter')connect();};$('search').oninput=renderTree;
+// Toggling the enclosing-function path changes whether a run is possible at
+// all, so the button follows it immediately instead of after a re-selection.
+if($('exec-via-enable'))$('exec-via-enable').onchange=()=>{const profile=state.execProfile;if(!profile)return;const wanted=Boolean(profile.enclosing_symbol&&$('exec-via-enable').checked);$('exec-run').disabled=!((profile.runnable||wanted)&&profile.arity!==null);};
 $('more').onclick=()=>loadNodes().catch(e=>status(e.message));$('more-edges').onclick=()=>loadEdges().catch(e=>status(e.message));
 $('reset').onclick=resetDetail;
 $('export').onclick=async()=>{try{const selected=state.selected,request=state.request;if(!selected)return;const context=await api('context',{entity:selected.id},'POST');if(request!==state.request)return;clearContext();const json=JSON.stringify(context,null,2);state.exportUrl=URL.createObjectURL(new Blob([json],{type:'application/json'}));$('context-json').value=json;$('context-download').href=state.exportUrl;$('context-download').download=`atlas-context-${context.selection_id.slice(0,12)}.json`;$('context-panel').hidden=false;$('context-panel').open=true;status('选区上下文已在本地生成，可复制或下载；未发送给 LLM');}catch(e){status(e.message);}};

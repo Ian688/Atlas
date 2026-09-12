@@ -153,6 +153,18 @@ enum Action {
         /// the global object before the module is imported.
         #[arg(long = "global")]
         global: Vec<String>,
+        /// Run a nested function by first calling the function that encloses it
+        /// and taking the function it returns. The value must be the target's
+        /// exact enclosing symbol; a returned function is only accepted when its
+        /// source matches the target's pinned bytes.
+        #[arg(long)]
+        via: Option<String>,
+        /// Arguments for the enclosing (`--via`) call, as a JSON array.
+        #[arg(long = "via-args", default_value = "[]")]
+        via_args: String,
+        /// The receiver for the enclosing (`--via`) call, as JSON.
+        #[arg(long = "via-this")]
+        via_this: Option<String>,
         /// Declare that this run used mocks/fixtures, so its result can never
         /// be read as an observation of the real project environment.
         #[arg(long)]
@@ -1090,6 +1102,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             env,
             this_arg,
             global,
+            via,
+            via_args,
+            via_this,
             fixtures,
             fixture_note,
             history,
@@ -1136,6 +1151,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 fixtures,
                 fixture_note,
                 label: None,
+                via: match via {
+                    // Resolved like the target: `--via` names a real published
+                    // symbol, and `decide` then compares it against the
+                    // target's actual enclosing symbol.
+                    Some(reference) => Some(atlas_engine::exec::ViaSpec {
+                        symbol: runner::resolve_symbol(&store, &analysis, &reference)?,
+                        args: serde_json::from_str(&via_args)?,
+                        this_arg: match via_this {
+                            Some(text) => Some(serde_json::from_str(&text)?),
+                            None => None,
+                        },
+                    }),
+                    None => None,
+                },
             };
             if plan {
                 print(runner::plan(&store, &spec)?)?;

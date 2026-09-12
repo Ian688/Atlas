@@ -646,6 +646,18 @@ struct ExecRequest {
     fixture_note: Option<String>,
     #[serde(default)]
     plan: bool,
+    /// Run a nested function through its enclosing function. The symbol is
+    /// resolved inside this analysis; the enclosing call's receiver stays
+    /// unstated, exactly like the target's.
+    #[serde(default)]
+    via: Option<ViaRequest>,
+}
+
+#[derive(serde::Deserialize)]
+struct ViaRequest {
+    symbol: String,
+    #[serde(default)]
+    args: Vec<serde_json::Value>,
 }
 
 async fn exec(
@@ -682,6 +694,23 @@ async fn exec(
             .is_some_and(|names| names.iter().any(|name| name == "unknown_calls")),
     };
     let plan_only = request.plan;
+    let via = match request.via {
+        Some(via) => match crate::runner::resolve_symbol(&app.store, &app.analysis, &via.symbol) {
+            Ok(symbol) => Some(atlas_engine::exec::ViaSpec {
+                symbol,
+                args: via.args.into_iter().take(64).collect(),
+                this_arg: None,
+            }),
+            Err(error) => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    axum::Json(serde_json::json!({"error": error})),
+                )
+                    .into_response();
+            }
+        },
+        None => None,
+    };
     let spec = RunSpec {
         schema: atlas_engine::exec::RUN_SPEC_SCHEMA.into(),
         analysis_id: app.analysis.clone(),
@@ -700,6 +729,7 @@ async fn exec(
         fixtures: request.fixtures,
         fixture_note: request.fixture_note,
         label: Some("http".into()),
+        via,
     };
     let store = app.store.clone();
     let outcome = tokio::spawn(async move {

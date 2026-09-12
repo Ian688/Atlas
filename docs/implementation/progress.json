@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-patch-review",
+    "window": "2026-09-12/w08-closure-via",
     "status": "DELIVERED",
-    "note": "提案审阅面：页面可登记与读取提案，验证/应用保留在 CLI；HTTP 与 CLI 共用同一校验路径。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-patch-review",
-    "verification": "evidence/development/2026-09-12-w09-patch-review/verification.json"
+    "note": "嵌套闭包经包含函数取得实例（--via）：闭包实例只能被真实产生、并按源码同一性核对；两层观测、命名空间查找区分阶段，更深的链具名拒绝。",
+    "evidence_dir": "evidence/development/2026-09-12-w08-closure-via",
+    "verification": "evidence/development/2026-09-12-w08-closure-via/verification.json"
   },
   "windows": [
     {
@@ -310,10 +310,19 @@
       ],
       "note": "场景结果成为不可变记录（--scenario-history / GET /api/scenarios、/api/scenario），不再只存在于 stdout；同场景同分析幂等。",
       "report": "evidence/development/2026-09-12-w08/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/w08-closure-via",
+      "status": "DELIVERED",
+      "work_items": [
+        "W08-nested-closure-via"
+      ],
+      "note": "needs_context 的最后一块：捕获绑定不可声明，只能由包含函数真实产生。--via 必须等于目标的包含符号；harness 分两阶段并只调用返回值中源码与目标钉住字节一致的那个函数；closure_not_returned / closure_identity_mismatch 作为观测保留；closure_depth_not_supported 静态拒绝更深链。",
+      "report": "evidence/development/2026-09-12-w08-closure-via/REPORT.md"
     }
   ],
-  "next_work_item": "W08 深化：嵌套闭包上下文（闭包实例化）；或 3D 的 LOD 与正式层级",
-  "next_action": "本轮补齐两处证据链缺口：跨版本选区重定位（带依据、拒绝不确定的情况）与场景结果落库。剩余可做项按价值：(1) needs_context 的嵌套闭包——需要闭包实例化，是算法级工作，也是执行画像最后一块'应有但不可运行'；(2) 3D 的 LOD 与正式层级（工作单要求 'LOD 不改变事实数量'）；(3) 依赖切片（受控运行只物化目标闭包而不是整个快照）；(4) GE-3 规模资格：目前只有单项目单次测量，大仓库/多语言/并发/Windows 都未资格。W10 的宿主侧 E2E 与旧入口切换仍被 Modus 检出缺席阻塞。",
+  "next_work_item": "W08 深化：依赖切片（只物化目标闭包）与真正的多级 via 组合；或 3D 的 LOD 与正式层级",
+  "next_action": "本轮交付 --via（嵌套闭包经包含函数取得实例，源码同一性核对，两阶段记录，更深的链具名拒绝）。剩余可做项按价值：(1) 依赖切片——受控运行只物化目标闭包而不是整个快照（当前每个 run 都复制整个 snapshot，大树上是真实成本）；(2) 多级 via（outer→middle→inner）需要多阶段组合与逐级源码核对；(3) 3D 的 LOD 与正式层级（工作单要求 'LOD 不改变事实数量'）；(4) GE-3 规模资格：目前只有单项目单次测量，大仓库/多语言/并发/Windows 都未资格。W10 的宿主侧 E2E 与旧入口切换仍被 Modus 检出缺席阻塞。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
@@ -669,13 +678,13 @@
       "features": [
         "执行画像：从已发布 flow 事实派生 pure_callable/needs_context/needs_entry_driver/unsupported；判定顺序 unsupported>driver>context>pure；每条理由含 code/detail/evidence(fact 字段路径)",
         "保守性：status!=complete_within_profile 一律降级（frontier 就是事实缺失的块）；Capture/External/This/heap/global/unknown_call/registers_callback/escaped_value/callsite 不完整均降级；参数按声明偏移排序，排不出则 arity=null 而不是猜",
-        "决定与拒绝：needs_context 本切片不可运行；needs_entry_driver 需显式 --allow-effects unknown_calls；unsupported 即使全授权也拒绝；拒绝不启动进程并在记录里写 refused/started=false",
+        "决定与拒绝：needs_context 中可声明的输入必须给出、捕获绑定只能经 --via 取得实例；needs_entry_driver 需显式 --allow-effects unknown_calls；unsupported 即使全授权也拒绝；拒绝不启动进程并在记录里写 refused/started=false",
         "RunSpec 固定：analysis/symbol/args/timeout/output_limit/grants/node/env(显式白名单)/fixtures；validate 拒绝非法超时、输出预算、环境键与超量实参",
         "隔离副本：从不可变快照的每个内容寻址 blob 读入并重新哈希校验后物化到 0700 临时目录；临时根先 canonicalize（否则 Node loader 会在 /var→/private/var 触发未授权读）",
         "目标解析按源码同一性：模块命名空间内每个函数的 toString 归一化后必须等于快照中该符号的字节切片，唯一命中才调用；改名/遮蔽/同名不误执行，导不出即 target_not_exported",
         "权限强制：node --permission + 仅副本只读；每进程首次运行前跑能力探针，要求一次真实写入被 ERR_ACCESS_DENIED 拒绝，否则拒绝执行；fs_write/child_process/network 只在显式授权时加 flag",
         "进程生命周期：子进程自成进程组，超时/取消按组 SIGKILL 并回收；stdin/stdout/stderr 均有预算；harness 报告带每轮唯一标记、最后写入并显式退出（目标自写 stdout 不会被误当报告）",
-        "观测记录：verdict=returned|threw|timeout|cancelled|refused|target_not_exported|target_ambiguous|module_load_failed|harness_error；抛出时把运行时栈帧映射回快照路径+行+字节偏移+行文本；trace.coverage=not_sampled、unknown_paths=not_observed",
+        "观测记录：verdict=returned|threw|timeout|cancelled|refused|target_not_exported|target_ambiguous|enclosing_not_exported|enclosing_ambiguous|closure_not_returned|closure_identity_mismatch|module_load_failed|harness_error；抛出时把运行时栈帧映射回快照路径+行+字节偏移+行文本；trace.coverage=not_sampled、unknown_paths=not_observed",
         "记录身份与不可变：id=digest(固定问题+观测答案)，排除耗时与绝对临时路径，同问同答即同一行，异答新增一条而不是覆盖",
         "mock 区分：--fixtures 运行在记录里标 isolation.mocks=true，前端明确提示不得读作真实环境观测",
         "scenario：atlas.scenario.v1 用例集，断言 returns/throws(name,message_contains,code)/denied/awaited；refused 与 failed 分开计数",
@@ -691,7 +700,8 @@
         "外部读分三类：运行时 import（模块状态，不声明）、运行时内建/宿主全局（RUNTIME_GLOBALS，不声明，声明反而会覆盖真构造器）、真正自由标识符（具名要求声明并在拒绝里写 global:NAME）",
         "FlowFunction.imports（运行时可导入名，import type 排除）+ FunctionFlowFact.imports；engine 的 ReadExternal 仅在该名不是 import 时置 may_access_global",
         "单一 WORKER_PRODUCER 常量：不兼容的 worker 输出被具名拒绝（worker_producer_not_supported / flow_producer_mismatch），而不是被读成相反结论；ENGINE_VERSION/ALGORITHM_VERSION 同步提升（0.2.2 / 0.2.2）",
-        "场景结果落库：atlas exec --scenario 发布不可变 scenario_results（逐用例结局、passed/failed/refused、declared/attempted、stopped），--scenario-history 与 GET /api/scenarios、/api/scenario 可读；id 是结果摘要，同场景同分析幂等"
+        "场景结果落库：atlas exec --scenario 发布不可变 scenario_results（逐用例结局、passed/failed/refused、declared/attempted、stopped），--scenario-history 与 GET /api/scenarios、/api/scenario 可读；id 是结果摘要，同场景同分析幂等",
+        "嵌套闭包经包含函数取得实例（--via）：捕获绑定不可声明（unsatisfiable_context=captures，并给出 captures 名与 enclosing_symbol/enclosing_name）；--via 必须等于目标包含符号，否则 via_not_the_enclosing_symbol；harness 两阶段（阶段1调包含函数，阶段2只调用返回值中 Function.toString() 与目标钉住字节一致的那个函数），命名空间查找按阶段区分（enclosing_not_exported / target_not_exported）；closure_not_returned 与 closure_identity_mismatch 保留观测到的返回值/源码；只支持一层，更深链静态拒绝 closure_depth_not_supported；via.source_binding 与目标 source_binding 同样重新哈希校验"
       ],
       "evidence": [
         "crates/atlas-engine/src/exec.rs（8 个单测：分类顺序/arity/参数顺序/partial 降级/dynamic 拒绝/缺授权/路径校验/栈帧映射）",

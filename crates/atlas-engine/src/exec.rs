@@ -70,10 +70,20 @@ pub struct ExecutionProfile {
     /// The external names behind the `globals` requirement. Empty means the
     /// effect flag was set without a name Atlas could recover.
     pub required_globals: Vec<String>,
-    /// Context Atlas cannot accept a declaration for in this slice. A captured
-    /// binding is an instance of an enclosing scope, and instantiating that is
-    /// a different problem than reading a value the caller states.
+    /// Context Atlas cannot accept a declaration for. A captured binding is an
+    /// instance of an enclosing scope, and the only honest way to obtain one is
+    /// to run the enclosing function (see `via`), never to invent a value.
     pub unsatisfiable_context: Vec<String>,
+    /// The captured binding names behind that requirement, so the caller can
+    /// see what the closure instance would have to carry.
+    pub captures: Vec<String>,
+    /// The enclosing function symbol, when the target is nested. `via.symbol`
+    /// must equal this value exactly.
+    pub enclosing_symbol: Option<String>,
+    /// The enclosing function's declared name. The symbol id is the identity;
+    /// the name is only a label for messages a human reads.
+    #[serde(default)]
+    pub enclosing_name: Option<String>,
     pub notes: Vec<String>,
 }
 
@@ -167,6 +177,27 @@ pub struct RunSpec {
     pub fixture_note: Option<String>,
     #[serde(default)]
     pub label: Option<String>,
+    /// How to obtain an instance of a nested function. Atlas never synthesises
+    /// a closure: it calls the function that encloses the target and accepts
+    /// only the function that call returns, after checking that value's source
+    /// against the pinned bytes of the target symbol.
+    #[serde(default)]
+    pub via: Option<ViaSpec>,
+}
+
+/// One stage of a `via` run: the enclosing function Atlas calls first.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ViaSpec {
+    /// Must be the *exact* enclosing symbol of the target. A closure is only
+    /// reachable through its real enclosing scope, never through whichever
+    /// symbol a caller believes returns a similar function.
+    pub symbol: String,
+    #[serde(default)]
+    pub args: Vec<serde_json::Value>,
+    /// The receiver for the enclosing call, when it is a method. Distinct from
+    /// the target's own `this_arg`.
+    #[serde(default)]
+    pub this_arg: Option<serde_json::Value>,
 }
 
 fn default_timeout_ms() -> u64 {
@@ -209,6 +240,17 @@ impl RunSpec {
         for key in self.env.keys() {
             if key.is_empty() || key.contains('=') || key.contains('\0') {
                 return Err(invalid("invalid_env_key"));
+            }
+        }
+        if let Some(via) = &self.via {
+            if via.symbol.is_empty() || via.symbol.len() > 512 || via.symbol.contains('\0') {
+                return Err(invalid("invalid_via_symbol"));
+            }
+            if via.symbol == self.symbol {
+                return Err(invalid("via_symbol_is_the_target"));
+            }
+            if via.args.len() > 64 {
+                return Err(invalid("too_many_via_arguments"));
             }
         }
         Ok(())
@@ -526,6 +568,70 @@ fn origin_kinds(fact: &serde_json::Value) -> BTreeMap<String, usize> {
     counts
 }
 
+/// The captured binding names, sorted and deduplicated.
+///
+/// A capture origin is `Capture(<binding id>)`; the published `binding_names`
+/// map turns that id into the name the caller would recognise. A capture whose
+/// binding is not in the map is reported by its id rather than dropped, because
+/// an unexplained capture is exactly what must not be silently omitted.
+fn capture_names(fact: &serde_json::Value, blocks: Option<&Vec<serde_json::Value>>) -> Vec<String> {
+    fn collect(
+        origins: &serde_json::Value,
+        names: Option<&serde_json::Map<String, serde_json::Value>>,
+        found: &mut BTreeSet<String>,
+    ) {
+        let Some(origins) = origins.as_array() else {
+            return;
+        };
+        for origin in origins.iter().filter_map(|v| v.as_str()) {
+            let Some(binding) = origin
+                .strip_prefix("Capture(")
+                .and_then(|rest| rest.strip_suffix(')'))
+            else {
+                continue;
+            };
+            let short = names
+                .and_then(|map| map.get(binding))
+                .and_then(|v| v.as_str())
+                .map(str::to_string)
+                // A capture's binding is declared in the *enclosing* function,
+                // so it is usually absent from this function's `binding_names`.
+                // The id ends with the declared name; that name is only used
+                // when it looks like an identifier, never a path segment.
+                .or_else(|| {
+                    let last = binding.rsplit(':').next().unwrap_or(binding);
+                    (!last.is_empty()
+                        && last
+                            .chars()
+                            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$'))
+                    .then(|| last.to_string())
+                })
+                .unwrap_or_else(|| binding.to_string());
+            found.insert(short);
+        }
+    }
+    let names = fact.get("binding_names").and_then(|v| v.as_object());
+    let mut found: BTreeSet<String> = BTreeSet::new();
+    for key in ["returns", "throws"] {
+        if let Some(value) = fact.get(key) {
+            collect(value.get("origins").unwrap_or(value), names, &mut found);
+        }
+    }
+    if let Some(blocks) = blocks {
+        for block in blocks {
+            let Some(bindings) = block.get("bindings").and_then(|v| v.as_array()) else {
+                continue;
+            };
+            for binding in bindings {
+                if let Some(value) = binding.get("value").and_then(|v| v.get("origins")) {
+                    collect(value, names, &mut found);
+                }
+            }
+        }
+    }
+    found.into_iter().collect()
+}
+
 /// Derive the sufficiency profile of one function from its published fact.
 ///
 /// Ordering of the rules is the whole argument: `unsupported` wins over
@@ -533,14 +639,18 @@ fn origin_kinds(fact: &serde_json::Value) -> BTreeMap<String, usize> {
 /// `pure_callable`. A function is only `pure_callable` when nothing in its
 /// published fact says otherwise, and any partial analysis is at best
 /// `needs_context` because unknown facts cannot prove purity.
+///
+/// `enclosing` is the symbol of the function this one is declared inside, as
+/// published by the analysis graph. `None` means the target is top-level.
 pub fn profile(
     analysis_id: &str,
     symbol: &str,
     path: &str,
     name: &str,
     fact: &serde_json::Value,
-    top_level: bool,
+    enclosing: Option<&str>,
 ) -> ExecutionProfile {
+    let top_level = enclosing.is_none();
     let mut reasons: Vec<Reason> = Vec::new();
     let mut required: BTreeSet<String> = BTreeSet::new();
 
@@ -707,8 +817,9 @@ pub fn profile(
                 // A capture is module-level state when the function is
                 // top-level: the module is copied, so that state exists at
                 // import time and needs no declaration. A capture in a nested
-                // function is an instance of an enclosing scope, and
-                // constructing one is a different problem than this slice.
+                // function is an instance of an enclosing scope: it cannot be
+                // declared as a value, it can only be produced by running the
+                // enclosing function, and that is what `via` does.
                 _ if top_level => {
                     required.insert("unknown_calls".into());
                 }
@@ -718,6 +829,7 @@ pub fn profile(
             }
         }
     }
+    let captures = capture_names(fact, blocks);
 
     let interprocedural_incomplete = fact
         .get("interprocedural")
@@ -779,7 +891,19 @@ pub fn profile(
         "纯调用判定不包含文件/网络/子进程副作用的静态建模：这些权限由运行时的 Node 权限模型强制，未授予即被拒绝。".to_string(),
     ];
     if classification == CLASS_CONTEXT {
-        notes.push("本切片不为 needs_context 合成上下文，因此该分类不可运行。".to_string());
+        if unsatisfiable.contains("captures") {
+            notes.push(
+                "needs_context：捕获的绑定不是可声明的值，无法用数据提供；它只能由包含它的函数真实产生。\
+                 直接调用按 unsatisfiable 拒绝，改用 --via <enclosing-symbol> 让 Atlas 先调用该外层函数，\
+                 并只接受它返回的函数实例（返回值会与目标符号的钉住字节做源码同一性比对）。"
+                    .to_string(),
+            );
+        } else {
+            notes.push(
+                "needs_context：需要调用者用 --this / --global 显式声明输入才能运行；Atlas 不发明这些值。"
+                    .to_string(),
+            );
+        }
     }
     if classification == CLASS_DRIVER {
         notes.push(
@@ -788,6 +912,11 @@ pub fn profile(
     }
     if !complete {
         notes.push("partial 分析的部分结果不作为 no-effect 证明。".to_string());
+    }
+    if let Some(enclosing) = enclosing {
+        notes.push(format!(
+            "目标嵌套在 {enclosing} 内：模块命名空间里通常没有它；用 --via {enclosing} 让 Atlas 调用包含函数并只接受它返回的那个函数实例。"
+        ));
     }
 
     ExecutionProfile {
@@ -810,7 +939,20 @@ pub fn profile(
         required_context: required_context.into_iter().collect(),
         required_globals: globals,
         unsatisfiable_context: unsatisfiable.into_iter().collect(),
+        captures,
+        enclosing_symbol: enclosing.map(str::to_string),
+        enclosing_name: None,
         notes,
+    }
+}
+
+/// How an enclosing function is named in a message: the declared name when it
+/// is known, always with the symbol id that is the actual identity.
+pub fn enclosing_label(profile: &ExecutionProfile) -> String {
+    match (&profile.enclosing_name, &profile.enclosing_symbol) {
+        (Some(name), Some(symbol)) => format!("{name}（{symbol}）"),
+        (None, Some(symbol)) => symbol.clone(),
+        _ => "无（目标是顶层函数）".to_string(),
     }
 }
 
@@ -835,13 +977,51 @@ pub fn decide(profile: &ExecutionProfile, spec: &RunSpec) -> ExecutionDecision {
             missing_context: Vec::new(),
         };
     }
-    if !profile.unsatisfiable_context.is_empty() {
+    // A `via` run may only enter through the target's real enclosing function.
+    // Anything else would be a different instance wearing a similar source, so
+    // the mismatch is refused instead of being left to the run to notice.
+    if let Some(via) = &spec.via
+        && profile.enclosing_symbol.as_deref() != Some(via.symbol.as_str())
+    {
+        return ExecutionDecision {
+            allowed: false,
+            refusal: Some(Reason {
+                code: "via_not_the_enclosing_symbol".into(),
+                detail: format!(
+                    "--via {} 不是目标的包含函数；目标的包含函数是 {}。闭包实例只能从真实的包含作用域产生。",
+                    via.symbol,
+                    enclosing_label(profile)
+                ),
+                evidence: "execution_profile.enclosing_symbol".into(),
+            }),
+            required_grants: profile.required_grants.clone(),
+            missing_grants: Vec::new(),
+            missing_context: Vec::new(),
+        };
+    }
+    let via_enters_enclosing = spec
+        .via
+        .as_ref()
+        .is_some_and(|via| profile.enclosing_symbol.as_deref() == Some(via.symbol.as_str()));
+    if !profile.unsatisfiable_context.is_empty() && !via_enters_enclosing {
+        let captures = if profile.captures.is_empty() {
+            String::new()
+        } else {
+            format!("（捕获的绑定：{}）", profile.captures.join(", "))
+        };
+        let how = match &profile.enclosing_symbol {
+            Some(symbol) => format!(
+                "；该函数只能通过 --via {symbol} 运行，由包含函数 {} 真实产生这个实例",
+                enclosing_label(profile)
+            ),
+            None => String::new(),
+        };
         return ExecutionDecision {
             allowed: false,
             refusal: Some(Reason {
                 code: "context_required".into(),
                 detail: format!(
-                    "函数依赖 Atlas 无法用数据声明的上下文：{}",
+                    "函数依赖 Atlas 无法用数据声明的上下文：{}{captures}{how}",
                     profile.unsatisfiable_context.join(", ")
                 ),
                 evidence: "execution_profile.unsatisfiable_context".into(),
@@ -941,6 +1121,31 @@ pub struct PreparedRun {
     pub target_source: String,
 }
 
+/// The bytes of one symbol slice, read from the pinned snapshot blobs. Every
+/// read re-verifies the blob hash, so a slice is bound to the snapshot rather
+/// than to whatever the file happens to contain now.
+pub fn source_slice(
+    store: &Store,
+    snapshot: &Snapshot,
+    path: &str,
+    start: usize,
+    end: usize,
+) -> Result<String> {
+    let blob = snapshot
+        .entries
+        .iter()
+        .find(|entry| entry.path == path)
+        .and_then(|entry| entry.blob.clone())
+        .ok_or_else(|| invalid("target_source_missing"))?;
+    let bytes = store.read_blob(&blob)?;
+    if end > bytes.len() || start > end {
+        return Err(invalid("invalid_symbol_span"));
+    }
+    Ok(std::str::from_utf8(&bytes[start..end])
+        .map_err(|_| invalid("target_source_not_utf8"))?
+        .to_string())
+}
+
 pub fn prepare(
     store: &Store,
     snapshot: &Snapshot,
@@ -982,20 +1187,7 @@ pub fn prepare(
     }
     let workdir_digest = digest(identity.as_bytes());
     let module_path = safe_relative(symbol_path)?.to_string_lossy().to_string();
-    let source_bytes = store.read_blob(
-        &snapshot
-            .entries
-            .iter()
-            .find(|entry| entry.path == symbol_path)
-            .and_then(|entry| entry.blob.clone())
-            .ok_or_else(|| invalid("target_source_missing"))?,
-    )?;
-    if symbol_end > source_bytes.len() || symbol_start > symbol_end {
-        return Err(invalid("invalid_symbol_span"));
-    }
-    let target_source = std::str::from_utf8(&source_bytes[symbol_start..symbol_end])
-        .map_err(|_| invalid("target_source_not_utf8"))?
-        .to_string();
+    let target_source = source_slice(store, snapshot, symbol_path, symbol_start, symbol_end)?;
     let harness = root.join("atlas-harness.mjs");
     fs::write(&harness, HARNESS)?;
     #[cfg(unix)]
@@ -1030,7 +1222,6 @@ const payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
 const marker = payload.report_marker;
 const normalise = text => String(text).replace(/\s+/g, ' ').trim();
 const strip = text => normalise(text).replace(/^(export\s+)?(default\s+)?(async\s+)?(export\s+)?/, '');
-const expected = strip(payload.target_source || '');
 const encode = (value, depth, seen) => {
   if (depth > 6) return { kind: 'depth_limit' };
   if (value === null) return { kind: 'null' };
@@ -1087,7 +1278,23 @@ const capture = name => (...args) => {
 };
 const original = { log: console.log, warn: console.warn, error: console.error, info: console.info };
 console.log = capture('log'); console.warn = capture('warn'); console.error = capture('error'); console.info = capture('info');
-const report = { schema: 'atlas.execution-harness.v1', verdict: 'failed', detail: null, export_name: null, matched_by: null, candidates: [], awaited: false, value: null, thrown: null, async_events: [], console: { lines, truncated } };
+const report = { schema: 'atlas.execution-harness.v1', verdict: 'failed', detail: null, export_name: null, matched_by: null, candidates: [], awaited: false, value: null, thrown: null, async_events: [], via: null, console: { lines, truncated } };
+// One call, awaited if it returns a thenable. Shared by the two stages of a
+// `via` run so both stages are observed by exactly the same rules.
+const callStage = async (fn, args, thisArg) => {
+  const raw = thisArg === null || thisArg === undefined ? fn(...args) : fn.apply(thisArg, args);
+  const thenable = raw !== null && (typeof raw === 'object' || typeof raw === 'function') && typeof raw.then === 'function';
+  return { awaited: thenable, settled: thenable ? await raw : raw };
+};
+// The identity rule used for the module namespace is used for a closure the
+// enclosing call returned: the value is only accepted when its source is the
+// pinned source of the target symbol.
+const sourceMatches = (fn, source) => {
+  const actual = strip(Function.prototype.toString.call(fn));
+  const want = strip(source || '');
+  if (actual === want) return true;
+  return want.length > 0 && want.endsWith(actual) && actual.length >= want.length * 0.9;
+};
 let finished = false;
 const finish = () => {
   if (finished) return;
@@ -1101,6 +1308,11 @@ process.on('uncaughtException', error => { report.async_events.push({ kind: 'unc
 // at import time as often as at call time. Atlas does not invent them -- each
 // one is a value the caller stated, and the record says which.
 report.declared_globals = Object.keys(payload.globals || {});
+// A `via` run is two calls. The enclosing stage is created up front so a run in
+// which it could not even be resolved still says which stage failed.
+if (payload.via) {
+  report.via = { stage: 'enclosing', export_name: null, matched_by: null, awaited: false, value: null, thrown: null, closure: null };
+}
 for (const [name, value] of Object.entries(payload.globals || {})) globalThis[name] = value;
 try {
   const namespace = await import(payload.module_url);
@@ -1108,30 +1320,69 @@ try {
   const push = (name, fn) => { if (!candidates.some(([existing]) => existing === name)) candidates.push([name, fn]); };
   if (payload.export_name && typeof namespace[payload.export_name] === 'function') push(payload.export_name, namespace[payload.export_name]);
   for (const [key, value] of Object.entries(namespace)) if (typeof value === 'function') push(key, value);
-  const matches = candidates.filter(([, fn]) => {
-    const actual = strip(Function.prototype.toString.call(fn));
-    if (actual === expected) return true;
-    return expected.length > 0 && expected.endsWith(actual) && actual.length >= expected.length * 0.9;
-  });
+  const matches = candidates.filter(([, fn]) => sourceMatches(fn, payload.resolve_source));
   report.candidates = candidates.map(([name]) => name);
-  if (matches.length === 0) { report.detail = 'target_not_exported'; }
-  else if (matches.length > 1) { report.detail = 'target_ambiguous'; report.matched_by = matches.map(([name]) => name).join(','); }
+  // The stage that could not be resolved is named: "the enclosing function is
+  // not reachable from the namespace" is a different fact from "the target is
+  // not exported", and the caller acting on it differs.
+  if (matches.length === 0) { report.detail = payload.via ? 'enclosing_not_exported' : 'target_not_exported'; }
+  else if (matches.length > 1) { report.detail = payload.via ? 'enclosing_ambiguous' : 'target_ambiguous'; report.matched_by = matches.map(([name]) => name).join(','); }
   else {
     report.export_name = matches[0][0];
     report.matched_by = 'source_identity';
+    if (report.via) { report.via.export_name = matches[0][0]; report.via.matched_by = 'source_identity'; }
+    // A `via` run calls the enclosing function first and only then the closure
+    // it returned. Each stage has its own receiver and arguments, and each
+    // stage's outcome is reported separately.
+    const stage = payload.via
+      ? { target: payload.via.args, thisArg: payload.via.this_arg }
+      : { target: payload.args, thisArg: payload.this_arg };
+    let first = null;
     try {
-      const raw = payload.this_arg === null || payload.this_arg === undefined
-        ? matches[0][1](...payload.args)
-        : matches[0][1].apply(payload.this_arg, payload.args);
-      report.receiver_declared = payload.this_arg !== null && payload.this_arg !== undefined;
-      const thenable = raw !== null && (typeof raw === 'object' || typeof raw === 'function') && typeof raw.then === 'function';
-      report.awaited = thenable;
-      const settled = thenable ? await raw : raw;
-      report.value = encode(settled, 0, new Set());
-      report.verdict = 'returned';
+      first = await callStage(matches[0][1], stage.target, stage.thisArg);
     } catch (error) {
       report.verdict = 'threw';
       report.thrown = describe(error);
+      if (report.via) report.via.thrown = describe(error);
+    }
+    if (first) {
+      report.receiver_declared = payload.via
+        ? payload.via.this_arg !== null && payload.via.this_arg !== undefined
+        : payload.this_arg !== null && payload.this_arg !== undefined;
+      report.awaited = first.awaited;
+      if (!payload.via) {
+        report.value = encode(first.settled, 0, new Set());
+        report.verdict = 'returned';
+      } else {
+        report.via.awaited = first.awaited;
+        report.via.value = encode(first.settled, 0, new Set());
+        if (typeof first.settled !== 'function') {
+          // The enclosing function ran and its result is reported verbatim.
+          // Nothing was called, so this is not a failed call of the target.
+          report.detail = 'closure_not_returned';
+        } else {
+          const observed = strip(Function.prototype.toString.call(first.settled));
+          const matched = sourceMatches(first.settled, payload.via.closure_source);
+          report.via.closure = {
+            matched_by: matched ? 'source_identity' : null,
+            name: String(first.settled.name || ''),
+            observed_source: observed.slice(0, 2000)
+          };
+          if (!matched) {
+            report.detail = 'closure_identity_mismatch';
+          } else {
+            try {
+              const second = await callStage(first.settled, payload.args, payload.this_arg);
+              report.closure_awaited = second.awaited;
+              report.value = encode(second.settled, 0, new Set());
+              report.verdict = 'returned';
+            } catch (error) {
+              report.verdict = 'threw';
+              report.thrown = describe(error);
+            }
+          }
+        }
+      }
     }
   }
 } catch (error) {
@@ -1148,6 +1399,10 @@ pub fn harness_payload(
     spec: &RunSpec,
     export_name: Option<&str>,
     report_marker: &str,
+    // The source of the function the module namespace is searched for. For a
+    // `via` run that is the *enclosing* function, because that is the one the
+    // namespace can actually contain; the closure is never looked up by name.
+    resolve_source: Option<&str>,
 ) -> Result<String> {
     let module_url = format!(
         "file://{}",
@@ -1157,11 +1412,16 @@ pub fn harness_payload(
         "schema": HARNESS_SCHEMA,
         "module_url": module_url,
         "module_path": prepared.module_path,
-        "target_source": prepared.target_source,
+        "resolve_source": resolve_source.unwrap_or(&prepared.target_source),
         "export_name": export_name,
         "args": spec.args,
         "this_arg": spec.this_arg,
         "globals": spec.globals,
+        "via": spec.via.as_ref().map(|via| serde_json::json!({
+            "args": via.args,
+            "this_arg": via.this_arg,
+            "closure_source": prepared.target_source,
+        })),
         "report_marker": report_marker,
         "console_limit": spec.output_limit.min(64 * 1024),
     }))?)
@@ -1234,9 +1494,34 @@ mod tests {
         )
     }
 
+    /// A spec that grants the acknowledgement, so a test about context is not
+    /// silently a test about grants.
+    fn spec_for(symbol: &str) -> RunSpec {
+        RunSpec {
+            schema: RUN_SPEC_SCHEMA.into(),
+            analysis_id: "a".into(),
+            symbol: symbol.into(),
+            args: vec![],
+            timeout_ms: 1000,
+            output_limit: 1024,
+            grants: Grants {
+                unknown_calls: true,
+                ..Grants::default()
+            },
+            node: "node".into(),
+            env: BTreeMap::new(),
+            this_arg: None,
+            globals: BTreeMap::new(),
+            fixtures: false,
+            fixture_note: None,
+            label: None,
+            via: None,
+        }
+    }
+
     #[test]
     fn clean_function_is_pure_and_params_are_ordered() {
-        let p = profile("a", "s", "x.ts", "add", &clean(), true);
+        let p = profile("a", "s", "x.ts", "add", &clean(), None);
         assert_eq!(p.classification, CLASS_PURE);
         assert!(p.runnable);
         assert_eq!(p.arity, Some(2));
@@ -1249,7 +1534,7 @@ mod tests {
     fn unknown_call_requires_explicit_grant() {
         let mut f = clean();
         f["effects"]["unknown_call"] = true.into();
-        let p = profile("a", "s", "x.ts", "f", &f, true);
+        let p = profile("a", "s", "x.ts", "f", &f, None);
         assert_eq!(p.classification, CLASS_DRIVER);
         assert!(p.required_grants.contains(&"unknown_calls".to_string()));
         let mut spec = RunSpec {
@@ -1267,6 +1552,7 @@ mod tests {
             fixtures: false,
             fixture_note: None,
             label: None,
+            via: None,
         };
         let refused = decide(&p, &spec);
         assert!(!refused.allowed);
@@ -1281,7 +1567,7 @@ mod tests {
         let mut f = clean();
         f["status"] = "partial_budget".into();
         f["frontier"] = serde_json::json!([3]);
-        let p = profile("a", "s", "x.ts", "f", &f, true);
+        let p = profile("a", "s", "x.ts", "f", &f, None);
         assert_eq!(p.classification, CLASS_CONTEXT);
         assert!(p.reasons.iter().any(|r| r.code == "analysis_partial"));
         assert!(p.reasons.iter().any(|r| r.code == "frontier_blocks"));
@@ -1302,6 +1588,7 @@ mod tests {
             fixtures: false,
             fixture_note: None,
             label: None,
+            via: None,
         };
         assert_eq!(
             decide(&p, &spec).refusal.unwrap().code,
@@ -1324,7 +1611,7 @@ mod tests {
             {"index": 1, "kind": "read_external", "detail": "CONFIG"},
         ]);
         f["effects"]["may_access_global"] = true.into();
-        let p = profile("a", "s", "x.ts", "f", &f, true);
+        let p = profile("a", "s", "x.ts", "f", &f, None);
         assert_eq!(p.required_globals, vec!["CONFIG".to_string()]);
         assert_eq!(p.required_context, vec!["globals".to_string()]);
         let spec = RunSpec {
@@ -1342,6 +1629,7 @@ mod tests {
             fixtures: false,
             fixture_note: None,
             label: None,
+            via: None,
         };
         let refused = decide(&p, &spec);
         assert!(!refused.allowed);
@@ -1362,7 +1650,7 @@ mod tests {
                 {"binding": "b:x.ts:10:a", "name": "a", "value": {"origins": ["External(CONFIG)"]}}
             ]}
         ]);
-        let p = profile("a", "s", "x.ts", "method", &f, true);
+        let p = profile("a", "s", "x.ts", "method", &f, None);
         assert_eq!(p.classification, CLASS_CONTEXT);
         assert_eq!(
             p.required_context,
@@ -1384,6 +1672,7 @@ mod tests {
             fixtures: false,
             fixture_note: None,
             label: None,
+            via: None,
         };
         assert!(!decide(&p, &spec).allowed);
         assert_eq!(decide(&p, &spec).missing_context.len(), 2);
@@ -1399,7 +1688,7 @@ mod tests {
     fn dynamic_code_is_unsupported_and_refused() {
         let mut f = clean();
         f["unknown_reasons"] = serde_json::json!(["dynamic_code:with"]);
-        let p = profile("a", "s", "x.ts", "f", &f, true);
+        let p = profile("a", "s", "x.ts", "f", &f, None);
         assert_eq!(p.classification, CLASS_UNSUPPORTED);
         assert!(!p.runnable);
         let spec = RunSpec {
@@ -1420,6 +1709,7 @@ mod tests {
             fixtures: false,
             fixture_note: None,
             label: None,
+            via: None,
         };
         // Even a fully permissive spec cannot run an unsupported function.
         assert_eq!(
@@ -1434,9 +1724,82 @@ mod tests {
         f["block_states"] = serde_json::json!([
             {"block": 0, "bindings": [{"binding": "b:x.ts:30:b", "name": "b", "value": {"origins": ["Capture(b:x.ts:1:c)"]}}]}
         ]);
-        let p = profile("a", "s", "x.ts", "f", &f, true);
+        let p = profile("a", "s", "x.ts", "f", &f, None);
         assert_eq!(p.classification, CLASS_CONTEXT);
         assert!(p.reasons.iter().any(|r| r.code == "captured_binding"));
+    }
+
+    #[test]
+    fn a_nested_capture_names_the_enclosing_function_and_cannot_be_declared() {
+        let mut f = clean();
+        f["block_states"] = serde_json::json!([
+            {"block": 0, "bindings": [{"binding": "b:x.ts:30:b", "name": "b", "value": {"origins": ["Capture(b:x.ts:1:value)"]}}]}
+        ]);
+        let enclosing = "symbol:x.ts:0:40";
+        let p = profile("a", "s", "x.ts", "increment", &f, Some(enclosing));
+        assert_eq!(p.classification, CLASS_CONTEXT);
+        assert_eq!(p.unsatisfiable_context, vec!["captures".to_string()]);
+        assert_eq!(
+            p.captures,
+            vec!["value".to_string()],
+            "the captured binding must be named from the id it is published under"
+        );
+        assert_eq!(p.enclosing_symbol.as_deref(), Some(enclosing));
+        assert!(!p.runnable, "a capture is never a declared input");
+
+        let spec = spec_for("s");
+        let refused = decide(&p, &spec);
+        assert_eq!(refused.refusal.as_ref().unwrap().code, "context_required");
+        assert!(refused.refusal.as_ref().unwrap().detail.contains(enclosing));
+
+        // Through the real enclosing function it is allowed -- the instance is
+        // produced by code, not typed in by a caller.
+        let via = RunSpec {
+            via: Some(ViaSpec {
+                symbol: enclosing.into(),
+                args: vec![],
+                this_arg: None,
+            }),
+            ..spec_for("s")
+        };
+        assert!(decide(&p, &via).allowed);
+    }
+
+    #[test]
+    fn a_via_that_is_not_the_enclosing_function_is_refused() {
+        let mut f = clean();
+        f["block_states"] = serde_json::json!([
+            {"block": 0, "bindings": [{"binding": "b:x.ts:30:b", "name": "b", "value": {"origins": ["Capture(b:x.ts:1:value)"]}}]}
+        ]);
+        let p = profile("a", "s", "x.ts", "increment", &f, Some("symbol:x.ts:0:40"));
+        let spec = RunSpec {
+            via: Some(ViaSpec {
+                symbol: "symbol:x.ts:100:140".into(),
+                args: vec![],
+                this_arg: None,
+            }),
+            ..spec_for("s")
+        };
+        let decision = decide(&p, &spec);
+        assert!(!decision.allowed);
+        assert_eq!(
+            decision.refusal.as_ref().unwrap().code,
+            "via_not_the_enclosing_symbol"
+        );
+    }
+
+    #[test]
+    fn a_via_spec_cannot_point_at_its_own_target() {
+        let spec = RunSpec {
+            via: Some(ViaSpec {
+                symbol: "s".into(),
+                args: vec![],
+                this_arg: None,
+            }),
+            ..spec_for("s")
+        };
+        let error = spec.validate().unwrap_err().to_string();
+        assert!(error.contains("via_symbol_is_the_target"), "{error}");
     }
 
     #[test]

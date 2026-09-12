@@ -493,6 +493,81 @@ check('a mock-labelled run says so and an observed record keeps its identity', a
   assert.match(shown, /a\.js:3:9/, 'the observed source location must be shown');
 });
 
+check('a nested closure is offered only through its real enclosing function', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = profile({
+    classification: 'needs_context', runnable: false,
+    unsatisfiable_context: ['captures'], captures: ['value'],
+    enclosing_symbol: 'symbol:a.js:40:80',
+    reasons: [{ code: 'captured_binding', detail: '1 个值来源是 Capture', evidence: 'block_states[].bindings[].value.origins' }],
+  });
+  t.routes.exec = record({
+    via: {
+      symbol: 'symbol:a.js:40:80', path: 'a.js', name: 'makeCounter',
+      source_binding: { path: 'a.js', blob: 'c'.repeat(64), start: 40, end: 80, bytes_verified: true },
+      decision: { allowed: true, refusal: null },
+      stage_report: {
+        stage: 'enclosing', export_name: 'makeCounter', matched_by: 'source_identity',
+        awaited: false, thrown: null, value: { kind: 'function', name: 'increment' },
+        closure: { matched_by: 'source_identity', name: 'increment', observed_source: 'function increment(step) {}' },
+      },
+    },
+  });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+
+  // The direct path is impossible (captures), so the enclosing path is what the
+  // checkbox offers, and the button follows the checkbox rather than the
+  // classification alone.
+  assert.match(t.el('exec-body').textContent, /包含函数 symbol:a\.js:40:80/, 'the enclosing symbol must be named');
+  assert.equal(t.el('exec-via-enable').checked, true, 'the only possible path must be pre-selected');
+  assert.equal(t.el('exec-run').disabled, false, 'a closure is runnable through its enclosing function');
+
+  t.el('exec-args').value = '[5]';
+  t.el('exec-via-args').value = '[100]';
+  await t.run('runControlled()');
+  const posted = t.requests.filter((r) => r.name === 'exec');
+  assert.equal(posted.length, 1, 'exactly one run must be requested');
+  const body = JSON.parse(posted[0].body);
+  assert.deepEqual(body.via, { symbol: 'symbol:a.js:40:80', args: [100] }, 'the enclosing call must be stated, not guessed');
+  assert.deepEqual(body.args, [5], 'the closure keeps its own arguments');
+
+  const shown = t.el('exec-body').textContent;
+  assert.match(shown, /阶段 1 包含函数 makeCounter/, 'the enclosing stage must be shown, not hidden');
+  assert.match(shown, /源码同一性 source_identity/, 'the closure instance must be shown as identity-checked');
+});
+
+check('an unmatched closure instance is shown as an observation, not as the target', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = profile({
+    classification: 'needs_context', runnable: false,
+    unsatisfiable_context: ['captures'], captures: ['value'],
+    enclosing_symbol: 'symbol:a.js:40:80', reasons: [],
+  });
+  t.routes.exec = record({
+    verdict: 'closure_identity_mismatch', value: null,
+    via: {
+      symbol: 'symbol:a.js:40:80', path: 'a.js', name: 'factory',
+      source_binding: { path: 'a.js', blob: 'c'.repeat(64), start: 40, end: 80, bytes_verified: true },
+      decision: { allowed: true, refusal: null },
+      stage_report: {
+        stage: 'enclosing', export_name: 'factory', matched_by: 'source_identity',
+        awaited: false, thrown: null, value: { kind: 'function', name: 'alpha' },
+        closure: { matched_by: null, name: 'alpha', observed_source: 'function alpha(step) { return value + step; }' },
+      },
+    },
+  });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  await t.run('runControlled()');
+  const shown = t.el('exec-body').textContent;
+  assert.match(shown, /closure_identity_mismatch/, 'the verdict must name the mismatch');
+  assert.match(shown, /源码同一性 不匹配/, 'the mismatch must be stated explicitly');
+  assert.match(shown, /function alpha/, 'the observed (different) source must be shown');
+});
+
 check('a profile from another symbol is refused, not rendered', async () => {
   const t = boot(routeBase());
   t.routes.profile = profile({ symbol: 'symbol:OTHER:0:9', classification: 'needs_context', runnable: false });

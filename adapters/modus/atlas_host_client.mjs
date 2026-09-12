@@ -149,10 +149,21 @@ export class AtlasHostClient {
   /**
    * Run one controlled call. Only a static profile that allows a run will
    * actually start a process; a refusal comes back as a record, not a throw.
+   *
+   * `via` names the function that encloses a nested target: Atlas calls it
+   * first and only invokes the function it returns when that value's source
+   * matches the target's pinned bytes. A host cannot supply a closure any other
+   * way, and it must not invent one.
    */
-  exec({ symbol, args = [], timeoutMs, allowEffects = [], plan = false }) {
+  exec({ symbol, args = [], timeoutMs, allowEffects = [], plan = false, via }) {
     return this.request('exec', {
-      body: { symbol, args, ...(timeoutMs ? { timeout_ms: timeoutMs } : {}), allow_effects: allowEffects, plan },
+      body: {
+        symbol, args,
+        ...(timeoutMs ? { timeout_ms: timeoutMs } : {}),
+        allow_effects: allowEffects,
+        plan,
+        ...(via ? { via } : {}),
+      },
     });
   }
 

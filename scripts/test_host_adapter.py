@@ -106,6 +106,17 @@ record('run_verdict', run.verdict);
 record('run_value', run.value);
 record('run_trace_coverage', run.trace.coverage);
 
+// A closure is reached through its enclosing function, and the host says which
+// one: it never hands Atlas a function and never claims to have made a scope.
+const closure = await client.exec({
+  symbol: 'src/lib.js:addTo', args: [5],
+  allowEffects: ['unknown_calls'],
+  via: { symbol: 'makeAdder', args: [100] },
+});
+record('closure_verdict', closure.verdict);
+record('closure_value', closure.value);
+record('closure_stage', closure.via.stage_report.closure.matched_by);
+
 // A bad token must fail loudly rather than silently returning nothing.
 try {
   const bad = new AtlasHostClient({ url, token: 'not-the-token' });
@@ -141,7 +152,13 @@ class HostSeam(unittest.TestCase):
         (self.project / "src").mkdir(parents=True)
         (self.project / "package.json").write_text('{"name":"host-lab","type":"module"}\n', encoding="utf-8")
         (self.project / "src" / "lib.js").write_text(
-            "export function double(value) { return value * 2; }\n", encoding="utf-8"
+            "export function double(value) { return value * 2; }\n"
+            # A nested function, so the host seam covers the one thing a host
+            # cannot obtain by naming it: an instance of an enclosing scope.
+            "export function makeAdder(base) {\n"
+            "  return function addTo(value) { return base + value; };\n"
+            "}\n",
+            encoding="utf-8",
         )
         self.store = self.base / "store"
         indexed = subprocess.run(
@@ -259,6 +276,14 @@ class HostSeam(unittest.TestCase):
         self.assertEqual(report["run_trace_coverage"], "not_sampled",
                          "a host must be able to see that no coverage was sampled")
         self.assertTrue(report["bad_token_rejected"])
+
+    def test_a_host_reaches_a_closure_through_its_enclosing_function(self):
+        report = self.drive()
+        self.assertEqual(report["closure_verdict"], "returned")
+        self.assertEqual(report["closure_value"], {"kind": "number", "value": 105},
+                         "the closure must see the scope its enclosing call created")
+        self.assertEqual(report["closure_stage"], "source_identity",
+                         "the returned function must be accepted by source, not by name")
 
     # -- the seam itself --------------------------------------------------
     def test_the_contract_does_not_leak_the_store_layout(self):
