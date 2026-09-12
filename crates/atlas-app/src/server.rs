@@ -225,6 +225,33 @@ async fn query(
                 }))
                 .map_err(Into::into)
             }
+            "scenarios" => {
+                let entity = q.entity.as_deref().unwrap_or("");
+                let entity = if entity.is_empty() {
+                    None
+                } else {
+                    Some(
+                        crate::runner::resolve_symbol(&app.store, id, entity)
+                            .map_err(|error| atlas_engine::invalid(&error))?,
+                    )
+                };
+                serde_json::to_value(serde_json::json!({
+                    "analysis_id": id,
+                    "symbol": entity,
+                    "scenarios": app.store.scenario_results(id, entity.as_deref(), q.limit.unwrap_or(50))?,
+                }))
+                .map_err(Into::into)
+            }
+            "scenario" => {
+                let result = app
+                    .store
+                    .scenario_result(q.id.as_deref().or(q.entity.as_deref()).unwrap_or(""))
+                    .map_err(|error| atlas_engine::invalid(&error.to_string()))?;
+                if result["analysis_id"].as_str() != Some(id.as_str()) {
+                    return Err(atlas_engine::invalid("scenario_belongs_to_another_analysis"));
+                }
+                serde_json::to_value(result).map_err(Into::into)
+            }
             "run-markers" => {
                 let markers = app.store.run_markers(id, q.limit.unwrap_or(200))?;
                 serde_json::to_value(serde_json::json!({
@@ -334,6 +361,8 @@ endpoint!(profile, "profile");
 endpoint!(exec_records, "exec-records");
 endpoint!(run_markers, "run-markers");
 endpoint!(relocate, "relocate");
+endpoint!(scenarios, "scenarios");
+endpoint!(scenario_detail, "scenario");
 endpoint!(selection, "selection");
 endpoint!(annotations, "annotations");
 endpoint!(agent_requests, "agent-requests");
@@ -807,6 +836,22 @@ const CONTRACT: &[(&str, &str, &str, &str, &str, &str)] = &[
         "单次上限 500；只说明入口运行结论，不是调用路径",
     ),
     (
+        "scenarios",
+        "GET",
+        "http",
+        "已发布的场景结果（可按符号过滤）",
+        "结果是证据：逐用例结局与计数",
+        "单页上限 200",
+    ),
+    (
+        "scenario",
+        "GET",
+        "http",
+        "读取一份场景结果（`id=<场景 id>`）",
+        "内容不可变；id 是结果摘要",
+        "只含该分析的结果",
+    ),
+    (
         "relocate",
         "GET",
         "http",
@@ -1095,6 +1140,8 @@ pub async fn serve(
         .route("/api/exec-records", get(exec_records))
         .route("/api/run-markers", get(run_markers))
         .route("/api/relocate", get(relocate))
+        .route("/api/scenarios", get(scenarios))
+        .route("/api/scenario", get(scenario_detail))
         .route("/api/exec", post(exec))
         .route("/api/selection", get(selection))
         .route("/api/annotations", get(annotations))

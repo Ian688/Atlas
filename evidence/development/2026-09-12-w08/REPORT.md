@@ -205,3 +205,17 @@ atlas exec <id> spin --args [1] --timeout-ms 60000   → SIGINT 1.5s 后
 scenario（3 个用例，第 1 个挂住）→ SIGINT
   declared_cases=3 · attempted_cases=1 · stopped=cancelled · cases=["hangs"]
 ```
+
+---
+
+## 十一、补片（同日）：场景结果是证据，会被发布
+
+之前 `atlas exec --scenario` 的结果只打印到 stdout：消费者想问"上次这个场景做了什么"必须去捕获输出流。
+现在它是不可变记录：
+
+- 表 `scenario_results`（id = 结果摘要，analysis/symbol/name + passed/failed/refused + body）；
+- `atlas exec <analysis> <symbol> --scenario-history` 与 `GET /api/scenarios`、`GET /api/scenario?id=`；
+- 同一场景在同一固定分析上重复运行是**同一条记录**（id 是结果摘要），不会每次生成新行；
+- 结果里保留 `declared_cases` / `attempted_cases` / `stopped`，所以"被取消后剩余用例未尝试"这件事在记录里也能读到。
+
+跨分析读取被拒绝（`scenario_belongs_to_another_analysis`），与提案、执行记录同一纪律。

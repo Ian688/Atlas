@@ -162,6 +162,9 @@ enum Action {
         /// List previously published execution records for this symbol.
         #[arg(long)]
         history: bool,
+        /// List previously published scenario results for this symbol.
+        #[arg(long)]
+        scenario_history: bool,
     },
     Serve {
         analysis: String,
@@ -1090,8 +1093,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             fixtures,
             fixture_note,
             history,
+            scenario_history,
         } => {
             let symbol = runner::resolve_symbol(&store, &analysis, &entity)?;
+            if scenario_history {
+                print(json!({
+                    "analysis_id": analysis,
+                    "symbol": symbol,
+                    "scenarios": store.scenario_results(&analysis, Some(&symbol), 20)?,
+                }))?;
+                return Ok(());
+            }
             if history {
                 print(json!({
                     "analysis_id": analysis,
@@ -1137,7 +1149,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Some(path) => {
                     let text = std::fs::read_to_string(&path)?;
                     let document: serde_json::Value = serde_json::from_str(&text)?;
-                    print(runner::run_scenario(&store, &spec, &document, cancel_rx).await?)?
+                    let mut result =
+                        runner::run_scenario(&store, &spec, &document, cancel_rx).await?;
+                    // A scenario is evidence, so it is published rather than
+                    // only printed: a consumer should not have to capture a
+                    // stream to ask what a scenario did.
+                    let id = store.publish_scenario_result(&mut result)?;
+                    if let Some(object) = result.as_object_mut() {
+                        object.insert("id".into(), json!(id));
+                    }
+                    print(result)?
                 }
                 None => print(runner::execute(&store, &spec, cancel_rx).await?)?,
             }

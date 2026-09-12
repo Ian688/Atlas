@@ -611,6 +611,28 @@ class Execution(unittest.TestCase):
                           "--allow-effects", GRANTS)
         self.assertEqual(result["passed"], 1, result["cases"])
 
+    def test_a_scenario_result_is_published_and_readable_back(self):
+        # A scenario is evidence. It used to exist only on stdout, so a consumer
+        # had to capture a stream to ask what a scenario did last time.
+        first = self.scenario([
+            {"name": "adds", "args": [1, 2], "expect": {"returns": 3}},
+            {"name": "wrong", "args": [1, 2], "expect": {"returns": 4}},
+        ])
+        self.assertTrue(first["id"], "the scenario result must be published with an id")
+        history = self.cli("exec", self.analysis, "add", "--scenario-history")["scenarios"]
+        self.assertEqual(len(history), 1)
+        self.assertEqual(history[0]["id"], first["id"])
+        self.assertEqual(history[0]["passed"], 1)
+        self.assertEqual(history[0]["failed"], 1)
+        self.assertEqual(history[0]["declared_cases"], 2)
+        # The same scenario over the same pinned analysis is the same record.
+        again = self.scenario([
+            {"name": "adds", "args": [1, 2], "expect": {"returns": 3}},
+            {"name": "wrong", "args": [1, 2], "expect": {"returns": 4}},
+        ])
+        self.assertEqual(again["id"], first["id"])
+        self.assertEqual(len(self.cli("exec", self.analysis, "add", "--scenario-history")["scenarios"]), 1)
+
     def test_a_scenario_case_that_is_refused_is_not_a_pass(self):
         path = self.base / "scenario.json"
         path.write_text(json.dumps({

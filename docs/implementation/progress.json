@@ -301,6 +301,15 @@
       ],
       "note": "跨版本选区重定位：path_and_name / identical_bytes / name_only 三条依据，撤回与无对应物分开，歧义拒绝；只给建议不改记录；网页显示依据与字节是否变化。",
       "report": "evidence/development/2026-09-12-w09-relocation/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/w08-scenario-records",
+      "status": "DELIVERED",
+      "work_items": [
+        "W08-scenario-results-published"
+      ],
+      "note": "场景结果成为不可变记录（--scenario-history / GET /api/scenarios、/api/scenario），不再只存在于 stdout；同场景同分析幂等。",
+      "report": "evidence/development/2026-09-12-w08/REPORT.md"
     }
   ],
   "next_work_item": "W09 深化：嵌套闭包上下文 / 跨版本选区重定位 / LOD；或宿主侧 E2E（需要 Modus 检出）",
@@ -681,7 +690,8 @@
         "SIGINT 取消受控运行：按进程组 SIGKILL 回收并发布 verdict=cancelled 的记录（取消的运行同样被记录，不丢弃）；scenario 收到取消即停止，declared_cases 与 attempted_cases 分开，避免把未尝试的用例读成已尝试",
         "外部读分三类：运行时 import（模块状态，不声明）、运行时内建/宿主全局（RUNTIME_GLOBALS，不声明，声明反而会覆盖真构造器）、真正自由标识符（具名要求声明并在拒绝里写 global:NAME）",
         "FlowFunction.imports（运行时可导入名，import type 排除）+ FunctionFlowFact.imports；engine 的 ReadExternal 仅在该名不是 import 时置 may_access_global",
-        "单一 WORKER_PRODUCER 常量：不兼容的 worker 输出被具名拒绝（worker_producer_not_supported / flow_producer_mismatch），而不是被读成相反结论；ENGINE_VERSION/ALGORITHM_VERSION 同步提升（0.2.2 / 0.2.2）"
+        "单一 WORKER_PRODUCER 常量：不兼容的 worker 输出被具名拒绝（worker_producer_not_supported / flow_producer_mismatch），而不是被读成相反结论；ENGINE_VERSION/ALGORITHM_VERSION 同步提升（0.2.2 / 0.2.2）",
+        "场景结果落库：atlas exec --scenario 发布不可变 scenario_results（逐用例结局、passed/failed/refused、declared/attempted、stopped），--scenario-history 与 GET /api/scenarios、/api/scenario 可读；id 是结果摘要，同场景同分析幂等"
       ],
       "evidence": [
         "crates/atlas-engine/src/exec.rs（8 个单测：分类顺序/arity/参数顺序/partial 降级/dynamic 拒绝/缺授权/路径校验/栈帧映射）",
@@ -699,7 +709,9 @@
         "scripts/test_execution.py（37 个用例，新增 2 项取消用例）",
         "workers/typescript/tests/flow.test.mjs（26 项，新增 imports 用例含 import type 排除）",
         "crates/atlas-engine/src/exec.rs（import/全局/内建三分单测）",
-        "scripts/test_execution.py（39 个用例，新增 3 项分类用例）"
+        "scripts/test_execution.py（39 个用例，新增 3 项分类用例）",
+        "scripts/test_execution.py（40 个用例，新增场景发布用例）",
+        "scripts/test_host_adapter.py（scenarios/scenario 纳入合同覆盖）"
       ],
       "blockers": [
         "needs_context 仍不完整：嵌套函数的闭包实例无法用数据声明，因此这类函数不可运行。worker import 绑定与真正全局已区分（本片修复），但**动态 import / require** 的局部绑定仍无法解析，只能保守地当作未解析名",

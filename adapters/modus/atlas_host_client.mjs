@@ -90,6 +90,11 @@ export class AtlasHostClient {
   selection({ entity }) { return this.request('selection', { params: { entity } }); }
   /** Which entries have actually been run, and how each run ended. */
   runMarkers({ limit = 200 } = {}) { return this.request('run-markers', { params: { limit } }); }
+  /** Published scenario results: which cases ran and how each ended. */
+  scenarios({ entity, limit = 50 } = {}) {
+    return this.request('scenarios', { params: { ...(entity ? { entity } : {}), limit } });
+  }
+  scenario({ id }) { return this.request('scenario', { params: { id } }); }
   /**
    * Ask what a selection pinned to `fromAnalysis` becomes in the served
    * analysis. Read-only: the answer carries the evidence and a pinned
@@ -156,6 +161,7 @@ export class AtlasHostClient {
     return ['report', 'nodes', 'edges', 'reach', 'flow', 'flows', 'source', 'context',
       'profile', 'exec-records', 'exec', 'selection', 'annotations', 'annotation',
       'agent/requests', 'agent/request', 'agent/work', 'contract',
-      'patches', 'patch', 'patch/propose', 'run-markers', 'relocate'];
+      'patches', 'patch', 'patch/propose', 'run-markers', 'relocate',
+      'scenarios', 'scenario'];
   }
 }

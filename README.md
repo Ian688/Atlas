@@ -57,6 +57,7 @@ target/debug/atlas --store local-state serve <上一步返回的id>
 - **受控运行**（`atlas exec` / `/api/exec`）只对通过画像的函数生效：它把快照字节物化成隔离副本，用调用者指定的**目标 Node** 在 `--permission` 下启动，只授予副本只读与显式声明的项。权限是强制的而不是声明式的——每个进程首次运行前先跑一次能力探针，要求一次真实写入被 `ERR_ACCESS_DENIED` 拒绝，否则拒绝执行。目标函数按**源码同一性**选定（命名空间里某个值的 `toString()` 必须等于快照中该符号的字节），因此同名的另一个函数不会被静默执行，导不出的函数直接报 `target_not_exported`。超时/取消按进程组 `SIGKILL` 回收。
 - **Effect journal**：记录运行时明确报告的**被拒绝尝试**（权限种类 + 目标，例如 `FileSystemWrite → /tmp/x`）。Node 只为拒绝附上这些字段，所以 journal 不声称列出被允许的操作——授予集合就是边界，记录里写明这一点。空 journal 等于"没有拒绝被报告"，不等于"没有副作用"。
 - **取消与超时是两种事实**：`SIGINT` 取消一次受控运行会按进程组 `SIGKILL` 并发布 `verdict=cancelled` 的记录（取消的运行也是事实，不会被丢掉）；scenario 被取消时**停止**而不是把剩余用例跑成一行"已取消"，结果里 `attempted_cases < declared_cases`。
+- **场景结果是证据，会被发布**：`atlas exec --scenario` 的结果（逐用例结局、计数、是否被取消）作为不可变记录落库（`--scenario-history` / `GET /api/scenarios`），不再只存在于 stdout——消费者不该为了问"上次这个场景做了什么"而去捕获输出流。同一场景在同一固定分析上重复运行是同一条记录。
 - **观测边界写在记录里**：`coverage=not_sampled`、`unknown_paths=not_observed`。只观测入口调用的返回/抛出、运行时报告的源码位置、进程输出与退出码；没有行级覆盖，没有运行期调用图，静态 BFS 不作为执行顺序。`--scenario` 可对一组用例断言返回/抛出/被拒绝，`refused` 与「断言失败」是两种结果。声明 `--fixtures` 的运行会在记录里标为 mock，结果不得读作真实环境观测。
 
 **当前连线是静态候选，不是数据流执行顺序或运行血流。** 计算器同时出现加、减、除候选，不能据此声称一次加法执行过所有分支。Flow 事实是声明 profile 内的静态推导：未知构造、外部调用效果与跨过程值流都保留为显式 unknown。`examples/flow-lab` 是局部语义事实的集成测试样例（finally、短路、循环、分支候选、显式 unknown）。

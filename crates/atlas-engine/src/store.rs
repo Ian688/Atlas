@@ -154,7 +154,18 @@ impl Store {
             terminal_reason TEXT,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL);
-          CREATE INDEX IF NOT EXISTS patch_proposals_entity ON patch_proposals(analysis_id,entity_id,created_at);")?;
+          CREATE INDEX IF NOT EXISTS patch_proposals_entity ON patch_proposals(analysis_id,entity_id,created_at);
+          CREATE TABLE IF NOT EXISTS scenario_results(
+            id TEXT PRIMARY KEY,
+            analysis TEXT NOT NULL,
+            symbol TEXT NOT NULL,
+            name TEXT NOT NULL,
+            passed INTEGER NOT NULL,
+            failed INTEGER NOT NULL,
+            refused INTEGER NOT NULL,
+            body TEXT NOT NULL,
+            created_at INTEGER NOT NULL);
+          CREATE INDEX IF NOT EXISTS scenario_results_symbol ON scenario_results(analysis,symbol,created_at);")?;
             Ok(())
         })?;
         // Additive migration. A store created before the queue existed has a
@@ -594,6 +605,107 @@ impl Store {
             Ok(())
         })?;
         Ok(id)
+    }
+
+    /// Publish a scenario result.
+    ///
+    /// A scenario is evidence: it says which cases ran and how each ended. It
+    /// used to exist only on stdout, which meant a consumer had to capture a
+    /// stream to ask "what did this scenario do last time". The id is a digest
+    /// of the result, so the same scenario over the same pinned analysis is the
+    /// same record.
+    pub fn publish_scenario_result(&self, result: &mut serde_json::Value) -> Result<String> {
+        let analysis = result
+            .get("analysis_id")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| invalid("scenario_missing_analysis"))?
+            .to_string();
+        let symbol = result
+            .get("symbol")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| invalid("scenario_missing_symbol"))?
+            .to_string();
+        let name = result
+            .get("name")
+            .and_then(|value| value.as_str())
+            .unwrap_or("scenario")
+            .to_string();
+        let count = |key: &str, value: &serde_json::Value| {
+            value.get(key).and_then(|item| item.as_u64()).unwrap_or(0) as i64
+        };
+        let (passed, failed, refused) = (
+            count("passed", result),
+            count("failed", result),
+            count("refused", result),
+        );
+        let body = serde_json::to_string(result)?;
+        let id = digest(body.as_bytes());
+        if let Some(object) = result.as_object_mut() {
+            object.insert("id".into(), serde_json::json!(id));
+        }
+        let stored = serde_json::to_string(result)?;
+        let created_at = crate::job::now_ms();
+        let conn = self.connection()?;
+        retry_on_busy(|| {
+            let tx = rusqlite::Transaction::new_unchecked(
+                &conn,
+                rusqlite::TransactionBehavior::Immediate,
+            )?;
+            let existing: Option<String> = tx
+                .query_row(
+                    "SELECT body FROM scenario_results WHERE id=?1",
+                    [&id],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            if existing.is_none() {
+                tx.execute(
+                    "INSERT INTO scenario_results VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)",
+                    params![
+                        id, analysis, symbol, name, passed, failed, refused, stored, created_at
+                    ],
+                )?;
+            }
+            tx.commit()?;
+            Ok(())
+        })?;
+        Ok(id)
+    }
+
+    pub fn scenario_result(&self, id: &str) -> Result<serde_json::Value> {
+        let body: Option<String> = self
+            .connection()?
+            .query_row(
+                "SELECT body FROM scenario_results WHERE id=?1",
+                [id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        serde_json::from_str(&body.ok_or_else(|| invalid("scenario_result_not_found"))?)
+            .map_err(Into::into)
+    }
+
+    /// Scenario results for one symbol or one analysis, newest first.
+    pub fn scenario_results(
+        &self,
+        analysis: &str,
+        symbol: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<serde_json::Value>> {
+        let limit = limit.clamp(1, 200);
+        let conn = self.connection()?;
+        let mut statement = conn.prepare(
+            "SELECT body FROM scenario_results WHERE analysis=?1 AND (?2 IS NULL OR symbol=?2)
+             ORDER BY created_at DESC, id DESC LIMIT ?3",
+        )?;
+        let rows = statement.query_map(params![analysis, symbol, limit as i64], |row| {
+            row.get::<_, String>(0)
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(serde_json::from_str(&row?)?);
+        }
+        Ok(out)
     }
 
     pub fn exec_record(&self, id: &str) -> Result<serde_json::Value> {

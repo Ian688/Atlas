@@ -121,6 +121,9 @@ const markers = await client.runMarkers();
 record('run_markers', markers.markers.length);
 record('run_markers_note', markers.note.includes('不是调用路径'));
 
+const scenarios = await client.scenarios();
+record('scenario_count', scenarios.scenarios.length);
+
 const relocation = await client.relocate({ entity: 'double', fromAnalysis: report.id });
 record('relocate_same_version', relocation.relocation.matched_by);
 
@@ -226,6 +229,8 @@ class HostSeam(unittest.TestCase):
     def test_a_host_can_ask_what_an_old_selection_becomes_here(self):
         report = self.drive()
         self.assertEqual(report["relocate_same_version"], "same_version")
+        # No scenario was run by this driver; an empty list is the honest answer.
+        self.assertEqual(report["scenario_count"], 0)
 
     def test_a_host_can_register_and_read_a_patch_proposal(self):
         report = self.drive()
