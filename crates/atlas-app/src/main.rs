@@ -165,6 +165,12 @@ enum Action {
         /// The receiver for the enclosing (`--via`) call, as JSON.
         #[arg(long = "via-this")]
         via_this: Option<String>,
+        /// What the isolated copy is made of: `snapshot` (every captured file,
+        /// the default) or `dependencies` (the target's static import closure
+        /// plus package.json files). A slice is a tighter read boundary and is
+        /// recorded as such.
+        #[arg(long, default_value = "snapshot")]
+        materialise: String,
         /// Declare that this run used mocks/fixtures, so its result can never
         /// be read as an observation of the real project environment.
         #[arg(long)]
@@ -1105,6 +1111,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             via,
             via_args,
             via_this,
+            materialise,
             fixtures,
             fixture_note,
             history,
@@ -1151,6 +1158,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 fixtures,
                 fixture_note,
                 label: None,
+                materialise: Some(materialise),
                 via: match via {
                     // Resolved like the target: `--via` names a real published
                     // symbol, and `decide` then compares it against the

@@ -141,6 +141,27 @@ export function outerFactory(start) {
 """
 
 
+# A small module graph for the materialisation cases: `a` imports `b` imports
+# `c`, `sibling` is never imported by anything, and `reader` reads a data file
+# and imports a module whose specifier is computed at runtime. That is exactly
+# the set of things a static closure can and cannot carry.
+SLICE_CHAIN = {
+    "src/chain/a.js": "import { fromB } from './b.js';\nexport function run(x) { return fromB(x) + 1; }\n",
+    "src/chain/b.js": "import { fromC } from './c.js';\nexport function fromB(x) { return fromC(x) * 2; }\n",
+    "src/chain/c.js": "export function fromC(x) { return x + 3; }\n",
+    "src/chain/sibling.js": "export function never() { return 'never'; }\n",
+    "src/chain/data.txt": "unrelated data file\n",
+    "src/chain/reader.js": (
+        "import fs from 'node:fs';\n"
+        "export function readSibling() { return fs.readFileSync('src/chain/data.txt', 'utf8').length; }\n"
+        "export async function readDynamic(name) {\n"
+        "  const mod = await import('./' + name + '.js');\n"
+        "  return Object.keys(mod).length;\n"
+        "}\n"
+    ),
+}
+
+
 def decode(value):
     """Mirror of the harness' tagged encoding, for readable assertions."""
     if not isinstance(value, dict) or "kind" not in value:
@@ -171,6 +192,9 @@ class Execution(unittest.TestCase):
         # reachable through the function that actually encloses it.
         self.closures = self.project / "src" / "closures.js"
         self.closures.write_text(CLOSURES, encoding="utf-8")
+        (self.project / "src" / "chain").mkdir(parents=True)
+        for relative, text in SLICE_CHAIN.items():
+            (self.project / relative).write_text(text, encoding="utf-8")
         self.store = self.base / "store"
         self.analysis = self.index()
         self.escape = Path("/tmp/atlas-exec-escape.txt")
@@ -749,6 +773,81 @@ class Execution(unittest.TestCase):
         self.assertFalse(bad["decision"]["allowed"])
         self.assertEqual(bad["decision"]["refusal"]["code"], "via_not_the_enclosing_symbol")
         self.assertFalse(bad["will_start_process"])
+
+    # -- what the isolated copy is made of ---------------------------------
+    def test_a_dependency_slice_carries_the_transitive_import_closure(self):
+        record = self.exec("src/chain/a.js:run", [4], grants=GRANTS,
+                           extra=["--materialise", "dependencies"])
+        self.assertEqual(record["verdict"], "returned", record.get("thrown"))
+        self.assertEqual(decode(record["value"]), 15, "c(4)=7, b=14, a=15")
+        materialisation = record["isolation"]["materialisation"]
+        self.assertEqual(materialisation["mode"], "dependencies")
+        written = set(materialisation["written"])
+        self.assertEqual(written, {"package.json", "src/chain/a.js", "src/chain/b.js", "src/chain/c.js"},
+                         "the closure is transitive, and nothing else comes along")
+        self.assertEqual(materialisation["closure"]["reached"], 3)
+        self.assertEqual(materialisation["closure"]["seed"], "src/chain/a.js")
+        # A bare specifier (`node:fs` elsewhere in the project) is not this
+        # run's problem; a *relative* import Atlas could not map would be.
+        self.assertEqual(materialisation["closure"]["unresolved_relative"], [])
+        self.assertFalse(materialisation["closure"]["bounded"])
+        self.assertLess(materialisation["files_written"], materialisation["files_in_snapshot"])
+        self.assertEqual(record["isolation"]["files_materialised"], materialisation["files_written"])
+
+    def test_the_default_copy_is_still_the_whole_snapshot(self):
+        record = self.exec("src/chain/a.js:run", [4], grants=GRANTS)
+        materialisation = record["isolation"]["materialisation"]
+        self.assertEqual(materialisation["mode"], "snapshot", "the default must not narrow anything")
+        self.assertEqual(materialisation["files_written"], materialisation["files_in_snapshot"])
+        written = set(materialisation["written"])
+        self.assertIn("src/chain/sibling.js", written, "a snapshot copy keeps files the target never imports")
+        self.assertIn("src/chain/data.txt", written)
+        self.assertEqual(materialisation["known_risk"], [])
+
+    def test_a_slice_narrows_the_read_boundary_and_the_record_says_how_to_recheck(self):
+        # The point of a slice: a file the target never imports but reads at
+        # runtime is no longer in the copy. The run fails honestly, and the
+        # record names the risk and the way to re-check.
+        sliced = self.exec("src/chain/reader.js:readSibling", [], grants=GRANTS,
+                           extra=["--materialise", "dependencies"])
+        self.assertEqual(sliced["verdict"], "threw")
+        self.assertEqual(sliced["thrown"]["name"], "Error")
+        self.assertIn("ENOENT", sliced["thrown"]["message"])
+        self.assertEqual(set(sliced["isolation"]["materialisation"]["written"]),
+                         {"package.json", "src/chain/reader.js"})
+        self.assertTrue(sliced["isolation"]["materialisation"]["known_risk"],
+                        "a slice must state what it cannot carry")
+        self.assertIn("--materialise snapshot", sliced["isolation"]["materialisation"]["fallback"])
+        # The same call against the whole snapshot succeeds, so the difference is
+        # the copy's extent and not the function.
+        whole = self.exec("src/chain/reader.js:readSibling", [], grants=GRANTS,
+                          extra=["--materialise", "snapshot"])
+        self.assertEqual(whole["verdict"], "returned", whole.get("thrown"))
+        self.assertEqual(decode(whole["value"]), len("unrelated data file\n"))
+
+    def test_a_computed_dynamic_import_is_a_named_risk_not_a_silent_success(self):
+        # A specifier computed at runtime is not in the static graph, so the
+        # module it names cannot be in the closure. The limitation is declared in
+        # advance, and the run fails loudly rather than returning something else.
+        sliced = self.exec("src/chain/reader.js:readDynamic", ["c"], grants=GRANTS,
+                           extra=["--materialise", "dependencies"])
+        self.assertEqual(sliced["verdict"], "threw")
+        self.assertIn("Cannot find module", sliced["thrown"]["message"])
+        risks = " ".join(sliced["isolation"]["materialisation"]["known_risk"])
+        self.assertIn("动态 import", risks, "the dynamic-import risk must be declared in the record")
+        whole = self.exec("src/chain/reader.js:readDynamic", ["c"], grants=GRANTS,
+                          extra=["--materialise", "snapshot"])
+        self.assertEqual(whole["verdict"], "returned", whole.get("thrown"))
+        self.assertEqual(decode(whole["value"]), 1)
+
+    def test_an_unknown_materialise_mode_is_rejected(self):
+        result = subprocess.run(
+            [str(BIN), "--store", str(self.store), "exec", self.analysis, "add",
+             "--args", "[1,2]", "--materialise", "everything"],
+            cwd=ROOT, capture_output=True, text=True, timeout=120,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("invalid_materialise_mode", result.stderr)
 
     # -- scenarios --------------------------------------------------------
     def scenario(self, cases):

@@ -712,12 +712,31 @@ pub async fn execute(
         return Ok(record);
     }
 
+    // What the isolated copy is made of. A `dependencies` slice is computed
+    // from the *published* import graph, so it is evidence about this analysis,
+    // not a guess about the filesystem.
+    let mode = exec::materialise_mode(spec.materialise.as_deref()).map_err(|e| e.to_string())?;
+    let slice = if mode == exec::MATERIALISE_DEPENDENCIES {
+        let closure = exec::import_closure(store, &spec.analysis_id, &pinned.path)
+            .map_err(|e| format!("import_closure_failed:{e}"))?;
+        Some(exec::SliceSpec {
+            seed: pinned.path.clone(),
+            files: closure.files,
+            unresolved_relative: closure.unresolved_relative,
+            unresolved_bare: closure.unresolved_bare,
+            edges_read: closure.edges_read,
+            bounded: closure.bounded,
+        })
+    } else {
+        None
+    };
     let prepared = exec::prepare(
         store,
         &pinned.snapshot,
         &pinned.path,
         pinned.start,
         pinned.end,
+        slice.as_ref(),
     )
     .map_err(|e| format!("prepare_failed:{e}"))?;
     let marker = format!(
@@ -777,6 +796,10 @@ pub async fn execute(
         "effective_flags": args,
         "workdir_digest": prepared.workdir_digest,
         "files_materialised": prepared.manifest.len(),
+        // What the copy is made of, and on what basis. A sliced copy is a
+        // tighter read boundary, and a reader has to be able to see that from
+        // the record alone.
+        "materialisation": prepared.materialisation,
         "environment_allowlist": spec.env.keys().collect::<Vec<_>>(),
         "path_inherited": true,
         "mocks": spec.fixtures,

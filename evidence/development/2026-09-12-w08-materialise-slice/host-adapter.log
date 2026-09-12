@@ -1,0 +1,63 @@
+test_a_host_can_ask_what_an_old_selection_becomes_here (__main__.HostSeam.test_a_host_can_ask_what_an_old_selection_becomes_here) ... ok
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='UTF-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+test_a_host_can_plan_and_then_run_a_controlled_call (__main__.HostSeam.test_a_host_can_plan_and_then_run_a_controlled_call) ... ok
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='UTF-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+test_a_host_can_register_and_read_a_patch_proposal (__main__.HostSeam.test_a_host_can_register_and_read_a_patch_proposal) ... ok
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='UTF-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+test_a_host_can_work_end_to_end_over_the_service (__main__.HostSeam.test_a_host_can_work_end_to_end_over_the_service) ... ok
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='UTF-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+test_a_host_reaches_a_closure_through_its_enclosing_function (__main__.HostSeam.test_a_host_reaches_a_closure_through_its_enclosing_function) ... ok
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='UTF-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+test_the_adapter_has_no_storage_access (__main__.HostSeam.test_the_adapter_has_no_storage_access) ... ok
+test_the_adapter_only_uses_published_endpoints (__main__.HostSeam.test_the_adapter_only_uses_published_endpoints) ... ok
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='UTF-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+test_the_bounded_bridge_is_reachable_from_a_host (__main__.HostSeam.test_the_bounded_bridge_is_reachable_from_a_host) ... ok
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='UTF-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+test_the_contract_does_not_leak_the_store_layout (__main__.HostSeam.test_the_contract_does_not_leak_the_store_layout) ... ok
+test_the_contract_requires_the_session_like_every_other_query (__main__.HostSeam.test_the_contract_requires_the_session_like_every_other_query) ... ok
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:84: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='UTF-8'>
+  return self.run(*args, **kwds)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:84: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
+  return self.run(*args, **kwds)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+
+----------------------------------------------------------------------
+Ran 10 tests in 10.261s
+
+OK

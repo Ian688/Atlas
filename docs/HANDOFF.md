@@ -43,7 +43,7 @@
 
 先做 ExecutionProfile 和充分性报告，将函数分为可纯调用、需上下文、需入口驱动、当前不支持。需要 this、数据库/网络/文件副作用时列出依赖与环境，不“new Function + 源码片段”强行执行。需要闭包时不构造作用域、也不接受函数值输入：`--via <enclosing-symbol>` 先调用**恰好是目标包含函数**的那个函数，再只调用它返回的、源码与目标钉住字节一致的那个实例（`closure_not_returned` / `closure_identity_mismatch` 是观测，更深的链静态拒绝）。
 
-Runner 使用隔离工作副本和用户项目真实环境，不用 Atlas 的 Node 版本假冒目标环境。显式 effects/网络/文件/数据库权限、fixture/mocks 标签、进程树生命周期、日志/输出预算。RunSpec 固定源码版本和调用入口，Trace 映射 build/source map，观测事件有实际来源。测试“复制函数”须核对源/目标字节、目录范围、异常、覆盖/权限与副作用，不只是返回值为 true。
+Runner 使用隔离工作副本和用户项目真实环境，不用 Atlas 的 Node 版本假冒目标环境。副本的**范围**是一个被记录的选择而不是隐含行为：`--materialise snapshot`（默认，整快照）或 `dependencies`（目标文件的静态 import 闭包 + 全部 package.json，因为 Node 靠后者决定模块类型）。切片是更紧的读边界：运行时按相对路径读取却从未 import 的文件会以 ENOENT 失败，记录里 `known_risk` 事先列出、`fallback` 说明复核方式（`--materialise snapshot`），未解析的相对 import 逐个具名，遍历触顶报 `bounded`。显式 effects/网络/文件/数据库权限、fixture/mocks 标签、进程树生命周期、日志/输出预算。RunSpec 固定源码版本和调用入口，Trace 映射 build/source map，观测事件有实际来源。测试“复制函数”须核对源/目标字节、目录范围、异常、覆盖/权限与副作用，不只是返回值为 true。
 
 验收：纯函数、上下文函数、异步和失败分支、循环/取消、禁止副作用、mock 与真实结果区分、source drift。图中未知路径与缺失采样要显示，不能用静态 BFS 作为实际 Trace 顺序。
 

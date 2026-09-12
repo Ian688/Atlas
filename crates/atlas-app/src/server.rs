@@ -730,6 +730,10 @@ async fn exec(
         fixture_note: request.fixture_note,
         label: Some("http".into()),
         via,
+        // The page does not choose the copy's extent: narrowing a read boundary
+        // is a decision for whoever can see the record, not for a page that
+        // states inputs for someone else's function.
+        materialise: None,
     };
     let store = app.store.clone();
     let outcome = tokio::spawn(async move {

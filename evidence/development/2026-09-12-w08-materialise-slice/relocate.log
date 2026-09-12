@@ -1,0 +1,32 @@
+test_a_function_moved_to_another_file_and_renamed_is_refused (__main__.Relocation.test_a_function_moved_to_another_file_and_renamed_is_refused) ... ok
+test_a_pure_move_relocates_by_identical_bytes (__main__.Relocation.test_a_pure_move_relocates_by_identical_bytes) ... ok
+test_a_renamed_and_edited_entity_is_refused_not_guessed (__main__.Relocation.test_a_renamed_and_edited_entity_is_refused_not_guessed) ... ok
+test_a_withdrawn_file_is_named_as_a_withdrawal (__main__.Relocation.test_a_withdrawn_file_is_named_as_a_withdrawal) ... ok
+test_an_edited_entity_relocates_and_reports_that_the_bytes_changed (__main__.Relocation.test_an_edited_entity_relocates_and_reports_that_the_bytes_changed) ... ok
+test_an_entity_deleted_from_a_live_file_has_no_counterpart (__main__.Relocation.test_an_entity_deleted_from_a_live_file_has_no_counterpart) ... ok
+test_an_unchanged_entity_relocates_by_path_and_name (__main__.Relocation.test_an_unchanged_entity_relocates_by_path_and_name) ... ok
+test_an_unknown_entity_cannot_even_be_asked_about (__main__.Relocation.test_an_unknown_entity_cannot_even_be_asked_about) ... ok
+test_an_unknown_target_analysis_is_an_error (__main__.Relocation.test_an_unknown_target_analysis_is_an_error) ... ok
+test_relocating_does_not_touch_any_stored_record (__main__.Relocation.test_relocating_does_not_touch_any_stored_record) ... ok
+test_the_same_version_needs_no_relocation (__main__.Relocation.test_the_same_version_needs_no_relocation) ... ok
+test_two_identical_copies_are_an_ambiguity_not_a_pick (__main__.Relocation.test_two_identical_copies_are_an_ambiguity_not_a_pick) ... ok
+test_http_relocation_refuses_without_a_source_version (__main__.RelocationHttp.test_http_relocation_refuses_without_a_source_version) ... ok
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='UTF-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+test_http_relocation_requires_the_session (__main__.RelocationHttp.test_http_relocation_requires_the_session) ... ok
+test_http_relocation_returns_the_decision_and_a_pinned_selection (__main__.RelocationHttp.test_http_relocation_returns_the_decision_and_a_pinned_selection) ... ok
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:84: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='UTF-8'>
+  return self.run(*args, **kwds)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:84: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
+  return self.run(*args, **kwds)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+
+----------------------------------------------------------------------
+Ran 15 tests in 16.594s
+
+OK

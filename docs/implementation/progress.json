@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-city-lod",
+    "window": "2026-09-12/w08-materialise-slice",
     "status": "DELIVERED",
-    "note": "3D 正式层级与 LOD：project→district→file 不可裁剪层级 + 每层视图；聚合守恒逐层重加并显示；层级省略与预算截断分开；聚合柱体不冒充文件。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-city-lod",
-    "verification": "evidence/development/2026-09-12-w09-city-lod/verification.json"
+    "note": "受控运行的副本范围可选：dependencies 只物化静态 import 闭包 + package.json，是更紧的读边界；记录含依据、计数、未解析 import 分类、已知风险与复核方式；真实项目上实测 2277→7 文件。",
+    "evidence_dir": "evidence/development/2026-09-12-w08-materialise-slice",
+    "verification": "evidence/development/2026-09-12-w08-materialise-slice/verification.json"
   },
   "windows": [
     {
@@ -337,10 +337,19 @@
       ],
       "note": "城市从一张固定图变成 一个模型 + 每层一张视图：buildCityHierarchy（不可裁剪、目录/项目为子节点之和）、cityLevelView（项目/目录/文件三种画法，共享打包路径避免层级间不一致）、cityLevelInvariants（逐层重加，project==Σdistrict==Σfile 才算守恒，页面上显示）。LOD 不改变事实数量因此是结构性保证；层级省略与预算截断分开报；聚合柱体 aggregate=true、无单一源码、共享选区落到粗层级指名真实文件并标注聚合；运行标记按 filePaths 落在聚合柱体上并写明是聚合。顺带修掉 maxFiles=0 被 || 缺省吞掉的预算 bug。city3d 行为用例 17→23。",
       "report": "evidence/development/2026-09-12-w09-city-lod/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/w08-materialise-slice",
+      "status": "DELIVERED",
+      "work_items": [
+        "W08-dependency-slice"
+      ],
+      "note": "--materialise snapshot|dependencies：dependencies 走已发布 import 边的传递闭包（type_import 不跟随）+ 全部 package.json（Node 模块类型判定，rxjs dist/cjs 靠它按 CJS 载入），闭包遍历有界。记录把 range 变成证据：files_written/files_in_snapshot/bytes_written/written[]/closure（未解析 import 分 relative（具名）与 bare（计数））/known_risk/fallback。真实项目（rxjs@7.8.1，dist/cjs/internal/util/isFunction.js:isFunction，两种模式都真的 returned）快照 2277 文件 4,501,327B vs 切片 7 文件 9,514B。execution 用例 50→55。",
+      "report": "evidence/development/2026-09-12-w08-materialise-slice/REPORT.md"
     }
   ],
-  "next_work_item": "依赖切片（受控运行只物化目标闭包）或多级 via 组合",
-  "next_action": "本轮交付 3D 正式层级与 LOD：形式层级不可裁剪、聚合守恒可检查、层级省略与预算截断分开、聚合永不冒充文件。剩余按价值：(1) 依赖切片——受控运行仍物化整个快照；(2) 多级 via 组合（outer→middle→inner）；(3) 2D 画布的正式层级与更大的空间索引；(4) 并发的下一步：大仓库/monorepo、多语言、Windows、并发度上限；(5) 城市里的运行激活路径需要行级/调用级采样，Atlas 目前只有入口观测，不能诚实画出。",
+  "next_work_item": "多级 via 组合（outer→middle→inner），或并发下一步（大仓库/monorepo、多语言、Windows、并发度上限）",
+  "next_action": "本轮交付受控运行的副本范围选择（dependencies 切片）：更紧的读边界、依据与风险全部落进记录、真实项目实测文件数与字节数。剩余按价值：(1) 多级 via 组合；(2) 并发下一步——大仓库/monorepo、多语言、Windows、并发度上限与有界并行策略；(3) 2D 画布的正式层级与空间索引；(4) patch 提案的创建/删除/重命名文件形式与图形化一键撤销；(5) 城市里的运行激活路径需要行级/调用级采样，Atlas 目前只有入口观测。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
@@ -722,7 +731,8 @@
         "FlowFunction.imports（运行时可导入名，import type 排除）+ FunctionFlowFact.imports；engine 的 ReadExternal 仅在该名不是 import 时置 may_access_global",
         "单一 WORKER_PRODUCER 常量：不兼容的 worker 输出被具名拒绝（worker_producer_not_supported / flow_producer_mismatch），而不是被读成相反结论；ENGINE_VERSION/ALGORITHM_VERSION 同步提升（0.2.2 / 0.2.2）",
         "场景结果落库：atlas exec --scenario 发布不可变 scenario_results（逐用例结局、passed/failed/refused、declared/attempted、stopped），--scenario-history 与 GET /api/scenarios、/api/scenario 可读；id 是结果摘要，同场景同分析幂等",
-        "嵌套闭包经包含函数取得实例（--via）：捕获绑定不可声明（unsatisfiable_context=captures，并给出 captures 名与 enclosing_symbol/enclosing_name）；--via 必须等于目标包含符号，否则 via_not_the_enclosing_symbol；harness 两阶段（阶段1调包含函数，阶段2只调用返回值中 Function.toString() 与目标钉住字节一致的那个函数），命名空间查找按阶段区分（enclosing_not_exported / target_not_exported）；closure_not_returned 与 closure_identity_mismatch 保留观测到的返回值/源码；只支持一层，更深链静态拒绝 closure_depth_not_supported；via.source_binding 与目标 source_binding 同样重新哈希校验"
+        "嵌套闭包经包含函数取得实例（--via）：捕获绑定不可声明（unsatisfiable_context=captures，并给出 captures 名与 enclosing_symbol/enclosing_name）；--via 必须等于目标包含符号，否则 via_not_the_enclosing_symbol；harness 两阶段（阶段1调包含函数，阶段2只调用返回值中 Function.toString() 与目标钉住字节一致的那个函数），命名空间查找按阶段区分（enclosing_not_exported / target_not_exported）；closure_not_returned 与 closure_identity_mismatch 保留观测到的返回值/源码；只支持一层，更深链静态拒绝 closure_depth_not_supported；via.source_binding 与目标 source_binding 同样重新哈希校验",
+        "副本范围可选且被记录：--materialise snapshot（默认，整快照）| dependencies（目标文件的静态 import 闭包 + 全部 package.json，package.json 有上限）。记录含 mode/basis/files_written/files_in_snapshot/bytes_written/written[]/closure{seed,reached,unresolved_relative[],unresolved_bare,import_edges_read,bounded}/known_risk[]/fallback；未解析 import 分相对（具名）与裸（计数）；动态 import 与运行时数据文件读取列为已知风险；触顶报 bounded；副本缺目标即拒绝 slice_missing_target；HTTP 不允许页面选择范围"
       ],
       "evidence": [
         "crates/atlas-engine/src/exec.rs（8 个单测：分类顺序/arity/参数顺序/partial 降级/dynamic 拒绝/缺授权/路径校验/栈帧映射）",

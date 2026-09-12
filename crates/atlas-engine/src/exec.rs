@@ -23,6 +23,139 @@ pub const EXEC_RECORD_SCHEMA: &str = "atlas.execution-record.v1";
 pub const SCENARIO_SCHEMA: &str = "atlas.scenario.v1";
 pub const HARNESS_SCHEMA: &str = "atlas.execution-harness.v1";
 
+/// What an isolated copy is made of. `snapshot` writes every captured file,
+/// which is what a run always did; `dependencies` writes the transitive static
+/// import closure of the target's file plus the `package.json` files Node needs
+/// for module resolution. The second is a *tighter read boundary*, not a
+/// smaller project: a file the target reads at runtime but never imports is
+/// absent from it, and that is reported rather than papered over.
+pub const MATERIALISE_SNAPSHOT: &str = "snapshot";
+pub const MATERIALISE_DEPENDENCIES: &str = "dependencies";
+/// A bound on the closure walk. Reaching it is reported (`bounded: true`) rather
+/// than silently producing a copy that is missing files.
+const SLICE_MAX_FILES: usize = 20_000;
+const SLICE_MAX_EDGES: usize = 400_000;
+const SLICE_MAX_PACKAGE_JSON: usize = 512;
+/// How many written paths a record lists before it only reports the count.
+const SLICE_LIST_LIMIT: usize = 200;
+
+pub fn materialise_mode(value: Option<&str>) -> Result<&'static str> {
+    match value {
+        None | Some(MATERIALISE_SNAPSHOT) => Ok(MATERIALISE_SNAPSHOT),
+        Some(MATERIALISE_DEPENDENCIES) => Ok(MATERIALISE_DEPENDENCIES),
+        Some(_) => Err(invalid("invalid_materialise_mode")),
+    }
+}
+
+/// The static import closure of one file, read from the published graph.
+pub struct ImportClosure {
+    pub files: BTreeSet<String>,
+    /// Relative specifiers on reached files that the worker could not map onto a
+    /// snapshot path. These are the ones that can break a sliced run, so they
+    /// are named rather than counted.
+    pub unresolved_relative: Vec<String>,
+    /// Bare specifiers on reached files: builtins and installed packages. Node
+    /// resolves them outside the copy; the closure neither contains nor needs
+    /// them, and a package that is not installed was never in the snapshot in
+    /// either mode.
+    pub unresolved_bare: usize,
+    pub edges_read: usize,
+    pub bounded: bool,
+}
+
+/// A specifier is "relative" when Node would resolve it against the file's own
+/// directory -- exactly the case a copy can break, because the file it names is
+/// supposed to be beside it.
+fn is_relative_specifier(specifier: &str) -> bool {
+    specifier.starts_with("./")
+        || specifier.starts_with("../")
+        || specifier == "."
+        || specifier == ".."
+}
+
+/// Walk published `import` edges from `seed` to a fixed point.
+///
+/// Type-only imports are not followed: they are erased before the module ever
+/// runs, so the file they name is not needed to execute it. An unresolved
+/// import (a specifier the worker could not map onto a snapshot path) is counted
+/// and not invented -- a run that needs one fails to load, and saying so is more
+/// useful than a copy that silently contains nothing for it.
+pub fn import_closure(store: &Store, analysis: &str, seed: &str) -> Result<ImportClosure> {
+    // (target, specifier) per source file, so an unresolved edge can be told
+    // apart from a resolved one without re-reading the graph.
+    let mut forward: BTreeMap<String, Vec<(Option<String>, String)>> = BTreeMap::new();
+    let mut cursor: Option<String> = None;
+    let mut edges_read = 0usize;
+    let mut bounded = false;
+    // `Store::edges` caps a page at 500.
+    for _ in 0..(SLICE_MAX_EDGES / 500 + 1) {
+        let page = store.edges(analysis, "import", 500, cursor.as_deref())?;
+        for edge in &page.items {
+            edges_read += 1;
+            let Some(source) = edge.source.strip_prefix("file:") else {
+                continue;
+            };
+            let target = edge
+                .target
+                .as_deref()
+                .map(|target| target.strip_prefix("file:").unwrap_or(target).to_string());
+            forward
+                .entry(source.to_string())
+                .or_default()
+                .push((target, edge.label.clone()));
+        }
+        if edges_read >= SLICE_MAX_EDGES {
+            bounded = true;
+            break;
+        }
+        cursor = page.next_cursor;
+        if cursor.is_none() {
+            break;
+        }
+    }
+    let mut files: BTreeSet<String> = BTreeSet::new();
+    files.insert(seed.to_string());
+    let mut unresolved_relative: BTreeSet<String> = BTreeSet::new();
+    let mut unresolved_bare = 0usize;
+    let mut queue: std::collections::VecDeque<String> = std::collections::VecDeque::new();
+    queue.push_back(seed.to_string());
+    while let Some(path) = queue.pop_front() {
+        let Some(edges) = forward.get(&path) else {
+            continue;
+        };
+        for (target, specifier) in edges {
+            let Some(target) = target else {
+                // Only the specifiers on files the closure actually reaches can
+                // affect this run; counting the whole graph's would report
+                // other modules' imports as if they were this run's problem.
+                if is_relative_specifier(specifier) {
+                    unresolved_relative.insert(specifier.clone());
+                } else {
+                    unresolved_bare += 1;
+                }
+                continue;
+            };
+            if files.contains(target) {
+                continue;
+            }
+            if files.len() >= SLICE_MAX_FILES {
+                bounded = true;
+                queue.clear();
+                break;
+            }
+            files.insert(target.clone());
+            queue.push_back(target.clone());
+        }
+    }
+    Ok(ImportClosure {
+        files,
+        unresolved_relative: unresolved_relative.into_iter().take(20).collect(),
+        unresolved_bare,
+        edges_read,
+        bounded,
+    })
+}
+
 pub const CLASS_PURE: &str = "pure_callable";
 pub const CLASS_CONTEXT: &str = "needs_context";
 pub const CLASS_DRIVER: &str = "needs_entry_driver";
@@ -183,6 +316,12 @@ pub struct RunSpec {
     /// against the pinned bytes of the target symbol.
     #[serde(default)]
     pub via: Option<ViaSpec>,
+    /// What the isolated copy is made of: `snapshot` (every captured file, the
+    /// default) or `dependencies` (the target's static import closure plus the
+    /// package.json files Node reads). The second is a tighter read boundary
+    /// and is recorded as such; it is never the silent default.
+    #[serde(default)]
+    pub materialise: Option<String>,
 }
 
 /// One stage of a `via` run: the enclosing function Atlas calls first.
@@ -242,6 +381,7 @@ impl RunSpec {
                 return Err(invalid("invalid_env_key"));
             }
         }
+        materialise_mode(self.materialise.as_deref())?;
         if let Some(via) = &self.via {
             if via.symbol.is_empty() || via.symbol.len() > 512 || via.symbol.contains('\0') {
                 return Err(invalid("invalid_via_symbol"));
@@ -1119,6 +1259,8 @@ pub struct PreparedRun {
     pub manifest: Vec<(String, String)>,
     pub workdir_digest: String,
     pub target_source: String,
+    /// What was written and on what basis, as it will appear in the record.
+    pub materialisation: serde_json::Value,
 }
 
 /// The bytes of one symbol slice, read from the pinned snapshot blobs. Every
@@ -1146,12 +1288,23 @@ pub fn source_slice(
         .to_string())
 }
 
+/// What a `dependencies` copy keeps, and the evidence for why.
+pub struct SliceSpec {
+    pub seed: String,
+    pub files: BTreeSet<String>,
+    pub unresolved_relative: Vec<String>,
+    pub unresolved_bare: usize,
+    pub edges_read: usize,
+    pub bounded: bool,
+}
+
 pub fn prepare(
     store: &Store,
     snapshot: &Snapshot,
     symbol_path: &str,
     symbol_start: usize,
     symbol_end: usize,
+    slice: Option<&SliceSpec>,
 ) -> Result<PreparedRun> {
     // The copy must live on a canonical path. On macOS `$TMPDIR` is reached
     // through the `/var -> /private/var` symlink, and Node's module loader
@@ -1163,19 +1316,49 @@ pub fn prepare(
         .prefix("atlas-run-")
         .tempdir_in(base)?;
     let root = dir.path().to_path_buf();
+    // A sliced copy always carries the target file and every `package.json` in
+    // the snapshot: Node reads the nearest one for module type resolution, and a
+    // copy that dropped them would change how the same bytes are interpreted.
+    // The second is a bounded, reported inclusion rather than a hidden one.
+    let mut package_json_kept = 0usize;
+    let mut package_json_skipped = 0usize;
+    let keep = |path: &str| -> bool {
+        match slice {
+            None => true,
+            Some(slice) => slice.files.contains(path) || path == symbol_path,
+        }
+    };
     let mut manifest = Vec::new();
+    let mut bytes_written = 0usize;
     for entry in &snapshot.entries {
         let Some(blob) = &entry.blob else {
             continue;
         };
+        let is_package_json = entry.path == "package.json" || entry.path.ends_with("/package.json");
+        if slice.is_some() && is_package_json {
+            if package_json_kept >= SLICE_MAX_PACKAGE_JSON {
+                package_json_skipped += 1;
+                continue;
+            }
+            package_json_kept += 1;
+        } else if !keep(&entry.path) {
+            continue;
+        }
         let relative = safe_relative(&entry.path)?;
         let bytes = store.read_blob(blob)?;
+        bytes_written += bytes.len();
         let target = root.join(relative);
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent)?;
         }
         fs::write(&target, &bytes)?;
         manifest.push((entry.path.clone(), blob.clone()));
+    }
+    // Never start a process whose target is not in the copy. With the closure
+    // above this cannot happen, which is exactly why it is asserted here rather
+    // than assumed.
+    if !manifest.iter().any(|(path, _)| path == symbol_path) {
+        return Err(invalid("slice_missing_target"));
     }
     manifest.sort();
     let mut identity = String::new();
@@ -1188,6 +1371,52 @@ pub fn prepare(
     let workdir_digest = digest(identity.as_bytes());
     let module_path = safe_relative(symbol_path)?.to_string_lossy().to_string();
     let target_source = source_slice(store, snapshot, symbol_path, symbol_start, symbol_end)?;
+    let snapshot_files = snapshot
+        .entries
+        .iter()
+        .filter(|entry| entry.blob.is_some())
+        .count();
+    let written: Vec<String> = manifest.iter().map(|(path, _)| path.clone()).collect();
+    let materialisation = serde_json::json!({
+        "mode": if slice.is_some() { MATERIALISE_DEPENDENCIES } else { MATERIALISE_SNAPSHOT },
+        "basis": if slice.is_some() {
+            "已发布 import 边上的传递闭包（type-only import 不跟随：它在运行前就被擦除），加上快照里所有 package.json（Node 用它决定模块类型）"
+        } else {
+            "快照里每一个被捕获的文件"
+        },
+        "files_written": manifest.len(),
+        "files_in_snapshot": snapshot_files,
+        "bytes_written": bytes_written,
+        "written": if written.len() <= SLICE_LIST_LIMIT { serde_json::json!(written) } else { serde_json::json!([]) },
+        "written_listed": written.len().min(SLICE_LIST_LIMIT),
+        "written_truncated": written.len() > SLICE_LIST_LIMIT,
+        "package_json": { "kept": package_json_kept, "skipped_by_cap": package_json_skipped },
+        "closure": slice.map(|slice| serde_json::json!({
+            "seed": slice.seed,
+            "reached": slice.files.len(),
+            // A relative import the graph could not map is the one kind that can
+            // break a sliced run, so it is named. A bare specifier is resolved
+            // by Node outside the copy and is counted only.
+            "unresolved_relative": slice.unresolved_relative,
+            "unresolved_bare": slice.unresolved_bare,
+            "import_edges_read": slice.edges_read,
+            "bounded": slice.bounded,
+        })),
+        "workdir_digest": workdir_digest,
+        "known_risk": if slice.is_some() {
+            serde_json::json!([
+                "动态 import 的计算型 specifier 不在静态图里，因此可能不在副本中",
+                "函数运行时按相对路径读取的其它项目文件不在副本里：这是更紧的读边界，缺失会以 ENOENT 出现",
+            ])
+        } else {
+            serde_json::json!([])
+        },
+        "fallback": if slice.is_some() {
+            "若本次运行以 module_load_failed / ENOENT 失败，可用 --materialise snapshot 复核；切片是静态闭包，不是运行时依赖追踪"
+        } else {
+            ""
+        },
+    });
     let harness = root.join("atlas-harness.mjs");
     fs::write(&harness, HARNESS)?;
     #[cfg(unix)]
@@ -1203,6 +1432,7 @@ pub fn prepare(
         manifest,
         workdir_digest,
         target_source,
+        materialisation,
     })
 }
 
@@ -1516,6 +1746,7 @@ mod tests {
             fixture_note: None,
             label: None,
             via: None,
+            materialise: None,
         }
     }
 
@@ -1553,6 +1784,7 @@ mod tests {
             fixture_note: None,
             label: None,
             via: None,
+            materialise: None,
         };
         let refused = decide(&p, &spec);
         assert!(!refused.allowed);
@@ -1589,6 +1821,7 @@ mod tests {
             fixture_note: None,
             label: None,
             via: None,
+            materialise: None,
         };
         assert_eq!(
             decide(&p, &spec).refusal.unwrap().code,
@@ -1630,6 +1863,7 @@ mod tests {
             fixture_note: None,
             label: None,
             via: None,
+            materialise: None,
         };
         let refused = decide(&p, &spec);
         assert!(!refused.allowed);
@@ -1673,6 +1907,7 @@ mod tests {
             fixture_note: None,
             label: None,
             via: None,
+            materialise: None,
         };
         assert!(!decide(&p, &spec).allowed);
         assert_eq!(decide(&p, &spec).missing_context.len(), 2);
@@ -1710,6 +1945,7 @@ mod tests {
             fixture_note: None,
             label: None,
             via: None,
+            materialise: None,
         };
         // Even a fully permissive spec cannot run an unsupported function.
         assert_eq!(
@@ -1800,6 +2036,35 @@ mod tests {
         };
         let error = spec.validate().unwrap_err().to_string();
         assert!(error.contains("via_symbol_is_the_target"), "{error}");
+    }
+
+    #[test]
+    fn materialise_modes_are_closed_and_the_default_is_the_whole_snapshot() {
+        assert_eq!(materialise_mode(None).unwrap(), MATERIALISE_SNAPSHOT);
+        assert_eq!(
+            materialise_mode(Some(MATERIALISE_SNAPSHOT)).unwrap(),
+            MATERIALISE_SNAPSHOT
+        );
+        assert_eq!(
+            materialise_mode(Some(MATERIALISE_DEPENDENCIES)).unwrap(),
+            MATERIALISE_DEPENDENCIES
+        );
+        // An unknown mode must fail loudly: silently falling back to the whole
+        // snapshot would report a tighter boundary than the one that was used.
+        let error = materialise_mode(Some("everything"))
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("invalid_materialise_mode"), "{error}");
+    }
+
+    #[test]
+    fn only_relative_specifiers_can_break_a_sliced_copy() {
+        for specifier in ["./a.js", "../b.js", ".", ".."] {
+            assert!(is_relative_specifier(specifier), "{specifier}");
+        }
+        for specifier in ["node:fs", "rxjs", "@scope/pkg", "/abs/path.js", ""] {
+            assert!(!is_relative_specifier(specifier), "{specifier}");
+        }
     }
 
     #[test]

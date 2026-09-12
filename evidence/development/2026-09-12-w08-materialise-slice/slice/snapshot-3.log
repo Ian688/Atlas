@@ -1,0 +1,259 @@
+$ /usr/bin/time -l /Users/yinsijie/CodeRepo/Atlas/target/debug/atlas --store /Users/yinsijie/CodeRepo/Atlas/local-state/bench/store exec dc2f21c455cbaddecc9c41f29769331b14382eada80f12032f7d00659373bc7e dist/cjs/internal/util/isFunction.js:isFunction --args [3] --allow-effects unknown_calls --materialise snapshot
+cwd: /Users/yinsijie/CodeRepo/Atlas
+--- stdout ---
+{
+  "analysis_id": "dc2f21c455cbaddecc9c41f29769331b14382eada80f12032f7d00659373bc7e",
+  "console": {
+    "harness_lines": [],
+    "harness_truncated": false,
+    "stderr": "",
+    "stdout": "",
+    "truncated": false
+  },
+  "duration_ms": 106,
+  "effect_journal": {
+    "denied_count": 0,
+    "entries": [],
+    "granted": {
+      "child_process": false,
+      "fs_write": false,
+      "network": false
+    },
+    "note": "只记录运行时明确报告的拒绝尝试（含权限种类与目标）。被允许的操作没有逐条日志，因此这里不声称'没有效果'；授予集合就是这次运行的边界。",
+    "observed": 0,
+    "schema": "atlas.effect-journal.v1"
+  },
+  "environment": {
+    "actual_node_version": "v26.5.1",
+    "declared_node_range_in_snapshot": null,
+    "note": "Atlas 记录目标项目声明的 engines.node 与实际使用的 Node 版本，但不声称二者兼容；没有用 Atlas 自己的 Node 冒充目标环境，二进制由调用者指定。",
+    "qualified": false
+  },
+  "exit_code": 0,
+  "id": "3d016bc132e290add42d49b6e340bd757be2c9f94465356f7595675eb8726c18",
+  "isolation": {
+    "cwd": "隔离副本根目录",
+    "declared_context": {
+      "globals": [],
+      "this_arg": false
+    },
+    "effective_flags": [
+      "--permission",
+      "--allow-fs-read=/private/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-run-biVFw8",
+      "/private/var/folders/d0/h8zmbc0971n266zb4nx3j9980000gn/T/atlas-run-biVFw8/atlas-harness.mjs"
+    ],
+    "environment_allowlist": [],
+    "files_materialised": 2277,
+    "fixture_note": null,
+    "materialisation": {
+      "basis": "快照里每一个被捕获的文件",
+      "bytes_written": 4501327,
+      "closure": null,
+      "fallback": "",
+      "files_in_snapshot": 2277,
+      "files_written": 2277,
+      "known_risk": [],
+      "mode": "snapshot",
+      "package_json": {
+        "kept": 0,
+        "skipped_by_cap": 0
+      },
+      "workdir_digest": "bfac9ea7191fc5c892d3f0bc85dee56d15bfaeda4f8aea2e66bdf36754712ddf",
+      "written": [],
+      "written_listed": 200,
+      "written_truncated": true
+    },
+    "mocks": false,
+    "node_binary": "node",
+    "node_version": "v26.5.1",
+    "path_inherited": true,
+    "permission_model": "node --permission (probe-verified: an attempted write was denied)",
+    "permission_probe": {
+      "available": true,
+      "enforced": true,
+      "node": "node",
+      "node_version": "v26.5.1",
+      "probe_stdout": "ATLAS_PROBE=DENIED:ERR_ACCESS_DENIED",
+      "reason": null
+    },
+    "started": true,
+    "workdir_digest": "bfac9ea7191fc5c892d3f0bc85dee56d15bfaeda4f8aea2e66bdf36754712ddf"
+  },
+  "name": "isFunction",
+  "path": "dist/cjs/internal/util/isFunction.js",
+  "profile": {
+    "analysis_id": "dc2f21c455cbaddecc9c41f29769331b14382eada80f12032f7d00659373bc7e",
+    "arity": 1,
+    "captures": [],
+    "classification": "needs_entry_driver",
+    "effects": {
+      "escaped_local_value": false,
+      "may_access_global": true,
+      "may_call": [],
+      "may_read_heap": false,
+      "may_throw": true,
+      "may_write_heap": true,
+      "registers_callback": false,
+      "unknown_call": true
+    },
+    "enclosing_name": null,
+    "enclosing_symbol": null,
+    "flow_profile": "js-structured-control.v1",
+    "flow_status": "complete_within_profile",
+    "name": "isFunction",
+    "notes": [
+      "分类来自已发布的静态事实，不是执行观测；unknown 一律降级而不是忽略。",
+      "纯调用判定不包含文件/网络/子进程副作用的静态建模：这些权限由运行时的 Node 权限模型强制，未授予即被拒绝。",
+      "needs_entry_driver 需要显式 --allow-effects unknown_calls 才可运行。"
+    ],
+    "params": [
+      {
+        "binding": "b:dist/cjs/internal/util/isFunction.js:126:value",
+        "index": 0,
+        "name": "value"
+      }
+    ],
+    "path": "dist/cjs/internal/util/isFunction.js",
+    "reasons": [
+      {
+        "code": "unknown_region",
+        "detail": "存在显式未知分量：unmodeled_construct:unsupported_expression:TypeOfExpression",
+        "evidence": "unknown_reasons"
+      },
+      {
+        "code": "unknown_call",
+        "detail": "调用了 Atlas 无法解析的目标，其行为不在事实内",
+        "evidence": "effects.unknown_call"
+      },
+      {
+        "code": "reads_global",
+        "detail": "读取了全局状态，其值由运行环境决定而不是由参数决定",
+        "evidence": "effects.may_access_global"
+      },
+      {
+        "code": "heap_state",
+        "detail": "读写堆对象，结果依赖被传入对象的身份与历史",
+        "evidence": "effects.may_read_heap / may_write_heap"
+      },
+      {
+        "code": "external_binding",
+        "detail": "1 个值来源是 External，不属于参数命名空间",
+        "evidence": "block_states[].bindings[].value.origins"
+      }
+    ],
+    "required_context": [],
+    "required_globals": [],
+    "required_grants": [
+      "unknown_calls"
+    ],
+    "runnable": true,
+    "schema": "atlas.execution-profile.v1",
+    "symbol": "symbol:dist/cjs/internal/util/isFunction.js:106:176",
+    "unknown_reasons": [
+      "unmodeled_construct:unsupported_expression:TypeOfExpression"
+    ],
+    "unsatisfiable_context": []
+  },
+  "refusal": null,
+  "schema": "atlas.execution-record.v1",
+  "signal": null,
+  "snapshot_id": "cf411b4d511a3d4721cee2d1c2fe08d323dba80200a6630c4de6a499a05dfdf5",
+  "source_binding": {
+    "analysis_id": "dc2f21c455cbaddecc9c41f29769331b14382eada80f12032f7d00659373bc7e",
+    "blob": "79b21347d14e3ef6d9cd5525d03ff3c586144643f67d71aa7733152542571d8f",
+    "bytes_verified": true,
+    "end": 176,
+    "path": "dist/cjs/internal/util/isFunction.js",
+    "snapshot_id": "cf411b4d511a3d4721cee2d1c2fe08d323dba80200a6630c4de6a499a05dfdf5",
+    "start": 106,
+    "verified_how": "每个字节都从内容寻址 blob 读取并在读取时重新哈希校验；执行副本由这些字节生成，因此分析与执行之间的源码漂移不可能发生，而不是被检测到。"
+  },
+  "spec": {
+    "analysis_id": "dc2f21c455cbaddecc9c41f29769331b14382eada80f12032f7d00659373bc7e",
+    "args": [
+      3
+    ],
+    "env": {},
+    "fixture_note": null,
+    "fixtures": false,
+    "globals": {},
+    "grants": {
+      "child_process": false,
+      "fs_write": false,
+      "network": false,
+      "unknown_calls": true
+    },
+    "label": null,
+    "materialise": "snapshot",
+    "node": "node",
+    "output_limit": 65536,
+    "schema": "atlas.run-spec.v1",
+    "symbol": "symbol:dist/cjs/internal/util/isFunction.js:106:176",
+    "this_arg": null,
+    "timeout_ms": 5000,
+    "via": null
+  },
+  "spec_digest": "3a16ca57bdd01817ec41d0e1c7e9f928c0faa396dffcdcf741312c9e11c52cc7",
+  "symbol": "symbol:dist/cjs/internal/util/isFunction.js:106:176",
+  "thrown": null,
+  "trace": {
+    "coverage": "not_sampled",
+    "events": [
+      {
+        "args": [
+          3
+        ],
+        "end": 176,
+        "kind": "call",
+        "path": "dist/cjs/internal/util/isFunction.js",
+        "stage": "target",
+        "start": 106,
+        "symbol": "symbol:dist/cjs/internal/util/isFunction.js:106:176"
+      },
+      {
+        "async_events": [],
+        "awaited": false,
+        "candidates": [
+          "isFunction"
+        ],
+        "declared_globals": [],
+        "export_name": "isFunction",
+        "harness_detail": null,
+        "kind": "returned",
+        "matched_by": "source_identity",
+        "receiver_declared": false,
+        "source_location": null
+      }
+    ],
+    "kind": "observed-entry-call",
+    "note": "只观测到入口调用的返回/抛出、进程输出与退出状态，以及运行时报告的源码位置。没有行级覆盖采样；未观测路径保持未知；静态 BFS 不作为执行顺序。",
+    "unknown_paths": "not_observed"
+  },
+  "value": {
+    "kind": "boolean",
+    "value": false
+  },
+  "verdict": "returned"
+}
+--- stderr ---
+        1.62 real         0.72 user         0.75 sys
+            42086400  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               32575  page reclaims
+                 447  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   1  messages sent
+                   1  messages received
+                   1  signals received
+                   5  voluntary context switches
+                3391  involuntary context switches
+          7365039171  instructions retired
+          4664276793  cycles elapsed
+            15003648  peak memory footprint
+[exit code: 0]
+[wall seconds: 1.629822]
+[peak rss: 42086400 (measured)]

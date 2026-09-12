@@ -126,7 +126,15 @@ worker stdin ≤160 MiB、stdout ≤32 MiB、stderr ≤64 KiB，V8 old-space 为
 
 **受控运行**只在一个条件下发生：静态画像允许，且 spec 已显式授予/声明所需项。执行路径：
 
-1. 从**不可变快照**的内容寻址 blob 逐个读取并重新哈希校验，物化到一个 `0700` 的隔离副本（临时目录先 canonicalize，否则 Node 的 loader 会在 `/var → /private/var` 上触发一次未被授权的读而死在 loader 里而不是被测代码里）。
+1. 从**不可变快照**的内容寻址 blob 逐个读取并重新哈希校验，物化到一个 `0700` 的隔离副本（临时目录先 canonicalize，否则 Node 的 loader 会在 `/var → /private/var` 上触发一次未被授权的读而死在 loader 里而不是被测代码里）。副本的**范围**由 `--materialise` 决定，而且它是一个被记录的选择，不是一个隐含行为：
+   - `snapshot`（默认）：快照里每一个被捕获的文件，与过去完全一致；
+   - `dependencies`：目标文件的**静态 import 闭包**（已发布的 `import` 边，传递到不动点；`type_import` 不跟随，因为它在运行前就被擦除），加上快照里所有 `package.json`（Node 用它决定模块类型——rxjs 的 `dist/cjs/package.json` 就是"同一份字节被当成 CJS 还是 ESM"的唯一依据）。`package.json` 的收录有上限并会报出跳过数。
+
+   这是一个**更紧的读边界**，不是"更小的项目"：目标运行时按相对路径读取、但从未 import 的文件不在副本里，读取会以 `ENOENT` 失败。记录里写明 `mode / basis / files_written / files_in_snapshot / bytes_written / written[] / closure{seed,reached,unresolved_relative[],unresolved_bare,import_edges_read,bounded} / known_risk[] / fallback`：
+   - **未解析的 import 分两类**：相对 specifier（可能真的缺文件，逐个具名列出）与裸 specifier（`node:fs` 由 Node 提供、已安装包本来就不在快照里，只计数）；
+   - 运行时的已知风险（计算型动态 `import()`、按相对路径读取其它项目文件）在运行前就列在 `known_risk` 里，`fallback` 直说"若以 `module_load_failed`/`ENOENT` 失败，用 `--materialise snapshot` 复核"；
+   - 闭包遍历有界（文件数/边数上限），触顶时 `bounded: true`，绝不产出一个悄悄缺文件的副本；副本里没有目标文件时直接拒绝（`slice_missing_target`），不启动进程。
+   - 页面**不能**选择副本范围：收紧读边界是能看到记录的人的决定，不是页面替别人的函数做输入声明的场合（与 `this`/`global` 同一条规则）。
 2. 生成 harness，用**源码同一性**而不是名字来选定目标：模块命名空间里每个可调用值的 `Function.toString()` 归一化后必须与快照中该符号的字节切片一致，唯一命中才调用。因此改名、遮蔽导出、同名不同函数都不会被静默执行；命中不了就是 `target_not_exported`，不猜测。`--via` 运行的命名空间查找针对的是**包含函数**（那才是命名空间里可能存在的那个），闭包本身从不按名字查找；解析不到时结论是 `enclosing_not_exported`，与应用到目标上的 `target_not_exported` 分开。
 3. 用**目标 Node**（由调用者指定，不是 Atlas 自己的运行时）以 `--permission` 启动，只授予隔离副本的读权限，以及 spec 里显式声明的项。权限模型不是"接受了 flag"就算数：每次进程内首次使用都会先跑一个能力探针，要求一次真实的写被拒绝（`ERR_ACCESS_DENIED`），否则拒绝执行。
 4. 子进程自成进程组，超时或取消按组 `SIGKILL` 并回收；stdin/stdout/stderr 都有预算；harness 报告带每轮唯一标记并最后写入、显式退出，因此目标自己写到 stdout 的内容不会被误当作报告。
