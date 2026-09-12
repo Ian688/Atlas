@@ -34,6 +34,17 @@ pub const STATE_CANCELLED: &str = "cancelled";
 
 pub const REASON_LEASE_EXPIRED: &str = "lease_expired";
 
+/// The kind of work a queued request describes. The queue is not index-specific:
+/// `job work` claims whatever is queued and dispatches on this, so a second kind
+/// of work joins the same identity, lease and crash-recovery machinery instead
+/// of growing a parallel one.
+pub const KIND_INDEX: &str = "index";
+pub const KIND_PATCH_VERIFY: &str = "patch_verify";
+
+pub fn is_known_kind(kind: &str) -> bool {
+    matches!(kind, KIND_INDEX | KIND_PATCH_VERIFY)
+}
+
 pub fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -44,6 +55,8 @@ pub fn now_ms() -> i64 {
 #[derive(Clone, Debug, Serialize)]
 pub struct Job {
     pub id: String,
+    /// `index` or `patch_verify`; see `is_known_kind`.
+    pub kind: String,
     pub owner: String,
     pub project: String,
     pub request_key: String,
@@ -94,6 +107,8 @@ impl Lease {
 /// interchangeable at the type level, so argument order would be the only thing
 /// keeping an owner out of the project field.
 pub struct JobRequest<'a> {
+    /// Defaults to `index` so existing callers keep their meaning.
+    pub kind: &'a str,
     pub owner: &'a str,
     pub project: &'a str,
     pub request_key: &'a str,
@@ -107,8 +122,14 @@ impl JobRequest<'_> {
         if self.owner.is_empty() || self.project.is_empty() || self.request_key.is_empty() {
             return Err(invalid("job_identity_must_be_non_empty"));
         }
-        if self.root.is_empty() {
+        // Only an index request is about a filesystem root. A patch
+        // verification is about a stored proposal, and inventing a root for it
+        // would be a field that means nothing.
+        if self.root.is_empty() && self.kind == KIND_INDEX {
             return Err(invalid("job_root_must_be_non_empty"));
+        }
+        if !is_known_kind(self.kind) {
+            return Err(invalid("job_kind_unknown"));
         }
         Ok(())
     }
@@ -117,6 +138,7 @@ impl JobRequest<'_> {
 fn row_to_job(row: &rusqlite::Row) -> rusqlite::Result<Job> {
     Ok(Job {
         id: row.get("id")?,
+        kind: row.get("kind")?,
         owner: row.get("owner")?,
         project: row.get("project")?,
         request_key: row.get("request_key")?,
@@ -174,10 +196,11 @@ impl Store {
         // no claim at all.
         let tx = write_tx(&conn)?;
         tx.execute(
-            "INSERT OR IGNORE INTO jobs(id,owner,project,request_key,root,options,state,attempt,created_at,updated_at)
-             VALUES(?1,?2,?3,?4,?5,?6,'queued',0,?7,?7)",
+            "INSERT OR IGNORE INTO jobs(id,kind,owner,project,request_key,root,options,state,attempt,created_at,updated_at)
+             VALUES(?1,?2,?3,?4,?5,?6,?7,'queued',0,?8,?8)",
             params![
                 preferred,
+                request.kind,
                 owner,
                 project,
                 request_key,
@@ -229,10 +252,11 @@ impl Store {
         let conn = self.connection()?;
         let tx = write_tx(&conn)?;
         let created = tx.execute(
-            "INSERT OR IGNORE INTO jobs(id,owner,project,request_key,root,options,state,attempt,priority,created_at,updated_at)
-             VALUES(?1,?2,?3,?4,?5,?6,'queued',0,?7,?8,?8)",
+            "INSERT OR IGNORE INTO jobs(id,kind,owner,project,request_key,root,options,state,attempt,priority,created_at,updated_at)
+             VALUES(?1,?2,?3,?4,?5,?6,?7,'queued',0,?8,?9,?9)",
             params![
                 preferred,
+                request.kind,
                 owner,
                 project,
                 request_key,
@@ -433,6 +457,7 @@ mod tests {
 
     fn request<'a>(key: &'a str, options: &'a str) -> JobRequest<'a> {
         JobRequest {
+            kind: KIND_INDEX,
             owner: "alice",
             project: "proj",
             request_key: key,
@@ -609,6 +634,7 @@ mod tests {
         assert_eq!(base, job_id("alice", "proj", "r1"));
         let cases = [
             JobRequest {
+                kind: KIND_INDEX,
                 owner: "",
                 project: "proj",
                 request_key: "r1",
@@ -616,6 +642,7 @@ mod tests {
                 options: "{}",
             },
             JobRequest {
+                kind: KIND_INDEX,
                 owner: "a",
                 project: "p",
                 request_key: "r1",
@@ -627,6 +654,7 @@ mod tests {
             assert!(store.submit_job(case, "h", DEFAULT_LEASE_MS).is_err());
         }
         let no_key = JobRequest {
+            kind: KIND_INDEX,
             owner: "a",
             project: "p",
             request_key: "",

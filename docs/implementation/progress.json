@@ -218,6 +218,16 @@
       ],
       "note": "Effect journal：记录运行时报告的拒绝尝试（权限种类+目标）与授予集合，并写明空 journal 不等于没有副作用。",
       "report": "evidence/development/2026-09-12-w08/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/w09-queued-verify",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09-patch-verify-as-durable-job",
+        "W06-queue-kind-dispatch"
+      ],
+      "note": "补丁验证可排队为 patch_verify 作业；队列按 kind 分派，index 与 patch_verify 共用身份/租约/心跳/收割；无法自述的作业行判失败而不是猜参数。",
+      "report": "evidence/development/2026-09-12-w09-queued-verify/REPORT.md"
     }
   ],
   "next_work_item": "宿主侧 E2E 与旧入口切换（需要 Modus 检出）；或回到 W08/W09 的深化项",
@@ -483,7 +493,8 @@
         "调度：job work 按优先级降序、同级按入队时间最旧优先认领；--once 只跑一个；租约过期的 running 由工人续跑（attempt+1），因为崩溃不该让队列停摆",
         "排队取消：queued 可取消；running 不可被旁观者取消（属于租约持有者）。reap 是放弃这次运行，claim_next 是换人接着跑，两种意图分开",
         "加列迁移：priority/options 以纯增量方式补齐旧库，且依赖新列的索引在迁移之后创建（此前索引先于加列执行会让旧库直接开不了）",
-        "请求身份收进 JobRequest：5 个同类型字符串不再靠参数位置区分 owner 与 project"
+        "请求身份收进 JobRequest：5 个同类型字符串不再靠参数位置区分 owner 与 project",
+        "队列按 kind 分派：jobs.kind（index|patch_verify，增量加列默认 index）；job work 依据行自身 kind 选择执行路径，两种作业共用身份三元组/优先级/租约/心跳/收割；一行无法自述怎么跑时判失败而不是用本 worker 默认参数顶替"
       ],
       "evidence": [
         "crates/atlas-engine/src/scan.rs deadline + tests",
@@ -495,7 +506,8 @@
         "scripts/test_jobs.py（11 个 CLI 级用例：幂等重放/owner 隔离/重试/并发选主/崩溃收割/心跳推进/入队不执行/优先级调度/排队取消/拒绝非排队取消/旧库加列迁移）",
         "evidence/daily/2026-09-12/w06-jobs/verification.json",
         "evidence/daily/2026-09-12/w06-queue/verification.json",
-        "evidence/development/2026-09-10-continuation/verified/verification.json"
+        "evidence/development/2026-09-10-continuation/verified/verification.json",
+        "scripts/test_patch.py::Queued（排队验证、幂等、多 kind 共存、坏作业行判失败）"
       ],
       "blockers": [
         "owner 是未经认证的调用者声明；W06 合同要求的“服务端验证权限与版本”未实现，作业 API 尚未暴露到 HTTP（HTTP 层仍只有本地会话令牌）",
@@ -653,7 +665,8 @@
         "apply/revert：apply 校验目标当前字节仍等于提案依据的固定快照 blob（否则 target_changed_since_apply），revert 校验当前字节等于 apply 写入的字节；状态机 proposed→verified→applied→reverted 单向",
         "Intent/Static/Observed 三类证据分开存放：proposal 带 intent=true/code_exists=false，verification 里 graph_diff 与 test 各自标注",
         "提案审阅面：GET /api/patches、GET /api/patch?id=、POST /api/patch/propose 与函数面板提案面板；页面可登记（Intent）并读校验结果/图差异/测试退出码，验证与应用仍只在 CLI",
-        "HTTP 与 CLI 共用 patchwork::propose_from_diff：同一校验路径，页面无法登记一个 CLI 会拒绝的 diff；跨分析的提案查询被拒绝"
+        "HTTP 与 CLI 共用 patchwork::propose_from_diff：同一校验路径，页面无法登记一个 CLI 会拒绝的 diff；跨分析的提案查询被拒绝",
+        "补丁验证可排队：patch verify --enqueue --owner X 生成 kind=patch_verify 作业，job work 用同一个 verify_proposal 执行（前台与排队不是两条路径）；终态 artifact 是补丁树派生的 analysis；同一 (owner,project,request_key) 幂等，完成后重排报告 already_completed"
       ],
       "evidence": [
         "crates/atlas-engine/src/patch.rs（11 个 diff 单测 + 提案存储与状态迁移）",
@@ -663,10 +676,11 @@
         "evidence/development/2026-09-12-w09-ai-coding/verification.json",
         "scripts/test_patch.py（35 个用例：CLI 32 + HTTP 3）",
         "web/tests/app.behavior.test.mjs（24 项，新增 4 项提案面板行为）",
-        "adapters/modus/atlas_host_client.mjs（patches/patch/proposePatch）"
+        "adapters/modus/atlas_host_client.mjs（patches/patch/proposePatch）",
+        "scripts/test_patch.py（25 个用例：CLI 16 + 排队 5 + HTTP 3 + 共享基类去重）"
       ],
       "blockers": [
-        "AI Coding 链仍未进持久作业队列：verify 是前台 CLI；应用/撤销只有 CLI，没有图形化的一键撤销；提案形式只支持统一 diff（新建/删除/重命名文件不支持）",
+        "AI Coding 链没有图形化的一键撤销：apply/revert 只有 CLI；提案形式只支持统一 diff（新建/删除/重命名文件不支持）",
         "选区只在同一 analysis 内互通；跨版本选区被拒绝而不是重定位（relocation 需要实体级重命名/移动追踪，未做）",
         "LOD 与正式 3D 层级未实现：城市仍按固定规则投影，没有细节层级切换，也没有「激活路径来自 Run」的图例分离（因为还没有 Run 轨迹）",
         "Agent Bridge 没有 owner 认证：owner 是调用者声明；服务端验证权限与版本仍未实现（与 W06 同一缺口）",

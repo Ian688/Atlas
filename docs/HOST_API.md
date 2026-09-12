@@ -38,7 +38,7 @@
 `profile` / `exec-records` / `exec` / `selection` / `annotations` / `annotation` /
 `agent/requests` / `agent/request` / `agent/work`。
 
-CLI 面（宿主可用子进程调用）：`index`、`job …`、`patch propose|verify|apply|revert|status|list`、
+CLI 面（宿主可用子进程调用）：`index`、`job …`（含 `job work` 执行 `patch_verify`）、`patch propose|verify|apply|revert|status|list`（`verify --enqueue` 排队）、
 `profile`、`exec`、`select`、`annotate`、`annotations`、`agent …`、`serve`。
 
 引用形式：`flow` / `source` / `reach` / `context` / `profile` / `exec` 都接受符号 id、`path:name`

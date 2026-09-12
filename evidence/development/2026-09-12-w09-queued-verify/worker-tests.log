@@ -1,0 +1,35 @@
+✔ flow IR carries version, profile and per-function anchors (30.571977ms)
+✔ block shadowing produces distinct binding ids (D01) (5.202813ms)
+✔ TDZ use-before-declare still resolves to the real binding (D01) (16.385991ms)
+✔ short-circuit and conditional operators become structured control (D02) (1.94878ms)
+✔ try/catch/finally lowers with catch param binding and anchors (D03/D04) (2.362085ms)
+✔ labeled break/continue keep labels (D05) (3.824776ms)
+✔ unsupported constructs are explicit unknowns with reasons (profile boundary) (1.790512ms)
+✔ module peers resolve to bindings and are recorded as captures (D14 setup) (1.672417ms)
+✔ object and array literals keep field names and element anchors (2.123583ms)
+✔ destructuring declarations become explicit unknowns, not silent copies (profile) (2.257711ms)
+✔ alpha-renaming preserves flow structure modulo identity (D21) (6.375121ms)
+✔ a folded global name loses to a shadowing binding (V-08b) (5.724266ms)
+✔ the unshadowed global undefined still folds to a constant (V-08b) (0.981872ms)
+✔ non-finite numeric literals are explicit unknowns, not unwireable constants (1.079596ms)
+✔ finite numeric literals are unaffected by the non-finite guard (0.955447ms)
+✔ a nested function keeps its own declarations out of the enclosing function (GE-2 regression) (4.806848ms)
+✔ cross-file alias and re-export resolve using captured sources (50.949581ms)
+✔ lexical shadowing does not bind to a global namesake (2.82628ms)
+✔ reassigned function declarations are marked; indirect and constructor calls stay unknown (6.493948ms)
+✔ duplicate script declarations are ambiguous, not first-declaration wins (1.609068ms)
+✔ UTF-8 byte spans retain Chinese and emoji source anchors (3.514053ms)
+✔ nested calls with identical start offsets have distinct full-span IDs (1.567875ms)
+✔ compiler host never falls back to ambient source or config reads (2.405561ms)
+✔ syntax failures and dynamic language features are explicit (2.173036ms)
+✔ request isolation rejects traversal and duplicates; source is never evaluated (3.246186ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 514.916225
+npm notice run @atlas/typescript-worker@0.1.0 test
+npm notice run node --test tests/*.test.mjs

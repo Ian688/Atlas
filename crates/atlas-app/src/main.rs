@@ -226,6 +226,15 @@ enum PatchAction {
     /// and optionally run a declared test command there.
     Verify {
         id: String,
+        /// Queue the verification as a durable job instead of running it now.
+        /// `atlas job work` performs it, with the same code path.
+        #[arg(long)]
+        enqueue: bool,
+        /// Required with `--enqueue`: a queued request needs an owner.
+        #[command(flatten)]
+        identity: QueueIdentityArgs,
+        #[arg(long, default_value_t = 0)]
+        priority: i64,
         #[arg(long, default_value = "node")]
         node: PathBuf,
         #[arg(long, default_value = "workers/typescript/worker.mjs")]
@@ -329,6 +338,17 @@ struct IdentityArgs {
     #[arg(long)]
     project: Option<String>,
     /// Idempotency key. A completed request with the same key never runs again.
+    #[arg(long)]
+    request_key: Option<String>,
+}
+
+/// Identity for a request that only needs one when it is queued. A foreground
+/// command has no owner, and demanding one would be a flag that exists to be
+/// ignored.
+#[derive(Args)]
+struct QueueIdentityArgs {
+    #[arg(long)]
+    owner: Option<String>,
     #[arg(long)]
     request_key: Option<String>,
 }
@@ -498,6 +518,47 @@ impl IndexOptions {
             stored.index_deadline_seconds,
             stored.incremental,
         )
+    }
+}
+
+/// A queued patch verification describes itself, exactly like a queued index
+/// request: the worker reads how to run it from the row rather than from its own
+/// defaults.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct StoredVerify {
+    proposal_id: String,
+    node: String,
+    worker: String,
+    timeout_seconds: u64,
+    scan_deadline_seconds: u64,
+    index_deadline_seconds: u64,
+    #[serde(default)]
+    test_argv: Option<Vec<String>>,
+    test_timeout_ms: u64,
+}
+
+impl StoredVerify {
+    /// Refuse a stored row that cannot describe how to run, rather than
+    /// substituting this worker's own parameters for someone else's request.
+    fn options(&self) -> Result<patchwork::VerifyOptions, Box<dyn std::error::Error>> {
+        if self.timeout_seconds == 0
+            || self.timeout_seconds > 600
+            || self.scan_deadline_seconds == 0
+            || self.scan_deadline_seconds > 3600
+            || self.index_deadline_seconds == 0
+            || self.index_deadline_seconds > 3600
+        {
+            return Err("stored_verify_deadlines_out_of_range".into());
+        }
+        Ok(patchwork::VerifyOptions {
+            node: PathBuf::from(&self.node),
+            worker: PathBuf::from(&self.worker),
+            timeout: Duration::from_secs(self.timeout_seconds),
+            scan_deadline: Duration::from_secs(self.scan_deadline_seconds),
+            index_deadline: Duration::from_secs(self.index_deadline_seconds),
+            test_argv: self.test_argv.clone(),
+            test_timeout: Duration::from_millis(self.test_timeout_ms.max(1)),
+        })
     }
 }
 
@@ -771,6 +832,27 @@ fn spawn_heartbeat(
     })
 }
 
+/// What a claimed row describes how to run.
+enum Claimed {
+    Index(IndexOptions),
+    PatchVerify(StoredVerify),
+}
+
+/// Read a claimed row's own instructions. Dispatch is by kind, so the queue
+/// carries more than one operation without either kind knowing about the other.
+fn claimed_kind(row: &job::Job) -> Result<Claimed, Box<dyn std::error::Error>> {
+    match row.kind.as_str() {
+        job::KIND_INDEX => Ok(Claimed::Index(IndexOptions::from_job(row)?)),
+        job::KIND_PATCH_VERIFY => {
+            let stored: StoredVerify =
+                serde_json::from_str(row.options.as_deref().ok_or("job_has_no_stored_options")?)?;
+            stored.options()?;
+            Ok(Claimed::PatchVerify(stored))
+        }
+        other => Err(format!("job_kind_unknown:{other}").into()),
+    }
+}
+
 /// Run one claimed job to a terminal state, renewing its lease while it works.
 ///
 /// Returns the outcome object and whether the job itself succeeded. The outer
@@ -779,12 +861,15 @@ fn spawn_heartbeat(
 async fn run_claimed_job(
     store: &Store,
     job: &job::Job,
-    options: &IndexOptions,
+    claimed: &Claimed,
     lease_ms: i64,
     holder: &str,
 ) -> Result<(serde_json::Value, bool), Box<dyn std::error::Error>> {
-    let root = PathBuf::from(&job.root);
-    let control = ExecutionControl::new(Some(std::time::Instant::now() + options.index_deadline));
+    let deadline = match claimed {
+        Claimed::Index(options) => options.index_deadline,
+        Claimed::PatchVerify(stored) => Duration::from_secs(stored.index_deadline_seconds),
+    };
+    let control = ExecutionControl::new(Some(std::time::Instant::now() + deadline));
     let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
     let _signal_watcher = signal_watcher(control.clone(), cancel_tx)?;
     let stop = Arc::new(AtomicBool::new(false));
@@ -796,31 +881,61 @@ async fn run_claimed_job(
         control.clone(),
         stop.clone(),
     );
-    let outcome = run_pipeline(store, &root, options, &control, cancel_rx).await;
-    stop.store(true, Ordering::Relaxed);
-    let _ = heartbeat.join();
-    // `recorded` is false when the lease was lost mid-run: the analysis is
-    // still valid and immutable, but it belongs to no job we own.
-    match outcome {
-        Ok(result) => {
-            let recorded = store.finish_job(
-                &job.id,
-                holder,
-                STATE_COMPLETED,
-                None,
-                Some(&result.analysis_id),
-            )?;
-            Ok((
-                json!({
-                    "outcome": "completed",
-                    "recorded": recorded,
-                    "job": store.job(&job.id)?,
+    let outcome: Result<serde_json::Value, Box<dyn std::error::Error>> = match claimed {
+        Claimed::Index(options) => {
+            let root = PathBuf::from(&job.root);
+            match run_pipeline(store, &root, options, &control, cancel_rx).await {
+                Ok(result) => Ok(json!({
+                    "kind": job::KIND_INDEX,
                     "analysis_id": result.analysis_id,
                     "metadata": result.metadata,
                     "incremental": result.incremental,
-                }),
-                true,
-            ))
+                })),
+                Err(error) => Err(error),
+            }
+        }
+        Claimed::PatchVerify(stored) => {
+            let options = stored.options()?;
+            patchwork::verify_proposal(store, &stored.proposal_id, &options)
+                .await
+                .map(|proposal| {
+                    json!({
+                        "kind": job::KIND_PATCH_VERIFY,
+                        "proposal_id": stored.proposal_id,
+                        "proposal": proposal,
+                    })
+                })
+                .map_err(|error| error.into())
+        }
+    };
+    stop.store(true, Ordering::Relaxed);
+    let _ = heartbeat.join();
+    match outcome {
+        Ok(value) => {
+            // The terminal artifact differs by kind: an index publishes an
+            // analysis, a verification publishes the patched analysis it
+            // derived. Both are recorded in the same column because both answer
+            // "what did this request produce".
+            let artifact = match job.kind.as_str() {
+                job::KIND_PATCH_VERIFY => value["proposal"]["verification"]["patched_analysis_id"]
+                    .as_str()
+                    .map(str::to_string),
+                _ => value["analysis_id"].as_str().map(str::to_string),
+            };
+            let recorded =
+                store.finish_job(&job.id, holder, STATE_COMPLETED, None, artifact.as_deref())?;
+            let mut payload = json!({
+                "outcome": "completed",
+                "recorded": recorded,
+                "kind": job.kind,
+                "job": store.job(&job.id)?,
+            });
+            if let (Some(object), Some(source)) = (payload.as_object_mut(), value.as_object()) {
+                for (key, item) in source {
+                    object.insert(key.clone(), item.clone());
+                }
+            }
+            Ok((payload, true))
         }
         Err(error) => {
             let recorded = store.finish_job(
@@ -834,6 +949,7 @@ async fn run_claimed_job(
                 json!({
                     "outcome": "failed",
                     "recorded": recorded,
+                    "kind": job.kind,
                     "job": store.job(&job.id)?,
                     "error": error.to_string(),
                 }),
@@ -1009,6 +1125,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .unwrap_or_else(|| options.fingerprint(&root));
                 let stored = options.stored()?;
                 let request = job::JobRequest {
+                    kind: job::KIND_INDEX,
                     owner: &identity.owner,
                     project: &project,
                     request_key: &request_key,
@@ -1016,8 +1133,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     options: &stored,
                 };
                 let (row, created) = store.enqueue_job(&request, priority)?;
+                // "already_queued" for a request that finished long ago would
+                // make a completed verification look like it is still waiting.
                 print(json!({
-                    "outcome": if created {"queued"} else {"already_queued"},
+                    "outcome": if created { "queued".to_string() } else { format!("already_{}", row.state) },
                     "job": row}))?;
             }
             JobAction::Work {
@@ -1038,8 +1157,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let Some(row) = store.claim_next(&holder, lease_ms)? else {
                         break;
                     };
-                    let options = match IndexOptions::from_job(&row) {
-                        Ok(options) => options,
+                    let claimed = match claimed_kind(&row) {
+                        Ok(claimed) => claimed,
                         Err(error) => {
                             // A row that cannot describe how to run itself is
                             // failed, not guessed at: executing it with this
@@ -1064,7 +1183,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     };
                     let (outcome, _succeeded) =
-                        run_claimed_job(&store, &row, &options, lease_ms, &holder).await?;
+                        run_claimed_job(&store, &row, &claimed, lease_ms, &holder).await?;
                     outcomes.push(outcome);
                     if once {
                         break;
@@ -1095,6 +1214,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let holder = new_holder();
                 let stored = options.stored()?;
                 let request = job::JobRequest {
+                    kind: job::KIND_INDEX,
                     owner: &identity.owner,
                     project: &project,
                     request_key: &request_key,
@@ -1109,8 +1229,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         print(json!({"outcome":"held_by_another_run","job":row,"reaped":reaped}))?
                     }
                     Lease::Acquired(row) => {
+                        let claimed = claimed_kind(&row)?;
                         let (mut outcome, succeeded) =
-                            run_claimed_job(&store, &row, &options, lease_ms, &holder).await?;
+                            run_claimed_job(&store, &row, &claimed, lease_ms, &holder).await?;
                         let message = outcome["error"]
                             .as_str()
                             .unwrap_or("job failed")
@@ -1325,6 +1446,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             PatchAction::Verify {
                 id,
+                enqueue,
+                identity,
+                priority,
                 node,
                 worker,
                 timeout_seconds,
@@ -1333,74 +1457,58 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 test_argv,
                 test_timeout_ms,
             } => {
-                let proposal = store.patch_proposal(&id)?;
-                if proposal.state != patch::STATE_PROPOSED {
-                    return Err(format!("proposal_not_verifiable:{}", proposal.state).into());
-                }
-                let parsed = patchwork::reparsed(&proposal)?;
-                let metadata = store.metadata(&proposal.analysis_id)?;
-                let snapshot = store.snapshot(
-                    metadata["snapshot_id"]
-                        .as_str()
-                        .ok_or("analysis_has_no_snapshot")?,
-                )?;
-                let files = patch::snapshot_files(&store, &snapshot)?;
-                let (patched_files, report) = patch::apply(&files, &parsed)?;
-                // An isolated copy: the user's checkout is never the thing that
-                // gets re-indexed, so a proposal cannot affect the analysis it
-                // was proposed against.
-                let dir = patch::materialize(&store, &snapshot, &patched_files)?;
-                let options = IndexOptions::new(
+                let test_argv: Option<Vec<String>> = match test_argv.as_deref() {
+                    Some(text) => Some(serde_json::from_str(text)?),
+                    None => None,
+                };
+                let options = patchwork::VerifyOptions {
                     node,
                     worker,
-                    timeout_seconds,
-                    scan_deadline_seconds,
-                    index_deadline_seconds,
-                    false,
-                )?;
-                let control =
-                    ExecutionControl::new(Some(std::time::Instant::now() + options.index_deadline));
-                let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
-                let _signal_watcher = signal_watcher(control.clone(), cancel_tx)?;
-                let result =
-                    run_pipeline(&store, dir.path(), &options, &control, cancel_rx).await?;
-                let graph =
-                    patchwork::graph_diff(&store, &proposal.analysis_id, &result.analysis_id)?;
-                let test = match test_argv.as_deref() {
-                    Some(text) => {
-                        let argv: Vec<String> = serde_json::from_str(text)?;
-                        patchwork::run_declared_test(
-                            &argv,
-                            dir.path(),
-                            Duration::from_millis(test_timeout_ms),
-                            64 * 1024,
-                        )
-                        .await
-                    }
-                    None => json!({
-                        "observed": false,
-                        "ran": false,
-                        "note": "没有声明 --test-argv，因此没有跑任何测试。这不是通过。",
-                    }),
+                    timeout: Duration::from_secs(timeout_seconds),
+                    scan_deadline: Duration::from_secs(scan_deadline_seconds),
+                    index_deadline: Duration::from_secs(index_deadline_seconds),
+                    test_argv,
+                    test_timeout: Duration::from_millis(test_timeout_ms),
                 };
-                let verification = json!({
-                    "schema": "atlas.patch-verification.v1",
-                    "base_analysis_id": proposal.analysis_id,
-                    "patched_snapshot_id": result.metadata["snapshot_id"],
-                    "patched_analysis_id": result.analysis_id,
-                    "applied_files": report,
-                    "graph_diff": graph,
-                    "test": test,
-                    "isolation": {
-                        "method": "从不可变快照的内容寻址 blob 物化到 0700 临时目录，补丁只写在这个副本里",
-                        "user_checkout_touched": false,
-                    },
-                    "note": "Intent（diff）→ Static（重新派生的分析与图差异）→ Observed（测试命令的退出码）三类证据在这里分开存放，不互相冒充。",
-                });
-                if !store.mark_patch_verified(&id, &verification)? {
-                    return Err("proposal_verification_lost_a_race".into());
+                if enqueue {
+                    let owner = identity
+                        .owner
+                        .clone()
+                        .ok_or("--enqueue requires --owner: a queued request needs an owner")?;
+                    // The queue stores how to run the request, so a worker that
+                    // picks it up later performs exactly this verification.
+                    let proposal = store.patch_proposal(&id)?;
+                    let stored = serde_json::to_string(&StoredVerify {
+                        proposal_id: id.clone(),
+                        node: options.node.display().to_string(),
+                        worker: options.worker.display().to_string(),
+                        timeout_seconds: options.timeout.as_secs(),
+                        scan_deadline_seconds: options.scan_deadline.as_secs(),
+                        index_deadline_seconds: options.index_deadline.as_secs(),
+                        test_argv: options.test_argv.clone(),
+                        test_timeout_ms: options.test_timeout.as_millis() as u64,
+                    })?;
+                    // Identity: the base analysis groups the request, and the
+                    // proposal id is the key, so one proposal is verified once
+                    // per owner rather than once per invocation.
+                    let project = proposal.analysis_id.clone();
+                    let request_key = identity.request_key.clone().unwrap_or_else(|| id.clone());
+                    let request = job::JobRequest {
+                        kind: job::KIND_PATCH_VERIFY,
+                        owner: &owner,
+                        project: &project,
+                        request_key: &request_key,
+                        root: "",
+                        options: &stored,
+                    };
+                    let (row, created) = store.enqueue_job(&request, priority)?;
+                    print(json!({
+                        "outcome": if created { "queued".to_string() } else { format!("already_{}", row.state) },
+                        "job": row,
+                    }))?;
+                } else {
+                    print(patchwork::verify_proposal(&store, &id, &options).await?)?;
                 }
-                print(store.patch_proposal(&id)?)?
             }
             PatchAction::Apply { id, target } => {
                 let proposal = store.patch_proposal(&id)?;

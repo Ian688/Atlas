@@ -35,7 +35,7 @@ MATH = (
 )
 
 
-class Harness(unittest.TestCase):
+class Base(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="atlas-patch-")
         self.addCleanup(self.tmp.cleanup)
@@ -78,6 +78,8 @@ class Harness(unittest.TestCase):
         return self.cli("patch", "propose", self.analysis, entity,
                         "--diff", diff or self.edit_diff(), "--summary", "bench", ok=ok)
 
+
+class Cli(Base):
     # -- propose ----------------------------------------------------------
     def test_a_proposal_is_intent_and_validated_against_pinned_bytes(self):
         result = self.propose()
@@ -244,7 +246,111 @@ class Harness(unittest.TestCase):
         self.assertEqual(proposal["proposal"]["proposed_by"], "model-x")
 
 
-class Http(Harness):
+class Queued(Base):
+    """Verification as a durable job, not as a foreground command.
+
+    The point of queueing it is that the same code path performs it later, with
+    the request describing how to run itself. These cases check that the queue
+    really carries the operation -- and that a row which cannot describe how to
+    run fails instead of being executed with this worker's defaults.
+    """
+
+    def enqueue(self, proposal_id, *extra, owner="owner-1", key="k1", ok=True):
+        return self.cli("patch", "verify", proposal_id, "--enqueue",
+                        "--owner", owner, "--request-key", key, *extra, ok=ok)
+
+    def work(self, *extra):
+        return self.cli("job", "work", "--once", *extra)
+
+    def test_a_queued_verification_does_not_run_until_a_worker_takes_it(self):
+        proposal = self.propose()["proposal"]
+        queued = self.enqueue(proposal["id"], "--test-argv", '["node","-e","process.exit(0)"]')
+        self.assertEqual(queued["outcome"], "queued")
+        self.assertEqual(queued["job"]["kind"], "patch_verify")
+        self.assertEqual(queued["job"]["state"], "queued")
+        self.assertEqual(queued["job"]["root"], "", "a verification is not about a filesystem root")
+        # Queueing must not have verified anything.
+        self.assertEqual(self.cli("patch", "status", proposal["id"])["state"], "proposed")
+        self.assertIsNone(queued["job"]["analysis_id"])
+
+        worked = self.work()
+        outcome = worked["outcomes"][0]
+        self.assertEqual(outcome["outcome"], "completed", outcome.get("error"))
+        self.assertEqual(outcome["kind"], "patch_verify")
+        verified = self.cli("patch", "status", proposal["id"])
+        self.assertEqual(verified["state"], "verified")
+        # The terminal artifact is the analysis the patch derived, so a
+        # completed request answers "what did it produce".
+        self.assertEqual(outcome["job"]["analysis_id"],
+                         verified["verification"]["patched_analysis_id"])
+        self.assertEqual(verified["verification"]["test"]["exit_code"], 0)
+        self.assertEqual(self.math.read_text(encoding="utf-8"), MATH,
+                         "a queued verification must not touch the checkout")
+
+    def test_the_request_is_identified_by_owner_project_and_key(self):
+        proposal = self.propose()["proposal"]
+        first = self.enqueue(proposal["id"])
+        again = self.enqueue(proposal["id"])
+        self.assertEqual(again["outcome"], "already_queued")
+        self.assertEqual(again["job"]["id"], first["job"]["id"])
+        # A different owner is a different request for the same proposal.
+        other = self.enqueue(proposal["id"], owner="owner-2")
+        self.assertNotEqual(other["job"]["id"], first["job"]["id"])
+
+    def test_a_finished_verification_reports_its_terminal_state_on_re_enqueue(self):
+        proposal = self.propose()["proposal"]
+        self.enqueue(proposal["id"])
+        self.work()
+        again = self.enqueue(proposal["id"])
+        self.assertEqual(again["outcome"], "already_completed",
+                         "a completed request must not read as still waiting")
+
+    def test_a_proposal_that_cannot_be_verified_fails_the_job_with_the_reason(self):
+        bad = self.diff_file("bad.patch", (
+            "--- a/src/math.js\n+++ b/src/math.js\n@@ -2,1 +2,1 @@\n"
+            "-export function subtract(left, right) { return left * right; }\n"
+            "+export function subtract(left, right) { return left - right - 0; }\n"
+        ))
+        rejected = self.propose(bad, ok=False)["proposal"]
+        self.enqueue(rejected["id"])
+        outcome = self.work()["outcomes"][0]
+        self.assertEqual(outcome["outcome"], "failed")
+        self.assertIn("proposal_not_verifiable", outcome["job"]["terminal_reason"])
+
+    def test_the_queue_carries_more_than_one_kind_of_work(self):
+        # An index request and a verification coexist in one queue and both run:
+        # the dispatch is by the row's own kind, not by what the worker assumes.
+        proposal = self.propose()["proposal"]
+        self.enqueue(proposal["id"], key="verify-k")
+        self.cli("job", "enqueue", self.project, "--owner", "owner-1", "--request-key", "index-k")
+        # `--max` without `--once`: the queue must run both, in one pass.
+        worked = self.cli("job", "work", "--max", "4")
+        kinds = sorted(outcome.get("kind") for outcome in worked["outcomes"])
+        self.assertEqual(kinds, ["index", "patch_verify"], worked)
+        self.assertTrue(all(outcome["outcome"] == "completed" for outcome in worked["outcomes"]),
+                        worked)
+        self.assertEqual(self.cli("patch", "status", proposal["id"])["state"], "verified")
+
+    def test_a_row_that_cannot_describe_how_to_run_is_failed_not_guessed(self):
+        # A stored request with an out-of-range deadline cannot be run with this
+        # worker's defaults: those would belong to somebody else's request.
+        proposal = self.propose()["proposal"]
+        queued = self.enqueue(proposal["id"])
+        stored = json.loads(queued["job"]["options"])
+        stored["index_deadline_seconds"] = 0
+        import sqlite3
+        conn = sqlite3.connect(self.store / "atlas.db")
+        conn.execute("UPDATE jobs SET state='queued', options=? WHERE id=?",
+                     (json.dumps(stored), queued["job"]["id"]))
+        conn.commit()
+        conn.close()
+        outcome = self.work()["outcomes"][0]
+        self.assertEqual(outcome["outcome"], "failed")
+        self.assertIn("stored_verify_deadlines_out_of_range", outcome["error"])
+        self.assertEqual(self.cli("patch", "status", proposal["id"])["state"], "proposed")
+
+
+class Http(Base):
     """The review surface: a page may register and read, never verify or apply."""
 
     def setUp(self):

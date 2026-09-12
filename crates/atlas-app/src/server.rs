@@ -858,7 +858,7 @@ const CONTRACT: &[(&str, &str, &str, &str, &str, &str)] = &[
         "cli",
         "隔离副本重新索引 + 图差异 + 声明的 argv 测试",
         "用户检出目录零改动",
-        "前台执行，尚未进作业队列",
+        "可用 --enqueue 作为 patch_verify 作业排队，由 job work 用同一代码路径执行",
     ),
     (
         "patch apply",

@@ -76,6 +76,7 @@ impl Store {
           CREATE INDEX IF NOT EXISTS facts_kind ON facts(analysis,kind,symbol);
           CREATE TABLE IF NOT EXISTS jobs(
             id TEXT PRIMARY KEY,
+            kind TEXT NOT NULL DEFAULT 'index',
             owner TEXT NOT NULL,
             project TEXT NOT NULL,
             request_key TEXT NOT NULL,
@@ -164,6 +165,9 @@ impl Store {
         for (column, definition) in [
             ("priority", "priority INTEGER NOT NULL DEFAULT 0"),
             ("options", "options TEXT"),
+            // A store created before the queue had kinds holds index requests,
+            // and that is exactly what the default says.
+            ("kind", "kind TEXT NOT NULL DEFAULT 'index'"),
         ] {
             let present = {
                 let mut statement =

@@ -147,7 +147,9 @@ worker stdin ≤160 MiB、stdout ≤32 MiB、stderr ≤64 KiB，V8 old-space 为
 
 **审阅面**：`GET /api/patches`、`GET /api/patch?id=`、`POST /api/patch/propose` 与函数面板的提案面板。页面可以登记提案（Intent，什么都不改）并读到验证结果，但**验证与应用仍只在本机 CLI**——`/api/exec` 之外的写路径不通过 HTTP 暴露，因为页面无法让人看见将要写入哪个目录。HTTP 登记与 CLI 验证共用 `patchwork::propose_from_diff`，所以"对固定快照校验过"在两条传输上是同一件事，页面无法登记一个 CLI 会拒绝的 diff。
 
-**仍未实现**：把 verify 放进持久作业队列（目前是前台 CLI）、以及除统一 diff 之外的建议形式（新建/删除文件、重命名）。
+**排队执行**：`patch verify --enqueue` 把验证登记为 `patch_verify` 作业。队列按行自身的 `kind` 分派（`index` / `patch_verify`），两种作业共用身份三元组、租约、心跳与崩溃收割；`job work` 用**同一个 `verify_proposal`** 执行，因此前台验证与排队验证不是两条路径。终态 artifact 是补丁树派生的新 analysis。一行描述不了自己怎么跑时（例如期限越界），作业**判失败**而不是用本 worker 的默认参数顶替别人的请求。
+
+**仍未实现**：除统一 diff 之外的建议形式（新建/删除文件、重命名）；图形化一键撤销。
 
 ### 7.4 宿主接缝（W10 首片）
 

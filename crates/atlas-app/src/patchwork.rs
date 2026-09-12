@@ -14,11 +14,12 @@
 //!   re-derived analysis and graph diff are Static, and the test run is
 //!   Observed -- each labelled, with "no test was run" never rendered as a pass.
 use atlas_engine::{
+    control::ExecutionControl,
     patch::{self, FilePatch},
     store::Store,
 };
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::PathBuf, time::Duration};
 
 /// Compare two published analyses in the way an edit is actually shaped.
 ///
@@ -161,6 +162,104 @@ fn all_edges(store: &Store, analysis: &str) -> Result<Vec<Value>, String> {
         }
     }
     Ok(out)
+}
+
+/// How to verify a proposal. Kept separate from the CLI so the same code serves
+/// a foreground `patch verify` and a queued `patch_verify` job: a queued request
+/// that took a different path would not be the same operation.
+pub struct VerifyOptions {
+    pub node: PathBuf,
+    pub worker: PathBuf,
+    pub timeout: Duration,
+    pub scan_deadline: Duration,
+    pub index_deadline: Duration,
+    pub test_argv: Option<Vec<String>>,
+    pub test_timeout: Duration,
+}
+
+/// Verify a stored proposal: isolated copy, full re-index, graph diff, optional
+/// declared test. Returns the updated proposal.
+pub async fn verify_proposal(
+    store: &Store,
+    proposal_id: &str,
+    options: &VerifyOptions,
+) -> Result<Value, String> {
+    let proposal = store
+        .patch_proposal(proposal_id)
+        .map_err(|e| e.to_string())?;
+    if proposal.state != patch::STATE_PROPOSED {
+        return Err(format!("proposal_not_verifiable:{}", proposal.state));
+    }
+    let parsed = reparsed(&proposal)?;
+    let metadata = store
+        .metadata(&proposal.analysis_id)
+        .map_err(|e| e.to_string())?;
+    let snapshot = store
+        .snapshot(
+            metadata["snapshot_id"]
+                .as_str()
+                .ok_or("analysis_has_no_snapshot")?,
+        )
+        .map_err(|e| e.to_string())?;
+    let files = patch::snapshot_files(store, &snapshot).map_err(|e| e.to_string())?;
+    let (patched_files, report) = patch::apply(&files, &parsed).map_err(|e| e.to_string())?;
+    // An isolated copy: the user's checkout is never the thing that gets
+    // re-indexed, so a proposal cannot affect the analysis it was proposed
+    // against.
+    let dir = patch::materialize(store, &snapshot, &patched_files).map_err(|e| e.to_string())?;
+    let options_for_index = crate::IndexOptions::new(
+        options.node.clone(),
+        options.worker.clone(),
+        options.timeout.as_secs(),
+        options.scan_deadline.as_secs(),
+        options.index_deadline.as_secs(),
+        false,
+    )
+    .map_err(|e| e.to_string())?;
+    let control = ExecutionControl::new(Some(
+        std::time::Instant::now() + options_for_index.index_deadline,
+    ));
+    let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+    let _signal_watcher =
+        crate::signal_watcher(control.clone(), cancel_tx).map_err(|e| e.to_string())?;
+    let result = crate::run_pipeline(store, dir.path(), &options_for_index, &control, cancel_rx)
+        .await
+        .map_err(|e| e.to_string())?;
+    let graph = graph_diff(store, &proposal.analysis_id, &result.analysis_id)?;
+    let test = match options.test_argv.as_deref() {
+        Some(argv) if !argv.is_empty() => {
+            run_declared_test(argv, dir.path(), options.test_timeout, 64 * 1024).await
+        }
+        _ => json!({
+            "observed": false,
+            "ran": false,
+            "note": "没有声明测试命令，因此没有跑任何测试。这不是通过。",
+        }),
+    };
+    let verification = json!({
+        "schema": "atlas.patch-verification.v1",
+        "base_analysis_id": proposal.analysis_id,
+        "patched_snapshot_id": result.metadata["snapshot_id"],
+        "patched_analysis_id": result.analysis_id,
+        "applied_files": report,
+        "graph_diff": graph,
+        "test": test,
+        "isolation": {
+            "method": "从不可变快照的内容寻址 blob 物化到 0700 临时目录，补丁只写在这个副本里",
+            "user_checkout_touched": false,
+        },
+        "note": "Intent（diff）→ Static（重新派生的分析与图差异）→ Observed（测试命令的退出码）三类证据在这里分开存放，不互相冒充。",
+    });
+    if !store
+        .mark_patch_verified(proposal_id, &verification)
+        .map_err(|e| e.to_string())?
+    {
+        return Err("proposal_verification_lost_a_race".into());
+    }
+    let updated = store
+        .patch_proposal(proposal_id)
+        .map_err(|e| e.to_string())?;
+    serde_json::to_value(updated).map_err(|e| e.to_string())
 }
 
 /// Run a declared test command in an isolated copy.
