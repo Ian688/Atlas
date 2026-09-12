@@ -9,7 +9,11 @@
 use crate::{Result, digest, invalid, store::Store};
 use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{Path, PathBuf},
+};
 
 pub const STATE_PROPOSED: &str = "proposed";
 pub const STATE_REJECTED: &str = "rejected";
@@ -291,6 +295,63 @@ pub fn write_checked(root: &Path, relative: &str, bytes: &[u8], expect: &str) ->
     fs::write(&temporary, bytes)?;
     fs::rename(&temporary, &target)?;
     Ok(())
+}
+
+/// The name of the lock file an apply/revert holds for the whole operation.
+///
+/// The byte check and the write are two steps, so without a lock two Atlas
+/// processes can both pass the check and then both write: the second one wins
+/// even though its check described a checkout that no longer exists. The lock is
+/// taken before the first check and released when the guard drops, including on
+/// every error path.
+pub const APPLY_LOCK_FILE: &str = ".atlas-apply.lock";
+
+/// An exclusive lock on one checkout, held for one apply or revert.
+///
+/// `create_new` is the whole mechanism: the operating system refuses the second
+/// creator. The holder's identity is written inside so the refusal can say who
+/// holds it instead of just "locked".
+pub struct ApplyLock {
+    path: PathBuf,
+}
+
+impl ApplyLock {
+    pub fn acquire(root: &Path, holder: &str) -> Result<Self> {
+        let relative = crate::exec::safe_relative(APPLY_LOCK_FILE)?;
+        let path = root.join(relative);
+        match fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+        {
+            Ok(mut file) => {
+                use std::io::Write;
+                let _ = writeln!(file, "{holder}");
+                Ok(ApplyLock { path })
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                let existing = fs::read_to_string(&path).unwrap_or_default();
+                Err(invalid(&format!(
+                    "apply_lock_held:{}:holder={}",
+                    path.display(),
+                    existing.trim()
+                )))
+            }
+            Err(error) => Err(invalid(&format!(
+                "apply_lock_unavailable:{}:{error}",
+                path.display()
+            ))),
+        }
+    }
+}
+
+impl Drop for ApplyLock {
+    fn drop(&mut self) {
+        // Best effort: a lock left behind by a crash is reported by the next
+        // attempt, which is better than a lock silently disappearing while a
+        // process still holds it.
+        let _ = fs::remove_file(&self.path);
+    }
 }
 
 /// Create one file under a root, refusing if anything is already there.

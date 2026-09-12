@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w06-bounded-parallel-jobs",
+    "window": "2026-09-12/w09-apply-lock",
     "status": "DELIVERED",
-    "note": "有界并行作业执行：job work --parallel N（1..=4），每槽位独立租约 holder，越界与 --once 组合具名拒绝，输出给出实际 holders。",
-    "evidence_dir": "evidence/development/2026-09-12-w06-bounded-parallel-jobs",
-    "verification": "evidence/development/2026-09-12-w06-bounded-parallel-jobs/verification.json"
+    "note": "apply/revert 全程持有检出目录锁（.atlas-apply.lock，create_new），第二个进程具名拒绝且不写；错误路径也释放锁。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-apply-lock",
+    "verification": "evidence/development/2026-09-12-w09-apply-lock/verification.json"
   },
   "windows": [
     {
@@ -382,10 +382,19 @@
       ],
       "note": "job work --parallel N：每槽位自己的 holder（租约不共用），上限 1..=4 是策略；越界与 --once 组合具名拒绝；输出 parallelism/holders 作为证据；用例用 1.2 秒的声明测试让重叠可见（观察到 >=2 个 running 与 3 个不同 holder），顺序模式从不重叠。patch 用例 37->39。",
       "report": "evidence/development/2026-09-12-w06-bounded-parallel-jobs/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/w09-apply-lock",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09-apply-lock"
+      ],
+      "note": "写入路径持锁：ApplyLock 用 create_new 创建 .atlas-apply.lock 并写入持有者身份，apply/revert 在整段校验+写入期间持有它；第二个进程以 apply_lock_held:<path>:holder=<who> 拒绝且不写任何文件；guard drop 在所有错误路径释放（用例：外部持锁时 apply 拒绝且文件未变、被拒绝的 apply 不留锁、revert 同样持锁）。patch 用例 39->42。仍未做：合并、逐文件磁盘备份（撤销来源是内容寻址 blob）、跨机器锁。",
+      "report": "evidence/development/2026-09-12-w09-apply-lock/REPORT.md"
     }
   ],
-  "next_work_item": "2D 画布的正式层级与空间索引；或 apply 的备份/合并/文件锁",
-  "next_action": "本轮交付有界并行作业执行（W06）：--parallel 1..=4、每槽位独立租约、越界具名拒绝、输出给出实际 holders、重叠有可见证据。剩余按价值：(1) 2D 画布的正式层级与空间索引；(2) apply 的备份/合并/文件锁；(3) 大仓库/monorepo、多语言、Windows 的并发资格；(4) 城市运行激活路径需要行级/调用级采样。",
+  "next_work_item": "2D 画布的正式层级与空间索引，或大仓库/monorepo 的规模资格",
+  "next_action": "本轮交付 apply/revert 的检出锁（W09）。剩余按价值：(1) 2D 画布的正式层级与空间索引；(2) 大仓库/monorepo 的规模资格；(3) 合并与逐文件备份；(4) 城市运行激活路径需要行级/调用级采样。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
@@ -850,7 +859,8 @@
         "跨版本选区重定位（atlas relocate / GET /api/relocate）：依据 path_and_name → identical_bytes → name_only 按强度排序并公开；entity_withdrawn（文件没了）与 no_counterpart（文件还在实体没了）分开；歧义拒绝；邻居只作上下文不作候选；只返回建议与钉在目标版本的选区，不修改已存记录",
         "3D 正式层级与 LOD：不可裁剪的形式层级 project→district→file（atlas.city-hierarchy.v1），每节点同一组事实计数、目录与项目为子节点之和；每层视图（atlas.city-layout.v1）只决定画什么（项目 1 根聚合柱体 / 每目录 1 根 / 每文件 1 根）；cityLevelInvariants 逐层重加、project==Σdistrict==Σfile 才算守恒并报出 violations；聚合柱体 aggregate=true 且无单一源码（citySelectionQuery 返回 null）；共享选区落到粗层级指名真实文件并标注聚合；运行标记按 filePaths 落在聚合柱体上并在观测行写明这是聚合；显式 maxFiles=0 是预算而非缺省值",
         "补丁三种形式：PatchForm=modify|create|delete，由 `--- /dev/null` / `+++ /dev/null` 声明、由 hunks 复核（create 不得含上下文/删除行、delete 不得留下行、两侧表头必须一致）；删除与「编辑成空文件」分开（PatchOutcome.files 与 deleted 分开，记录带 form 与 removed_digest）；apply/revert 按形式各自校验（create 要求路径为空、modify/delete 要求仍是钉住字节、revert create 删掉文件、revert delete 按钉住字节恢复且要求路径仍为空 target_recreated_since_delete）；同一路径在一条 diff 里出现两次被拒；git rename 具名拒绝 rename_not_expressible_in_unified_diff；新建提案的 entity 可以是不存在的路径（resolve_proposal_entity 只在 diff 真的新建它时接受），提案写 target_exists=false；隔离验证副本按 outcome 组装（新建写入、删除不写）",
-        "图形化一键撤销（带显式写边界）：atlas serve --allow-writes <DIR> 才开放 POST /api/patch/apply|revert，不带则 403 http_writes_disabled 且请求无法打开；目录在启动时 canonicalize 一次，请求体没有 target/root 字段（注入不读），必须逐字回显 confirm_path 否则 400 confirmation_mismatch 且不写任何文件；revert 只撤销记录里那个目录（revert_target_is_not_this_checkout）；HTTP 与 CLI 共用 patchwork::apply_proposal/revert_proposal 同一段写入代码；记录写明 applied_by:<actor>（HTTP 用会话身份）；契约增加 writes{enabled,root,how_to_enable,scope}，页面据它显示按钮并显示将写入的目录"
+        "图形化一键撤销（带显式写边界）：atlas serve --allow-writes <DIR> 才开放 POST /api/patch/apply|revert，不带则 403 http_writes_disabled 且请求无法打开；目录在启动时 canonicalize 一次，请求体没有 target/root 字段（注入不读），必须逐字回显 confirm_path 否则 400 confirmation_mismatch 且不写任何文件；revert 只撤销记录里那个目录（revert_target_is_not_this_checkout）；HTTP 与 CLI 共用 patchwork::apply_proposal/revert_proposal 同一段写入代码；记录写明 applied_by:<actor>（HTTP 用会话身份）；契约增加 writes{enabled,root,how_to_enable,scope}，页面据它显示按钮并显示将写入的目录",
+        "apply/revert 全程持有检出目录锁 .atlas-apply.lock（create_new；文件内写持有者身份；apply_lock_held 拒绝；guard drop 在所有错误路径上释放），消除「两个进程都通过字节校验再都写」的窗口；撤销来源是内容寻址的钉住 blob（无额外磁盘备份），仍无合并"
       ],
       "evidence": [
         "crates/atlas-engine/src/patch.rs（11 个 diff 单测 + 提案存储与状态迁移）",

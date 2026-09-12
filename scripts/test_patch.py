@@ -61,6 +61,16 @@ class Base(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         return json.loads(result.stdout) if result.stdout.strip() else {}
 
+    def cli_failure(self, *args):
+        """Run a command that must fail and return the process, so the test can
+        read the *stderr* named refusal instead of an empty stdout."""
+        result = subprocess.run(
+            [str(BIN), "--store", str(self.store), *map(str, args)],
+            cwd=ROOT, capture_output=True, text=True, timeout=300,
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        return result
+
     def diff_file(self, name, text):
         path = self.base / name
         path.write_text(text, encoding="utf-8")
@@ -330,6 +340,40 @@ class Cli(Base):
         status = self.cli("patch", "status", proposal["id"])
         self.assertEqual(status["proposal"]["diff"].count("right + 0"), 1)
         self.assertEqual(self.cli("patch", "list", self.analysis, "--entity", "subtract")["proposals"], [])
+
+    def test_apply_takes_a_lock_so_two_processes_cannot_both_win(self):
+        proposal = self.propose()["proposal"]
+        self.cli("patch", "verify", proposal["id"])
+        lock = self.project / ".atlas-apply.lock"
+        # Somebody else is mid-apply (or died mid-apply). Either way this process
+        # must not proceed: its byte check describes a checkout it does not own.
+        lock.write_text("another-process\n", encoding="utf-8")
+        result = self.cli_failure("patch", "apply", proposal["id"], "--target", self.project)
+        self.assertIn("apply_lock_held", result.stderr)
+        self.assertIn("another-process", result.stderr)
+        self.assertEqual(self.math.read_text(encoding="utf-8"), MATH, "a held lock must write nothing")
+        lock.unlink()
+        applied = self.cli("patch", "apply", proposal["id"], "--target", self.project)
+        self.assertEqual(applied["state"], "applied")
+        self.assertFalse(lock.exists(), "the lock must be released when the apply ends")
+
+    def test_a_refused_apply_leaves_no_lock_behind(self):
+        proposal = self.propose()["proposal"]
+        self.cli("patch", "verify", proposal["id"])
+        self.math.write_text(MATH.replace("left + right", "left + right + 1"), encoding="utf-8")
+        self.cli("patch", "apply", proposal["id"], "--target", self.project, ok=False)
+        self.assertFalse((self.project / ".atlas-apply.lock").exists(),
+                         "an error path must not keep the lock")
+
+    def test_revert_holds_the_lock_too(self):
+        proposal = self.propose()["proposal"]
+        self.cli("patch", "verify", proposal["id"])
+        self.cli("patch", "apply", proposal["id"], "--target", self.project)
+        (self.project / ".atlas-apply.lock").write_text("another-process\n", encoding="utf-8")
+        result = self.cli_failure("patch", "revert", proposal["id"])
+        self.assertIn("apply_lock_held", result.stderr)
+        self.assertIn("right + 0", self.math.read_text(encoding="utf-8"),
+                      "a held lock must leave the applied bytes alone")
 
     def test_a_proposal_records_who_proposed_it(self):
         proposal = self.cli("patch", "propose", self.analysis, "add",

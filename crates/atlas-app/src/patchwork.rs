@@ -386,6 +386,10 @@ pub fn apply_proposal(
     let target = target
         .canonicalize()
         .map_err(|error| format!("target_unreadable:{}:{error}", target.display()))?;
+    // Held across every check and write: without it two processes can both pass
+    // "the checkout still has the reviewed bytes" and then both write, and the
+    // second one wins even though its check described a different checkout.
+    let _lock = patch::ApplyLock::acquire(&target, actor).map_err(|e| e.to_string())?;
     for entry in &outcome.report {
         match entry.form.as_str() {
             "create" => {
@@ -435,6 +439,7 @@ pub fn revert_proposal(
         .clone()
         .ok_or("proposal_has_no_target")
         .map(PathBuf::from)?;
+    let _lock = patch::ApplyLock::acquire(&target, actor).map_err(|e| e.to_string())?;
     let (snapshot, outcome) = proposal_outcome(store, proposal)?;
     for entry in &outcome.report {
         let path = entry.path.as_str();
