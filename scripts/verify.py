@@ -43,6 +43,10 @@ CHECKS = [
     # things that keep that safe: a selection is refused rather than re-anchored
     # across versions, and only a closed set of actions is ever performed.
     ("bridge", [sys.executable, "scripts/test_bridge.py"]),
+    # The AI Coding chain. Every case here is a refusal that protects something:
+    # an unapplicable diff, a checkout that moved after review, a test that
+    # never ran being read as a pass.
+    ("patch", [sys.executable, "scripts/test_patch.py"]),
     ("calculator", ["node", "examples/calculator/demo.mjs"]),
     ("web-syntax", ["node", "--check", "web/app.js"]),
     ("city3d-syntax", ["node", "--check", "web/city3d.js"]),

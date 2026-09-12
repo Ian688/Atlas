@@ -140,7 +140,20 @@ impl Store {
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL,
             UNIQUE(owner,request_key));
-          CREATE INDEX IF NOT EXISTS agent_requests_state ON agent_requests(state,created_at);")?;
+          CREATE INDEX IF NOT EXISTS agent_requests_state ON agent_requests(state,created_at);
+          CREATE TABLE IF NOT EXISTS patch_proposals(
+            id TEXT PRIMARY KEY,
+            analysis_id TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
+            proposed_by TEXT NOT NULL,
+            state TEXT NOT NULL,
+            proposal TEXT NOT NULL,
+            verification TEXT,
+            target TEXT,
+            terminal_reason TEXT,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL);
+          CREATE INDEX IF NOT EXISTS patch_proposals_entity ON patch_proposals(analysis_id,entity_id,created_at);")?;
             Ok(())
         })?;
         // Additive migration. A store created before the queue existed has a

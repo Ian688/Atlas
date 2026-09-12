@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-selection-and-bridge",
+    "window": "2026-09-12/w09-ai-coding-chain",
     "status": "DELIVERED",
-    "note": "W09 首片：共享选区对象与跨版本拒绝、2D/3D 选区互通、语义 DOM 与有界桥接面、Intent 注解、带租约与 ACK 的有界 Agent Bridge。AI Coding 补丁链仍未实现。",
-    "evidence_dir": "evidence/development/2026-09-12-w09",
-    "verification": "evidence/development/2026-09-12-w09/verification.json"
+    "note": "AI Coding 第一条完整链接通（propose→verify→apply/revert），包含图差异与 Observed 测试证据；缺 Web 审阅界面与持久作业化。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-ai-coding",
+    "verification": "evidence/development/2026-09-12-w09-ai-coding/verification.json"
   },
   "windows": [
     {
@@ -159,10 +159,24 @@
       ],
       "note": "选区 = 实体 + 分析版本，经 fragment 在 2D 与 3D 之间传递，跨版本一律拒绝而不是重指。注解是 Intent（exists=false）。Agent Bridge 请求身份 (owner,request_key) 幂等、认领即 ACK 带租约、只有租约持有者能写终态、动作集合封闭且越界动作在入队时被持久拒绝。AI Coding 补丁链未实现。",
       "report": "evidence/development/2026-09-12-w09/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/w09-ai-coding-chain",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09-diff-against-pinned-bytes",
+        "W09-isolated-verify-reindex",
+        "W09-graph-diff",
+        "W09-declared-argv-test-observed",
+        "W09-apply-revert-with-drift-check",
+        "W09-intent-static-observed-separation"
+      ],
+      "note": "AI Coding 第一条完整链接通：diff 对固定快照字节校验（不匹配即带行拒绝，无模糊匹配）、隔离副本重新索引派生新 analysis、图差异按 path+name 配对、声明的 argv 测试作为 Observed 证据、apply/revert 带字节漂移校验与单向状态机。Intent/Static/Observed 分开存放。",
+      "report": "evidence/development/2026-09-12-w09-ai-coding/REPORT.md"
     }
   ],
-  "next_work_item": "W09 续：AI Coding 第一条完整链（Intent → 提案 → 隔离应用 → 重新解析 → 测试 → 图 diff → 审阅/撤销）",
-  "next_action": "W09 首片已接通：共享选区（带版本、跨版本拒绝）、2D/3D 选区互通、语义 DOM 与有界桥接面、Intent 注解、带租约/ACK/幂等身份的有界 Agent Bridge（动作集合封闭）。下一步做 AI Coding 第一条完整链，必须沿用同一纪律：补丁只在隔离工作副本中应用，应用前校验固定版本与权限，应用后本地重新解析并跑测试，产出图 diff 供审阅，可撤销；且 Intent/Static/Observed 三类证据始终分开。W10（Modus 接缝）依赖 W09 的稳定 API，应在补丁链之后进行。",
+  "next_work_item": "W10：Modus 接缝与旧实现退役（宿主调用服务而非读数据库）",
+  "next_action": "W09 的两片（共享选区/有界桥接 + AI Coding 补丁链）都已接通并纳入验证门。下一步是 W10：给宿主一个只通过服务接口工作的接缝——CLI/HTTP 合同稳定化、宿主不读 Atlas 数据库、真实 E2E（宿主→服务→事实→回执）与迁移/回退边界写清楚。之后仍待补：patch verify 进持久作业队列、Web 审阅界面、needs_context 上下文合成、Effect journal、依赖切片、owner 认证与服务端权限验证、真实大仓库资格。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
@@ -576,24 +590,30 @@
         "三个有界动作：inspect 读取已发布上下文；annotate 登记 Intent；propose_patch 只登记占位对象（applied=false，带「没有应用」说明），没有任何写源码路径",
         "HTTP 边界：GET /api/selection、/api/annotations、/api/agent/requests，POST /api/annotation、/api/agent/request、/api/agent/work；页面不能指定 analysis_id（不在请求类型里），未授权 401",
         "CLI：atlas select/annotate/annotations 与 atlas agent request|work|claim|complete|status|list|reap",
-        "实体解析不再静默兜底：select/annotate/annotations/agent 使用 resolve_entity（函数与文件），解析不到即报错，不给不存在的对象造一个选区"
+        "实体解析不再静默兜底：select/annotate/annotations/agent 使用 resolve_entity（函数与文件），解析不到即报错，不给不存在的对象造一个选区",
+        "AI Coding 链 propose：统一 diff 对固定快照字节在内存应用；不匹配则带着期望/实际的那一行拒绝；CRLF 目标拒绝而不是规范化；创建/删除文件不在本切片内",
+        "AI Coding 链 verify：从内容寻址 blob 物化 0700 隔离副本并在其中跑完整索引管线，派生新的 analysis；用户检出目录零改动（有测试）",
+        "图差异：节点按 path+name 配对（id 绑定字节区间，按 id 比较会把编辑读成删除+新增），给出 added/removed/changed 与函数/文件/调用/未解析调用的前后计数；id 原样保留",
+        "声明的 argv 测试命令（不是 shell 字符串）在副本内运行，超时按进程组杀死；退出码与输出作为 Observed 证据；未声明时写明「没有跑任何测试，这不是通过」",
+        "apply/revert：apply 校验目标当前字节仍等于提案依据的固定快照 blob（否则 target_changed_since_apply），revert 校验当前字节等于 apply 写入的字节；状态机 proposed→verified→applied→reverted 单向",
+        "Intent/Static/Observed 三类证据分开存放：proposal 带 intent=true/code_exists=false，verification 里 graph_diff 与 test 各自标注"
       ],
       "evidence": [
-        "crates/atlas-engine/src/bridge.rs（6 个单测：版本钉定/注解幂等与 exists/越界动作拒绝/未知分析拒绝/身份三元组/租约持有者纪律）",
-        "crates/atlas-app/src/agent.rs（三个有界动作）",
-        "crates/atlas-app/src/server.rs（/api/selection、/api/annotation、/api/annotations、/api/agent/*）",
-        "scripts/test_bridge.py（20 个用例：CLI 15 + HTTP 5，含跨版本拒绝、越界动作、租约过期回收、提案不改源码）",
-        "web/tests/app.behavior.test.mjs（新增 5 项：选区发布与 3D 链接、Intent 提案、同版本选区应用、跨版本选区拒绝、bridge 有界动作）",
-        "web/tests/city3d.behavior.test.mjs（新增 3 项：选择目标解析、跨版本拒绝、实体缺失拒绝）",
-        "evidence/development/2026-09-12-w09/verification.json"
+        "crates/atlas-engine/src/patch.rs（11 个 diff 单测 + 提案存储与状态迁移）",
+        "crates/atlas-app/src/patchwork.rs（图差异、声明的 argv 测试运行）",
+        "crates/atlas-app/src/main.rs（atlas patch propose|verify|apply|revert|status|list）",
+        "scripts/test_patch.py（16 个用例：全部拒绝路径 + apply/revert 字节校验）",
+        "evidence/development/2026-09-12-w09-ai-coding/verification.json"
       ],
       "blockers": [
-        "AI Coding 完整链未实现：没有隔离应用补丁、重新解析、运行测试、图 diff、审阅/应用/撤销。当前只有提案占位与拒绝，没有任何写源码路径",
+        "AI Coding 链仍未进持久作业队列与 Web 审阅界面：verify 是前台 CLI；没有图形化的 diff/图差异审阅与一键撤销；提案形式只支持统一 diff（新建/删除/重命名文件不支持）",
         "选区只在同一 analysis 内互通；跨版本选区被拒绝而不是重定位（relocation 需要实体级重命名/移动追踪，未做）",
         "LOD 与正式 3D 层级未实现：城市仍按固定规则投影，没有细节层级切换，也没有「激活路径来自 Run」的图例分离（因为还没有 Run 轨迹）",
         "Agent Bridge 没有 owner 认证：owner 是调用者声明；服务端验证权限与版本仍未实现（与 W06 同一缺口）",
         "bridge 的 inspect 直接展开已发布上下文，没有按请求方做最小披露裁剪；请求预算与配额未实现",
-        "没有被同一 analysis 之外的投影状态持久化：选区只在 fragment 与内存里，刷新页面依赖 URL"
+        "没有被同一 analysis 之外的投影状态持久化：选区只在 fragment 与内存里，刷新页面依赖 URL",
+        "patch verify 会在同一 store 里多发布一个 analysis（补丁树），长期会累积；没有回收策略",
+        "apply 直接写用户检出目录：虽然做了字节漂移校验与原子改名，但没有备份、没有冲突合并、也没有文件锁；并发修改的窗口仍然存在"
       ],
       "independent_review": {
         "id": "pending",

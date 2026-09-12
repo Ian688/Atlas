@@ -17,6 +17,7 @@
 - 静态能力是函数结构与词法候选，加上 0.2 的声明 profile 内局部语义：worker Flow IR → Rust CFG（finally completion/短路/循环/switch）→ 局部抽象解释（def-use、值来源、有限常量折叠、循环不动点、显式 unknown 与预算）。CLI `flows`/`flow` 与 HTTP `/api/flows`、`/api/flow` 已接通，函数面板消费同一事实。跨过程符号摘要（调用点代回、SCC 固定点）已接通并有 D13/D14/D15/D17 反例；有界标量参数 k=1 上下文已接通（每 callee 至多 8 个调用点）；完整堆/闭包上下文、堆别名精度与真实执行仍是目标。
 - 索引全链协作取消、发布事务取消门与共享求解预算已接通；`flow.frontier`、调用点 unknown 与计数是部分结果的查询合同。
 - 有界分页/遍历、快照源码和 SelectionContext 可用；持久作业身份/幂等/租约/崩溃收割/优先级队列与增量失效已接通（W06/W07 仍 PARTIAL）。正式工具注册/MCP、回执与可控 target runner 中的**场景驱动**（业务步骤、入口动作、依赖切片）仍未实现。
+- AI Coding 第一条完整链已接通：diff 提案对固定快照校验 → 隔离副本重新索引 + 图差异 + 声明的 argv 测试 → apply/revert 带字节漂移校验。Intent/Static/Observed 分开存放。**没有** Web 审阅界面，verify 也还没有进持久作业队列。
 - Web 实际使用服务事实，候选高亮保留，函数详情面板显示块级控制流、值来源摘要与绑定状态矩阵；`/city3d` 是同一份分析的 WebGL2 投影。**执行画像与隔离受控运行已接通（W08 首片）**：静态分类 + 快照副本 + 目标 Node 权限模型强制 + 源码同一性选目标 + 入口观测记录。仍没有行级覆盖、运行期调用图、上下文合成、Effect journal 与 AI 代码写入。
 - CLI 的 worker 参数指定 Atlas 自有受信任提取程序。不要把它扩展为直接运行用户代码的入口。
 

@@ -1,0 +1,269 @@
+//! W09 continuation: the rest of the AI Coding chain.
+//!
+//! propose (validated against pinned bytes) -> verify (isolated copy, re-index,
+//! graph diff, optional declared test) -> apply / revert against a checkout
+//! whose bytes are checked first.
+//!
+//! Two rules shape every step:
+//!
+//! * **A proposal never touches the user's checkout until `apply`**, and
+//!   `apply` refuses if the target's bytes are no longer the bytes the proposal
+//!   was verified against. Overwriting work that happened after review is not a
+//!   merge, it is a loss.
+//! * **Intent, Static and Observed stay separate.** The diff is Intent, the
+//!   re-derived analysis and graph diff are Static, and the test run is
+//!   Observed -- each labelled, with "no test was run" never rendered as a pass.
+use atlas_engine::{
+    patch::{self, FilePatch},
+    store::Store,
+};
+use serde_json::{Value, json};
+use std::collections::BTreeMap;
+
+/// Compare two published analyses in the way an edit is actually shaped.
+///
+/// Node ids are content-addressed over their source span, so editing a function
+/// changes its id. Keying on the id would report every edit as a removal plus an
+/// addition; keying on `path:name` reports it as the change it is. The ids are
+/// still reported, because a consumer that needs byte-exact identity should have
+/// it.
+pub fn graph_diff(store: &Store, base: &str, patched: &str) -> Result<Value, String> {
+    let base_nodes = all_nodes(store, base)?;
+    let patched_nodes = all_nodes(store, patched)?;
+    let base_edges = all_edges(store, base)?;
+    let patched_edges = all_edges(store, patched)?;
+
+    let key = |node: &Value| -> String {
+        let path = node["path"].as_str().unwrap_or("");
+        let name = node["name"].as_str().unwrap_or("");
+        format!("{}|{}|{}", node["kind"].as_str().unwrap_or(""), path, name)
+    };
+    let index = |nodes: &[Value]| -> BTreeMap<String, Value> {
+        let mut map = BTreeMap::new();
+        for node in nodes {
+            map.insert(key(node), node.clone());
+        }
+        map
+    };
+    let before = index(&base_nodes);
+    let after = index(&patched_nodes);
+    let mut added = Vec::new();
+    let mut removed = Vec::new();
+    let mut changed = Vec::new();
+    for (id, node) in &after {
+        match before.get(id) {
+            None => added.push(json!({
+                "kind": node["kind"], "path": node["path"], "name": node["name"],
+                "node_id": node["id"], "start": node["start"], "end": node["end"],
+            })),
+            Some(old) => {
+                let moved = old["start"] != node["start"] || old["end"] != node["end"];
+                let renamed = old["name"] != node["name"];
+                if moved || renamed || old["id"] != node["id"] {
+                    changed.push(json!({
+                        "kind": node["kind"], "path": node["path"], "name": node["name"],
+                        "before": {"node_id": old["id"], "start": old["start"], "end": old["end"], "name": old["name"]},
+                        "after": {"node_id": node["id"], "start": node["start"], "end": node["end"], "name": node["name"]},
+                    }));
+                }
+            }
+        }
+    }
+    for (id, node) in &before {
+        if !after.contains_key(id) {
+            removed.push(json!({
+                "kind": node["kind"], "path": node["path"], "name": node["name"],
+                "node_id": node["id"],
+            }));
+        }
+    }
+
+    // Edges are compared by what a reader can act on: kind, label and the paths
+    // at both ends. The ids move with the source spans for the same reason.
+    let edge_key = |edge: &Value| -> String {
+        format!(
+            "{}|{}|{}|{}",
+            edge["kind"].as_str().unwrap_or(""),
+            edge["label"].as_str().unwrap_or(""),
+            edge["path"].as_str().unwrap_or(""),
+            edge["target"].as_str().unwrap_or("<unresolved>")
+        )
+    };
+    let before_edges: std::collections::BTreeSet<String> =
+        base_edges.iter().map(edge_key).collect();
+    let after_edges: std::collections::BTreeSet<String> =
+        patched_edges.iter().map(edge_key).collect();
+    let edges_added: Vec<&String> = after_edges.difference(&before_edges).take(200).collect();
+    let edges_removed: Vec<&String> = before_edges.difference(&after_edges).take(200).collect();
+
+    let base_meta = store.metadata(base).map_err(|e| e.to_string())?;
+    let patched_meta = store.metadata(patched).map_err(|e| e.to_string())?;
+    let count = |meta: &Value, key: &str| meta[key].as_u64().unwrap_or(0);
+    Ok(json!({
+        "schema": "atlas.graph-diff.v1",
+        "base_analysis_id": base,
+        "patched_analysis_id": patched,
+        "nodes": {
+            "added": added, "removed": removed, "changed": changed,
+            "added_count": added.len(), "removed_count": removed.len(), "changed_count": changed.len(),
+            "truncated": added.len() + removed.len() + changed.len() > 600,
+        },
+        "edges": {
+            "added": edges_added, "removed": edges_removed,
+            "added_count": after_edges.difference(&before_edges).count(),
+            "removed_count": before_edges.difference(&after_edges).count(),
+        },
+        "counts": {
+            "functions": {"before": count(&base_meta, "function_count"), "after": count(&patched_meta, "function_count")},
+            "files": {"before": count(&base_meta, "file_count"), "after": count(&patched_meta, "file_count")},
+            "calls": {"before": count(&base_meta, "call_count"), "after": count(&patched_meta, "call_count")},
+            "unresolved_calls": {"before": count(&base_meta, "unresolved_call_count"), "after": count(&patched_meta, "unresolved_call_count")},
+        },
+        "note": "节点按 path+name 重新配对：节点 id 绑定源码字节区间，编辑函数会改变 id，按 id 比较会把每次编辑读成一次删除加一次新增。id 仍然原样给出。",
+    }))
+}
+
+fn all_nodes(store: &Store, analysis: &str) -> Result<Vec<Value>, String> {
+    let mut out = Vec::new();
+    let mut cursor: Option<String> = None;
+    for _ in 0..40 {
+        let page = store
+            .nodes(analysis, "all", 500, cursor.as_deref())
+            .map_err(|e| e.to_string())?;
+        out.extend(
+            page.items
+                .iter()
+                .map(|node| serde_json::to_value(node).unwrap_or(Value::Null)),
+        );
+        cursor = page.next_cursor;
+        if cursor.is_none() {
+            break;
+        }
+    }
+    Ok(out)
+}
+
+fn all_edges(store: &Store, analysis: &str) -> Result<Vec<Value>, String> {
+    let mut out = Vec::new();
+    let mut cursor: Option<String> = None;
+    for _ in 0..40 {
+        let page = store
+            .edges(analysis, "call_candidate", 500, cursor.as_deref())
+            .map_err(|e| e.to_string())?;
+        out.extend(
+            page.items
+                .iter()
+                .map(|edge| serde_json::to_value(edge).unwrap_or(Value::Null)),
+        );
+        cursor = page.next_cursor;
+        if cursor.is_none() {
+            break;
+        }
+    }
+    Ok(out)
+}
+
+/// Run a declared test command in an isolated copy.
+///
+/// The command is an argv array, never a shell string, so there is no shell to
+/// interpret a metacharacter. It is observed evidence and is labelled as such,
+/// including the case where no command was declared at all.
+pub async fn run_declared_test(
+    argv: &[String],
+    cwd: &std::path::Path,
+    timeout: std::time::Duration,
+    output_limit: usize,
+) -> Value {
+    use std::process::Stdio;
+    use tokio::io::AsyncReadExt;
+    let Some(program) = argv.first() else {
+        return json!({"observed": false, "ran": false, "note": "没有声明测试命令，因此没有跑任何测试；这不是通过。"});
+    };
+    let mut command = tokio::process::Command::new(program);
+    command
+        .args(&argv[1..])
+        .current_dir(cwd)
+        .env_clear()
+        .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.as_std_mut().process_group(0);
+    }
+    let started = std::time::Instant::now();
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            return json!({"observed": true, "ran": false, "argv": argv, "error": format!("spawn_failed:{error}"), "note": "测试命令没有启动；这既不是通过也不是失败。"});
+        }
+    };
+    let pid = child.id();
+    let mut stdout = child.stdout.take();
+    let mut stderr = child.stderr.take();
+    let read = async {
+        let mut out = Vec::new();
+        let mut err = Vec::new();
+        if let Some(handle) = stdout.as_mut() {
+            let _ = handle.take(output_limit as u64).read_to_end(&mut out).await;
+        }
+        if let Some(handle) = stderr.as_mut() {
+            let _ = handle.take(output_limit as u64).read_to_end(&mut err).await;
+        }
+        (out, err)
+    };
+    let outcome = tokio::time::timeout(timeout, async {
+        let (out, err) = read.await;
+        let status = child.wait().await;
+        (out, err, status)
+    })
+    .await;
+    match outcome {
+        Ok((out, err, Ok(status))) => json!({
+            "observed": true,
+            "ran": true,
+            "argv": argv,
+            "exit_code": status.code(),
+            "passed": status.success(),
+            "duration_ms": started.elapsed().as_millis() as u64,
+            "stdout": String::from_utf8_lossy(&out).chars().take(8192).collect::<String>(),
+            "stderr": String::from_utf8_lossy(&err).chars().take(8192).collect::<String>(),
+            "note": "这是执行观测：命令的退出码与输出。它只说明这条命令在这个隔离副本里的结果。",
+        }),
+        Ok((_, _, Err(error))) => {
+            json!({"observed": true, "ran": true, "argv": argv, "error": format!("wait_failed:{error}")})
+        }
+        Err(_) => {
+            #[cfg(unix)]
+            if let Some(pid) = pid {
+                unsafe {
+                    libc::kill(-(pid as i32), libc::SIGKILL);
+                }
+            }
+            let _ = child.start_kill();
+            let _ = child.wait().await;
+            json!({
+                "observed": true,
+                "ran": true,
+                "argv": argv,
+                "timed_out": true,
+                "duration_ms": started.elapsed().as_millis() as u64,
+                "note": "测试命令超时后被按进程组杀死；超时不是通过。",
+            })
+        }
+    }
+}
+
+/// Re-parse a stored diff. The stored text is authoritative: what was reviewed
+/// is what gets applied.
+pub fn reparsed(proposal: &patch::PatchProposal) -> Result<Vec<FilePatch>, String> {
+    let diff = proposal
+        .proposal
+        .get("diff")
+        .and_then(|value| value.as_str())
+        .ok_or("proposal_has_no_diff")?;
+    patch::parse_unified_diff(diff).map_err(|error| error.to_string())
+}

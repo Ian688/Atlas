@@ -43,6 +43,7 @@ target/debug/atlas --store local-state serve <上一步返回的id>
 - `index --incremental` 在字节与版本都没变时直接返回已发布的分析，并报告一次局部改动会失效什么：每个文件按自身内容与依赖闭包（在导入图 SCC 凝聚上折叠）得到一个键，因此失效**不需要**额外的一遍扫描，且改叶子不会反向失效共享模块。`withdrawn` 列出上次分析过、这次已不存在的文件。**承重断言**：增量与全量必须发布同一个 analysis id，冷/热/编辑/删除四条路径都有测试。已知边界：局部改动仍需重新派生全部函数（Rust 侧是全程序 SCC 不动点）。
 - **一个选区，两种投影**：选区 = 实体 + 它被选中时的分析版本，随 URL fragment 传递（fragment 不进入 HTTP 请求）。2D 与 `/city3d` 共享同一个选区；投影若在服务另一个版本，会**拒绝**这个选区并说明原因，而不是把它悄悄改指到当前版本的某个对象上。语义 DOM（`data-selection-entity` / `data-analysis-id`）与 `globalThis.atlasBridge` 是给外部 Agent 用的接口，不依赖向任何私有聊天窗口注入。
 - **Intent 与提案**：`atlas annotate` / `/api/annotation` 把约束、场景、补丁登记为注解，`exists:false`、带 `proposed_by`。注解是声明，不是事实，也不是已存在的代码；补丁提案只登记为占位对象（`applied:false`），本切片没有应用/重解析/测试/撤销的代码路径。
+- **AI Coding 第一条完整链**（`atlas patch …`）：提案是统一 diff，先对**固定快照字节**在内存里应用，位置不符就带着不一致的那一行拒绝（不做模糊匹配——那会把改动挪到另一个长得像的地方）。验证在**隔离副本**里重新索引：派生出新的 analysis，产出**图差异**（节点按 path+name 重新配对，因为 id 绑定字节区间，按 id 比较会把编辑读成删除+新增），并可在副本里跑一条**声明的 argv 测试命令**（不是 shell 字符串）。apply 会先校验目标当前字节仍等于提案所依据的固定快照，否则拒绝——覆盖审查之后发生的改动是损失而不是合并；revert 同样校验 apply 之后的字节。Intent（diff）、Static（重新派生的分析与图差异）、Observed（测试退出码）三类证据分开存放，没跑测试就写「没有跑任何测试，这不是通过」。
 - **有界 Agent Bridge**：`atlas agent request/work/claim/complete/reap` 与 `/api/agent/*`。请求身份 = (owner, request_key)，幂等；认领即 ACK 并带租约，过期租约被收割回队列；只有当前租约持有者能写终态。动作集合是**封闭**的（`inspect` / `annotate` / `propose_patch`），请求其它动作在入队时就被持久地拒绝并记录原因。页面不能自己指定 Node 二进制、环境或分析版本。
 - **执行画像**（`atlas profile` / `/api/profile`）把每个函数按已发布事实分成 `pure_callable` / `needs_context` / `needs_entry_driver` / `unsupported`，每条降级理由都指回它读的那个字段。partial 分析一律降级：frontier 就是事实缺失的块，「没有副作用」没有被证明。
 - **受控运行**（`atlas exec` / `/api/exec`）只对通过画像的函数生效：它把快照字节物化成隔离副本，用调用者指定的**目标 Node** 在 `--permission` 下启动，只授予副本只读与显式声明的项。权限是强制的而不是声明式的——每个进程首次运行前先跑一次能力探针，要求一次真实写入被 `ERR_ACCESS_DENIED` 拒绝，否则拒绝执行。目标函数按**源码同一性**选定（命名空间里某个值的 `toString()` 必须等于快照中该符号的字节），因此同名的另一个函数不会被静默执行，导不出的函数直接报 `target_not_exported`。超时/取消按进程组 `SIGKILL` 回收。
@@ -79,6 +80,7 @@ python3 scripts/test_incremental.py
 python3 scripts/test_semantic_contracts.py
 python3 scripts/test_execution.py
 python3 scripts/test_bridge.py
+python3 scripts/test_patch.py
 node examples/calculator/demo.mjs
 node web/tests/app.behavior.test.mjs
 node web/tests/city3d.behavior.test.mjs
@@ -86,4 +88,4 @@ node web/tests/city3d.behavior.test.mjs
 
 自动化分别覆盖存储/遍历/边界、真实编译器材料、完整 CLI/HTTP 链路和独立计算器断言。`web/tests/app.behavior.test.mjs` 在 `node:vm` 的 DOM 里真正驱动 `web/app.js`（会话保持、失败路径清空、事实与选中的 symbol 一致性），因此工作台的行为不再只靠 `node --check` 的语法检查。
 
-自动化分别覆盖存储/遍历/边界、真实编译器材料、完整 CLI/HTTP 链路、独立计算器断言、持久作业与队列、增量等价性、CLI/HTTP 受控执行、选区跨版本拒绝与有界 Agent Bridge，以及网页行为。120 文件、1,200 函数是合成分页与预算样本；10,000 节点 SCC 是图算法样本；两者均不构成大型真实项目资格。真实第三方项目的成本记录见 [GE-2/GE-3 证据](evidence/development/2026-09-12-real-project/REPORT.md)，它证明的是单机单项目成本，不是大仓库或多语言资格。
+自动化分别覆盖存储/遍历/边界、真实编译器材料、完整 CLI/HTTP 链路、独立计算器断言、持久作业与队列、增量等价性、CLI/HTTP 受控执行、选区跨版本拒绝与有界 Agent Bridge、AI Coding 补丁链的全部拒绝路径，以及网页行为。120 文件、1,200 函数是合成分页与预算样本；10,000 节点 SCC 是图算法样本；两者均不构成大型真实项目资格。真实第三方项目的成本记录见 [GE-2/GE-3 证据](evidence/development/2026-09-12-real-project/REPORT.md)，它证明的是单机单项目成本，不是大仓库或多语言资格。

@@ -1,4 +1,5 @@
 mod agent;
+mod patchwork;
 mod runner;
 mod server;
 mod worker;
@@ -7,6 +8,7 @@ use atlas_contract::{ParseRequest, ScanLimits};
 use atlas_engine::bridge;
 use atlas_engine::exec::{Grants, RunSpec};
 use atlas_engine::job::{self, Lease, STATE_COMPLETED, STATE_FAILED};
+use atlas_engine::patch;
 use atlas_engine::{analyze, control::ExecutionControl, incremental, scan, store::Store};
 use clap::{Args, Parser, Subcommand};
 use serde_json::json;
@@ -189,6 +191,68 @@ enum Action {
     Agent {
         #[command(subcommand)]
         command: AgentAction,
+    },
+    /// AI Coding chain: propose a diff against pinned bytes, verify it in an
+    /// isolated copy, then apply or revert it against a checkout.
+    Patch {
+        #[command(subcommand)]
+        command: PatchAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum PatchAction {
+    /// Record a unified diff as a proposal. It is applied in memory against the
+    /// pinned snapshot bytes before anything else happens.
+    Propose {
+        analysis: String,
+        entity: String,
+        #[arg(long)]
+        diff: PathBuf,
+        #[arg(long, default_value = "human")]
+        proposed_by: String,
+        #[arg(long)]
+        summary: Option<String>,
+    },
+    /// Apply the proposal in an isolated copy, re-index it, diff the two graphs
+    /// and optionally run a declared test command there.
+    Verify {
+        id: String,
+        #[arg(long, default_value = "node")]
+        node: PathBuf,
+        #[arg(long, default_value = "workers/typescript/worker.mjs")]
+        worker: PathBuf,
+        #[arg(long, default_value_t = 60)]
+        timeout_seconds: u64,
+        #[arg(long, default_value_t = 300)]
+        scan_deadline_seconds: u64,
+        #[arg(long, default_value_t = 600)]
+        index_deadline_seconds: u64,
+        /// A JSON argv array, e.g. '["node","--test"]'. Never a shell string.
+        #[arg(long)]
+        test_argv: Option<String>,
+        #[arg(long, default_value_t = 120000)]
+        test_timeout_ms: u64,
+    },
+    /// Write the verified files into a checkout, refusing if its bytes moved.
+    Apply {
+        id: String,
+        #[arg(long)]
+        target: PathBuf,
+    },
+    /// Restore the pinned bytes, refusing if the target was modified since apply.
+    Revert {
+        id: String,
+    },
+    Status {
+        id: String,
+    },
+    List {
+        analysis: String,
+        #[arg(long)]
+        entity: Option<String>,
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
     },
 }
 
@@ -1192,6 +1256,249 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 let ran = outcomes.len();
                 print(json!({"ran": ran, "outcomes": outcomes}))?
+            }
+        },
+        Action::Patch { command } => match command {
+            PatchAction::Propose {
+                analysis,
+                entity,
+                diff,
+                proposed_by,
+                summary,
+            } => {
+                let entity = runner::resolve_entity(&store, &analysis, &entity)?;
+                let text = std::fs::read_to_string(&diff)?;
+                let selection = bridge::selection(&analysis, &entity, "entity");
+                let metadata = store.metadata(&analysis)?;
+                let snapshot = store.snapshot(
+                    metadata["snapshot_id"]
+                        .as_str()
+                        .ok_or("analysis_has_no_snapshot")?,
+                )?;
+                let files = patch::snapshot_files(&store, &snapshot)?;
+                // The diff is checked against the pinned bytes before the
+                // proposal is stored. Storing an unapplicable proposal would
+                // make it look reviewable when it is not.
+                let outcome = patch::parse_unified_diff(&text).and_then(|parsed| {
+                    patch::apply(&files, &parsed).map(|(patched, report)| (parsed, patched, report))
+                });
+                let proposal = match outcome {
+                    Ok((parsed, patched, report)) => json!({
+                        "schema": patch::PATCH_SCHEMA,
+                        "analysis_id": analysis,
+                        "entity_id": entity,
+                        "selection_id": selection.id,
+                        "proposed_by": proposed_by,
+                        "summary": summary,
+                        "diff": text,
+                        "intent": true,
+                        "code_exists": false,
+                        "validation": {
+                            "ok": true,
+                            "files": report,
+                            "hunks": parsed.iter().map(|file| file.hunks.len()).sum::<usize>(),
+                            "patched_paths": patched.keys().collect::<Vec<_>>(),
+                        },
+                        "note": "这是 Intent：一份提案。它还没有写进任何检出目录，也没有改变已发布的分析。",
+                    }),
+                    Err(error) => json!({
+                        "schema": patch::PATCH_SCHEMA,
+                        "analysis_id": analysis,
+                        "entity_id": entity,
+                        "selection_id": selection.id,
+                        "proposed_by": proposed_by,
+                        "summary": summary,
+                        "diff": text,
+                        "intent": true,
+                        "code_exists": false,
+                        "validation": {"ok": false, "reason": error.to_string()},
+                        "note": "这份提案没有通过固定快照的校验，因此它不会进入可验证状态。",
+                    }),
+                };
+                let valid = proposal["validation"]["ok"].as_bool() == Some(true);
+                let (stored, created) = store.record_patch_proposal(
+                    &analysis,
+                    &entity,
+                    &proposed_by,
+                    &proposal,
+                    if valid {
+                        patch::STATE_PROPOSED
+                    } else {
+                        patch::STATE_REJECTED
+                    },
+                    if valid {
+                        None
+                    } else {
+                        proposal["validation"]["reason"].as_str()
+                    },
+                )?;
+                print(json!({
+                    "outcome": if created { if valid {"proposed"} else {"rejected"} } else {"already_proposed"},
+                    "proposal": stored,
+                }))?;
+                if !valid {
+                    return Err(
+                        "proposal_rejected:the diff does not apply to the pinned snapshot".into(),
+                    );
+                }
+            }
+            PatchAction::Verify {
+                id,
+                node,
+                worker,
+                timeout_seconds,
+                scan_deadline_seconds,
+                index_deadline_seconds,
+                test_argv,
+                test_timeout_ms,
+            } => {
+                let proposal = store.patch_proposal(&id)?;
+                if proposal.state != patch::STATE_PROPOSED {
+                    return Err(format!("proposal_not_verifiable:{}", proposal.state).into());
+                }
+                let parsed = patchwork::reparsed(&proposal)?;
+                let metadata = store.metadata(&proposal.analysis_id)?;
+                let snapshot = store.snapshot(
+                    metadata["snapshot_id"]
+                        .as_str()
+                        .ok_or("analysis_has_no_snapshot")?,
+                )?;
+                let files = patch::snapshot_files(&store, &snapshot)?;
+                let (patched_files, report) = patch::apply(&files, &parsed)?;
+                // An isolated copy: the user's checkout is never the thing that
+                // gets re-indexed, so a proposal cannot affect the analysis it
+                // was proposed against.
+                let dir = patch::materialize(&store, &snapshot, &patched_files)?;
+                let options = IndexOptions::new(
+                    node,
+                    worker,
+                    timeout_seconds,
+                    scan_deadline_seconds,
+                    index_deadline_seconds,
+                    false,
+                )?;
+                let control =
+                    ExecutionControl::new(Some(std::time::Instant::now() + options.index_deadline));
+                let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+                let _signal_watcher = signal_watcher(control.clone(), cancel_tx)?;
+                let result =
+                    run_pipeline(&store, dir.path(), &options, &control, cancel_rx).await?;
+                let graph =
+                    patchwork::graph_diff(&store, &proposal.analysis_id, &result.analysis_id)?;
+                let test = match test_argv.as_deref() {
+                    Some(text) => {
+                        let argv: Vec<String> = serde_json::from_str(text)?;
+                        patchwork::run_declared_test(
+                            &argv,
+                            dir.path(),
+                            Duration::from_millis(test_timeout_ms),
+                            64 * 1024,
+                        )
+                        .await
+                    }
+                    None => json!({
+                        "observed": false,
+                        "ran": false,
+                        "note": "没有声明 --test-argv，因此没有跑任何测试。这不是通过。",
+                    }),
+                };
+                let verification = json!({
+                    "schema": "atlas.patch-verification.v1",
+                    "base_analysis_id": proposal.analysis_id,
+                    "patched_snapshot_id": result.metadata["snapshot_id"],
+                    "patched_analysis_id": result.analysis_id,
+                    "applied_files": report,
+                    "graph_diff": graph,
+                    "test": test,
+                    "isolation": {
+                        "method": "从不可变快照的内容寻址 blob 物化到 0700 临时目录，补丁只写在这个副本里",
+                        "user_checkout_touched": false,
+                    },
+                    "note": "Intent（diff）→ Static（重新派生的分析与图差异）→ Observed（测试命令的退出码）三类证据在这里分开存放，不互相冒充。",
+                });
+                if !store.mark_patch_verified(&id, &verification)? {
+                    return Err("proposal_verification_lost_a_race".into());
+                }
+                print(store.patch_proposal(&id)?)?
+            }
+            PatchAction::Apply { id, target } => {
+                let proposal = store.patch_proposal(&id)?;
+                if proposal.state != patch::STATE_VERIFIED {
+                    return Err(format!("proposal_not_applicable:{}", proposal.state).into());
+                }
+                let parsed = patchwork::reparsed(&proposal)?;
+                let metadata = store.metadata(&proposal.analysis_id)?;
+                let snapshot = store.snapshot(
+                    metadata["snapshot_id"]
+                        .as_str()
+                        .ok_or("analysis_has_no_snapshot")?,
+                )?;
+                let files = patch::snapshot_files(&store, &snapshot)?;
+                let (patched_files, _) = patch::apply(&files, &parsed)?;
+                let target = target.canonicalize()?;
+                for (path, bytes) in &patched_files {
+                    // The bytes on disk must still be the bytes this proposal
+                    // was verified against. Anything else is somebody's work.
+                    let pinned = snapshot
+                        .entries
+                        .iter()
+                        .find(|entry| &entry.path == path)
+                        .and_then(|entry| entry.blob.clone())
+                        .ok_or_else(|| format!("pinned_blob_missing:{path}"))?;
+                    patch::write_checked(&target, path, bytes, &pinned)?;
+                }
+                if !store.mark_patch_applied(&id, &target.display().to_string())? {
+                    return Err("proposal_apply_lost_a_race".into());
+                }
+                print(store.patch_proposal(&id)?)?
+            }
+            PatchAction::Revert { id } => {
+                let proposal = store.patch_proposal(&id)?;
+                if proposal.state != patch::STATE_APPLIED {
+                    return Err(format!("proposal_not_revertible:{}", proposal.state).into());
+                }
+                let target =
+                    PathBuf::from(proposal.target.clone().ok_or("proposal_has_no_target")?);
+                let parsed = patchwork::reparsed(&proposal)?;
+                let metadata = store.metadata(&proposal.analysis_id)?;
+                let snapshot = store.snapshot(
+                    metadata["snapshot_id"]
+                        .as_str()
+                        .ok_or("analysis_has_no_snapshot")?,
+                )?;
+                let files = patch::snapshot_files(&store, &snapshot)?;
+                let (patched_files, _) = patch::apply(&files, &parsed)?;
+                for path in patched_files.keys() {
+                    let pinned = snapshot
+                        .entries
+                        .iter()
+                        .find(|entry| &entry.path == path)
+                        .and_then(|entry| entry.blob.clone())
+                        .ok_or_else(|| format!("pinned_blob_missing:{path}"))?;
+                    let original = store.read_blob(&pinned)?;
+                    let applied = patched_files.get(path).unwrap();
+                    // Refuse if the file moved since apply: reverting over a
+                    // newer edit would delete that edit.
+                    patch::write_checked(&target, path, &original, &atlas_engine::digest(applied))?;
+                }
+                store.mark_patch_reverted(&id, Some("reverted_by_operator"))?;
+                print(store.patch_proposal(&id)?)?
+            }
+            PatchAction::Status { id } => print(store.patch_proposal(&id)?)?,
+            PatchAction::List {
+                analysis,
+                entity,
+                limit,
+            } => {
+                let entity = match entity {
+                    Some(reference) => Some(runner::resolve_entity(&store, &analysis, &reference)?),
+                    None => None,
+                };
+                print(json!({
+                    "analysis_id": analysis,
+                    "entity_id": entity,
+                    "proposals": store.patch_proposals(&analysis, entity.as_deref(), limit)?,
+                }))?
             }
         },
         Action::Serve { analysis, port } => {

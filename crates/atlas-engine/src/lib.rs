@@ -7,6 +7,7 @@ pub mod flow;
 pub mod incremental;
 pub mod inter;
 pub mod job;
+pub mod patch;
 pub mod query;
 pub mod scan;
 pub mod solve;
