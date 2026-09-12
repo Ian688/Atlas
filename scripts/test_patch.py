@@ -375,6 +375,25 @@ class Cli(Base):
         self.assertIn("right + 0", self.math.read_text(encoding="utf-8"),
                       "a held lock must leave the applied bytes alone")
 
+    def test_a_stale_lock_is_cleared_by_an_explicit_command(self):
+        proposal = self.propose()["proposal"]
+        self.cli("patch", "verify", proposal["id"])
+        lock = self.project / ".atlas-apply.lock"
+        # A lock left by a crash, and no way to clear it -- until now, and never
+        # silently: the command reports who held it.
+        lock.write_text("dead-process\n", encoding="utf-8")
+        result = self.cli("patch", "unlock", "--target", self.project)
+        self.assertTrue(result["removed"])
+        self.assertEqual(result["holder"], "dead-process")
+        self.assertFalse(lock.exists())
+        # Clearing a lock that is not there is an error, not a silent success:
+        # a typo'd directory must not look like a cleanup.
+        missing = self.cli_failure("patch", "unlock", "--target", self.project)
+        self.assertIn("no_apply_lock", missing.stderr)
+        # And the proposal can now be applied, so the unlock really unblocked it.
+        self.assertEqual(self.cli("patch", "apply", proposal["id"], "--target", self.project)["state"],
+                         "applied")
+
     def test_a_proposal_records_who_proposed_it(self):
         proposal = self.cli("patch", "propose", self.analysis, "add",
                             "--diff", self.edit_diff(), "--proposed-by", "model-x")["proposal"]

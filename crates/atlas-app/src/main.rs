@@ -310,6 +310,16 @@ enum PatchAction {
     Status {
         id: String,
     },
+    /// Remove the apply/revert lock from a checkout after a crash.
+    ///
+    /// A stale lock is deliberate: it blocks the next apply and names the holder
+    /// rather than letting a process that is still writing be ignored. Clearing
+    /// it is therefore an explicit act, and this is the supported way to do it.
+    Unlock {
+        /// The checkout whose lock should be removed.
+        #[arg(long)]
+        target: PathBuf,
+    },
     List {
         analysis: String,
         #[arg(long)]
@@ -1804,6 +1814,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             PatchAction::Revert { id } => {
                 let proposal = store.patch_proposal(&id)?;
                 print(patchwork::revert_proposal(&store, &proposal, "cli")?)?
+            }
+            PatchAction::Unlock { target } => {
+                let target = target.canonicalize()?;
+                let path = target.join(patch::APPLY_LOCK_FILE);
+                if !path.exists() {
+                    return Err(format!("no_apply_lock:{}", path.display()).into());
+                }
+                // The holder is reported before the lock is gone: after this the
+                // only record of who held it is this line.
+                let holder = std::fs::read_to_string(&path).unwrap_or_default();
+                std::fs::remove_file(&path)?;
+                print(json!({
+                    "removed": true,
+                    "path": path.display().to_string(),
+                    "holder": holder.trim(),
+                    "note": "锁已被移除。它原本挡住写入是有意的：崩溃残留的锁会挡住下一次 apply 并报出持有者。",
+                }))?
             }
             PatchAction::Status { id } => print(store.patch_proposal(&id)?)?,
             PatchAction::List {

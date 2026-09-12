@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-apply-lock",
+    "window": "2026-09-12/w09-patch-unlock",
     "status": "DELIVERED",
-    "note": "apply/revert 全程持有检出目录锁（.atlas-apply.lock，create_new），第二个进程具名拒绝且不写；错误路径也释放锁。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-apply-lock",
-    "verification": "evidence/development/2026-09-12-w09-apply-lock/verification.json"
+    "note": "patch unlock --target：显式清理崩溃残留的检出锁，报出原持有者；没有锁时报错（不静默成功）。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-patch-unlock",
+    "verification": "evidence/development/2026-09-12-w09-patch-unlock/verification.json"
   },
   "windows": [
     {
@@ -391,10 +391,19 @@
       ],
       "note": "写入路径持锁：ApplyLock 用 create_new 创建 .atlas-apply.lock 并写入持有者身份，apply/revert 在整段校验+写入期间持有它；第二个进程以 apply_lock_held:<path>:holder=<who> 拒绝且不写任何文件；guard drop 在所有错误路径释放（用例：外部持锁时 apply 拒绝且文件未变、被拒绝的 apply 不留锁、revert 同样持锁）。patch 用例 39->42。仍未做：合并、逐文件磁盘备份（撤销来源是内容寻址 blob）、跨机器锁。",
       "report": "evidence/development/2026-09-12-w09-apply-lock/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/w09-patch-unlock",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09-patch-unlock"
+      ],
+      "note": "补上锁的操作面：atlas patch unlock --target <checkout> 删除 .atlas-apply.lock，删除前报出原持有者（此后唯一的记录就是这行输出），没有锁时以 no_apply_lock 报错而不是静默成功；用例验证解锁后提案真的可以 apply。patch 用例 42->43。",
+      "report": "evidence/development/2026-09-12-w09-patch-unlock/REPORT.md"
     }
   ],
   "next_work_item": "2D 画布的正式层级与空间索引，或大仓库/monorepo 的规模资格",
-  "next_action": "本轮交付 apply/revert 的检出锁（W09）。剩余按价值：(1) 2D 画布的正式层级与空间索引；(2) 大仓库/monorepo 的规模资格；(3) 合并与逐文件备份；(4) 城市运行激活路径需要行级/调用级采样。",
+  "next_action": "本轮交付 patch unlock（W09 锁的操作面）。剩余按价值：(1) 2D 画布的正式层级与空间索引；(2) 大仓库/monorepo 的规模资格；(3) 合并与逐文件备份；(4) 城市运行激活路径需要行级/调用级采样。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
@@ -881,7 +890,7 @@
         "web/tests/app.behavior.test.mjs（27 项，新增 3 项重定位行为）"
       ],
       "blockers": [
-        "apply 没有备份/合并/文件锁；--allow-writes 只覆盖单个目录与单个分析，没有多目录/多租户写入；页面没有逐行 diff 审阅视图",
+        "apply 没有合并与逐文件磁盘备份（撤销来源是内容寻址的钉住 blob）；锁是单机文件锁、不约束人工编辑；已提供 `patch unlock --target` 显式清理崩溃残留的锁（不静默、报出持有者）",
         "重定位只覆盖可判定的依据：同路径同名、字节完全相同、仅同名。**改名且内容也变了**的对象无法识别（名字是字节的一部分），这种情况如实拒绝；跨文件的复杂移动链（A→B→C）也没有追踪",
         "层级形式化与 LOD 已实现（buildCityHierarchy + cityLevelView + cityLevelInvariants，project/district/file 三层，聚合守恒逐层重加并在页面显示；层级省略与预算截断分开报）。仍未实现：\"激活路径来自 Run\" 需要行级/调用级采样，Atlas 只有入口调用的观测，所以城市里的运行信息仍然是\"哪些入口被跑过\"，不是运行路径；相机驱动的细节切换（远=文件级、近=函数层）保留，但它与正式层级是两件事",
         "Agent Bridge 没有 owner 认证：owner 是调用者声明；服务端验证权限与版本仍未实现（与 W06 同一缺口）",
