@@ -497,16 +497,13 @@ async fn exec(
         fs_write: false,
         child_process: false,
         network: false,
-        // Only the two grants that do not widen the process boundary are
-        // accepted from the page.
+        // The only grant that does not widen the process boundary is accepted
+        // from the page. A receiver or a global is an input, and inputs are not
+        // something a page states on someone else's behalf.
         unknown_calls: request
             .allow_effects
             .as_ref()
             .is_some_and(|names| names.iter().any(|name| name == "unknown_calls")),
-        globals: request
-            .allow_effects
-            .as_ref()
-            .is_some_and(|names| names.iter().any(|name| name == "globals")),
     };
     let plan_only = request.plan;
     let spec = RunSpec {
@@ -519,6 +516,11 @@ async fn exec(
         grants,
         node: "node".into(),
         env: std::collections::BTreeMap::new(),
+        // Deliberately absent from the page's request type: a receiver or a
+        // global is an input the caller states, and the local page is not where
+        // an operator states inputs for someone else's function.
+        this_arg: None,
+        globals: std::collections::BTreeMap::new(),
         fixtures: request.fixtures,
         fixture_note: request.fixture_note,
         label: Some("http".into()),

@@ -309,12 +309,20 @@ fn load_pinned(store: &Store, spec: &RunSpec) -> Result<Pinned, String> {
     let fact = store
         .flow_fact(&spec.analysis_id, &spec.symbol)
         .map_err(|e| format!("flow_fact_not_found:{e}"))?;
+    // A top-level function's captures are module-level state, which the copied
+    // module initialises on import; a nested function's captures are an
+    // enclosing scope that would have to be constructed.
+    let top_level = node
+        .parent
+        .as_deref()
+        .is_some_and(|parent| parent.starts_with("file:"));
     let profile = exec::profile(
         &spec.analysis_id,
         &spec.symbol,
         &node.path,
         &node.name,
         &fact,
+        top_level,
     );
     Ok(Pinned {
         snapshot,
@@ -419,8 +427,12 @@ pub fn profile_for(
     let fact = store
         .flow_fact(analysis, symbol)
         .map_err(|e| format!("flow_fact_not_found:{e}"))?;
+    let top_level = node
+        .parent
+        .as_deref()
+        .is_some_and(|parent| parent.starts_with("file:"));
     Ok(exec::profile(
-        analysis, symbol, &node.path, &node.name, &fact,
+        analysis, symbol, &node.path, &node.name, &fact, top_level,
     ))
 }
 
@@ -457,12 +469,23 @@ pub async fn execute(
     let pinned = load_pinned(store, spec)?;
     let decision = exec::decide(&pinned.profile, spec);
     if !decision.allowed {
+        let missing_grants = decision.missing_grants.clone();
+        let missing_context = decision.missing_context.clone();
         let reason = decision.refusal.unwrap_or(exec::Reason {
             code: "refused".into(),
             detail: "决策拒绝了本次执行".into(),
             evidence: "execution_decision".into(),
         });
         let mut record = refused_record(spec, &pinned, &spec_digest, &reason);
+        if let Some(refusal) = record
+            .get_mut("refusal")
+            .and_then(|value| value.as_object_mut())
+        {
+            // A refusal that does not say *what* is missing makes the caller
+            // guess and re-run; the lists are the actionable part.
+            refusal.insert("missing_grants".into(), json!(missing_grants));
+            refusal.insert("missing_context".into(), json!(missing_context));
+        }
         let identity =
             serde_json::to_string(&answer_identity(&record)).map_err(|e| e.to_string())?;
         store
@@ -557,6 +580,13 @@ pub async fn execute(
         "path_inherited": true,
         "mocks": spec.fixtures,
         "fixture_note": spec.fixture_note,
+        // What the caller declared, not what Atlas invented. A receiver or a
+        // global is an input to the run, and the record has to say which ones
+        // were stated so a reader can judge the result.
+        "declared_context": {
+            "this_arg": spec.this_arg.is_some(),
+            "globals": spec.globals.keys().collect::<Vec<_>>(),
+        },
         "cwd": "隔离副本根目录",
     });
     let source_binding = source_binding(&pinned, spec);
@@ -637,6 +667,8 @@ pub async fn execute(
             "async_events": report["async_events"],
             "harness_detail": report["detail"],
             "candidates": report["candidates"],
+            "declared_globals": report["declared_globals"],
+            "receiver_declared": report["receiver_declared"],
         }));
     } else {
         // No report. Two very different causes must not share one label: an

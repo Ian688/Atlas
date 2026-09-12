@@ -132,8 +132,8 @@ enum Action {
         timeout_ms: u64,
         #[arg(long, default_value_t = 65536)]
         output_limit: usize,
-        /// Comma-separated runtime permissions: fs_write, child_process,
-        /// network, unknown_calls, globals.
+        /// Comma-separated grants: fs_write, child_process, network,
+        /// unknown_calls (accepts work beyond what was proved).
         #[arg(long, default_value = "")]
         allow_effects: String,
         #[arg(long, default_value = "node")]
@@ -142,6 +142,14 @@ enum Action {
         /// inherited except PATH.
         #[arg(long = "env")]
         env: Vec<String>,
+        /// The receiver to call with, as JSON, when the function reads `this`.
+        /// Atlas does not synthesise a receiver; it records the one declared.
+        #[arg(long = "this")]
+        this_arg: Option<String>,
+        /// Repeatable `NAME=<json>` global the function is known to read. Set on
+        /// the global object before the module is imported.
+        #[arg(long = "global")]
+        global: Vec<String>,
         /// Declare that this run used mocks/fixtures, so its result can never
         /// be read as an observation of the real project environment.
         #[arg(long)]
@@ -509,6 +517,24 @@ struct StoredOptions {
 /// binary can never be mistaken for one holder.
 fn new_holder() -> String {
     format!("{}-{}", std::process::id(), uuid::Uuid::new_v4())
+}
+
+/// Repeatable `NAME=<json>` globals a controlled run declares. Each value is
+/// real JSON, so a caller cannot smuggle an expression in as a string.
+fn parse_globals(
+    entries: &[String],
+) -> Result<std::collections::BTreeMap<String, serde_json::Value>, Box<dyn std::error::Error>> {
+    let mut globals = std::collections::BTreeMap::new();
+    for entry in entries {
+        let (name, value) = entry
+            .split_once('=')
+            .ok_or_else(|| format!("global must be NAME=<json>: {entry}"))?;
+        if name.is_empty() {
+            return Err(format!("invalid global name in {entry}").into());
+        }
+        globals.insert(name.to_string(), serde_json::from_str(value)?);
+    }
+    Ok(globals)
 }
 
 /// Explicit `KEY=VALUE` environment for a controlled run. Nothing is inherited
@@ -895,6 +921,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             allow_effects,
             node,
             env,
+            this_arg,
+            global,
             fixtures,
             fixture_note,
             history,
@@ -924,6 +952,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 grants: Grants::parse(&names)?,
                 node: node.display().to_string(),
                 env: parse_env(&env)?,
+                this_arg: match this_arg {
+                    Some(text) => Some(serde_json::from_str(&text)?),
+                    None => None,
+                },
+                globals: parse_globals(&global)?,
                 fixtures,
                 fixture_note,
                 label: None,

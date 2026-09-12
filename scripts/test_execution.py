@@ -85,11 +85,23 @@ export function big() {
 function hidden(x) { return x; }
 
 export function callsHidden(x) { return hidden(x); }
+
+export function self() { return this; }
+
+export function readConfig() { return CONFIG.value; }
+
+export function writeField(target) { target.value = 2; return target.value; }
+
+export const BASE = 10;
+
+export function useModuleConst(x) { return x + BASE; }
 """
 
 # Every function here talks to something outside the parameter list, so the
-# static profile requires the same explicit opt-in a human would need.
-GRANTS = "unknown_calls,globals"
+# static profile requires the same explicit opt-in a human would need. Reading a
+# global is *not* a permission -- it is an input the caller must state, so it is
+# declared with `--global` rather than granted.
+GRANTS = "unknown_calls"
 
 
 def decode(value):
@@ -152,6 +164,22 @@ class Execution(unittest.TestCase):
     def profile(self, entity):
         return self.cli("profile", self.analysis, entity)
 
+    def declared_context(self, entity):
+        """The flags a caller must supply for this function, from its profile.
+
+        Derived rather than hard-coded so a test that is *about* enforcement
+        does not silently stop enforcing when the profile gains a requirement:
+        if the profile asks for a global that this cannot supply, the test fails
+        instead of running with an undeclared input.
+        """
+        profile = self.profile(entity)
+        extra = []
+        if "this_arg" in profile["required_context"]:
+            extra += ["--this", "{}"]
+        for name in profile["required_globals"]:
+            extra += ["--global", f"{name}=null"]
+        return extra
+
     # -- the static half -------------------------------------------------
     def test_a_clean_function_is_profiled_pure_and_the_reasons_cite_evidence(self):
         profile = self.profile("add")
@@ -183,7 +211,8 @@ class Execution(unittest.TestCase):
     def test_a_refusal_starts_no_process(self):
         record = self.exec("writeOutside", ["x"])
         self.assertEqual(record["verdict"], "refused")
-        self.assertEqual(record["refusal"]["code"], "missing_grants")
+        self.assertEqual(record["refusal"]["code"], "missing_requirements")
+        self.assertTrue(record["refusal"]["detail"])
         self.assertFalse(record["isolation"]["started"])
         self.assertFalse(self.escape.exists(), "a refused run must not have run anything")
         self.assertEqual(record["duration_ms"], 0)
@@ -192,7 +221,7 @@ class Execution(unittest.TestCase):
         plan = self.cli("exec", self.analysis, "writeOutside", "--args", '["x"]', "--plan")
         self.assertFalse(plan["will_start_process"])
         self.assertFalse(plan["decision"]["allowed"])
-        self.assertEqual(plan["decision"]["refusal"]["code"], "missing_grants")
+        self.assertEqual(plan["decision"]["refusal"]["code"], "missing_requirements")
         self.assertFalse(self.escape.exists())
 
     # -- the executing half ----------------------------------------------
@@ -212,7 +241,7 @@ class Execution(unittest.TestCase):
         self.assertEqual(decode(self.exec("add", ["a", "b"])["value"]), "ab")
 
     def test_a_throw_is_observed_with_its_source_location(self):
-        record = self.exec("divide", [1, 0], grants=GRANTS)
+        record = self.exec("divide", [1, 0], grants=GRANTS, extra=self.declared_context("divide"))
         self.assertEqual(record["verdict"], "threw")
         self.assertEqual(record["thrown"]["name"], "Error")
         self.assertEqual(record["thrown"]["message"], "Division by zero")
@@ -227,13 +256,13 @@ class Execution(unittest.TestCase):
         self.assertEqual(source[location["byte_offset"]:location["byte_offset"] + 4], b"  if")
 
     def test_an_async_function_is_awaited_and_marked_as_awaited(self):
-        record = self.exec("later", [21], grants=GRANTS)
+        record = self.exec("later", [21], grants=GRANTS, extra=self.declared_context("later"))
         self.assertEqual(record["verdict"], "returned")
         self.assertEqual(decode(record["value"]), 42)
         self.assertTrue(record["trace"]["events"][-1]["awaited"])
 
     def test_console_output_is_captured_separately_from_the_result(self):
-        record = self.exec("shout", ["hi"], grants=GRANTS)
+        record = self.exec("shout", ["hi"], grants=GRANTS, extra=self.declared_context("shout"))
         self.assertEqual(record["verdict"], "returned")
         self.assertEqual(decode(record["value"]), "HI")
         self.assertIn("shout hi", "\n".join(record["console"]["harness_lines"]))
@@ -250,18 +279,19 @@ class Execution(unittest.TestCase):
 
     # -- enforcement ------------------------------------------------------
     def test_a_file_write_is_denied_by_the_operating_system_not_by_atlas(self):
-        record = self.exec("writeOutside", ["x"], grants=GRANTS)
+        record = self.exec("writeOutside", ["x"], grants=GRANTS, extra=self.declared_context("writeOutside"))
         self.assertEqual(record["verdict"], "threw")
         self.assertEqual(record["thrown"]["code"], "ERR_ACCESS_DENIED")
         self.assertFalse(self.escape.exists(), "the write really did not happen")
 
     def test_reading_outside_the_isolated_copy_is_denied(self):
-        record = self.exec("readOutside", grants=GRANTS)
+        record = self.exec("readOutside", grants=GRANTS, extra=self.declared_context("readOutside"))
         self.assertEqual(record["verdict"], "threw")
         self.assertEqual(record["thrown"]["code"], "ERR_ACCESS_DENIED")
 
     def test_a_granted_write_lands_in_the_copy_and_never_in_the_project(self):
-        record = self.exec("writeInside", grants=GRANTS + ",fs_write")
+        record = self.exec("writeInside", grants=GRANTS + ",fs_write",
+                           extra=self.declared_context("writeInside"))
         self.assertEqual(record["verdict"], "returned", record.get("thrown"))
         self.assertEqual(decode(record["value"]), "wrote")
         self.assertFalse((self.project / "src" / "inside.txt").exists(),
@@ -270,12 +300,12 @@ class Execution(unittest.TestCase):
         self.assertTrue(record["isolation"]["files_materialised"] >= 2)
 
     def test_child_processes_are_denied_without_the_grant(self):
-        record = self.exec("spawnEcho", grants=GRANTS)
+        record = self.exec("spawnEcho", grants=GRANTS, extra=self.declared_context("spawnEcho"))
         self.assertEqual(record["verdict"], "threw")
         self.assertEqual(record["thrown"]["code"], "ERR_ACCESS_DENIED")
 
     def test_network_is_denied_without_the_grant(self):
-        record = self.exec("fetchLocal", grants=GRANTS)
+        record = self.exec("fetchLocal", grants=GRANTS, extra=self.declared_context("fetchLocal"))
         self.assertEqual(record["verdict"], "threw")
         self.assertEqual(record["thrown"]["code"], "ERR_ACCESS_DENIED")
 
@@ -341,6 +371,81 @@ class Execution(unittest.TestCase):
         # The default must not claim a mock run was the real environment.
         plain = self.exec("add", [1, 2])
         self.assertFalse(plain["isolation"]["mocks"])
+
+    # -- declared context -------------------------------------------------
+    def test_a_receiver_is_declared_by_the_caller_and_recorded_as_declared(self):
+        profile = self.profile("self")
+        self.assertEqual(profile["classification"], "needs_context")
+        self.assertEqual(profile["required_context"], ["this_arg"])
+        # Without a declaration the run is refused before any process exists.
+        refused = self.exec("self")
+        self.assertEqual(refused["verdict"], "refused")
+        self.assertEqual(refused["refusal"]["missing_context"], ["this_arg"])
+        self.assertFalse(refused["isolation"]["started"])
+        # With one, it runs -- and the record says the receiver was declared,
+        # because the observation is only as good as the declaration.
+        record = self.exec("self", extra=["--this", '{"base":7}'])
+        self.assertEqual(record["verdict"], "returned", record.get("thrown"))
+        self.assertEqual(decode(record["value"]), {"base": 7})
+        self.assertTrue(record["isolation"]["declared_context"]["this_arg"])
+        self.assertTrue(record["trace"]["events"][-1]["receiver_declared"])
+
+    def test_an_unnamed_global_read_needs_acknowledgement_not_a_fake_declaration(self):
+        # `CONFIG` is read as a bare identifier, and the published facts carry
+        # no name for it. Atlas therefore does not demand a declaration it
+        # cannot name; it asks for the acknowledgement and lets the run produce
+        # a real answer -- which is a ReferenceError until the caller states the
+        # value. Both halves are asserted, because "we ran it" is only useful if
+        # what happened is reported.
+        profile = self.profile("readConfig")
+        self.assertIn("unknown_calls", profile["required_grants"])
+        self.assertEqual(profile["required_globals"], [],
+                         "an unnamed external must not invent a name")
+        undeclared = self.exec("readConfig", grants=GRANTS)
+        self.assertEqual(undeclared["verdict"], "threw")
+        self.assertEqual(undeclared["thrown"]["name"], "ReferenceError",
+                         "the honest answer is the real error, not a fabricated value")
+        declared = self.exec("readConfig", grants=GRANTS,
+                             extra=["--global", 'CONFIG={"value":"declared"}'])
+        self.assertEqual(declared["verdict"], "returned", declared.get("thrown"))
+        self.assertEqual(decode(declared["value"]), "declared")
+        self.assertEqual(declared["isolation"]["declared_context"]["globals"], ["CONFIG"])
+        self.assertEqual(declared["trace"]["events"][-1]["declared_globals"], ["CONFIG"])
+
+    def test_an_unknown_effect_grant_name_is_rejected(self):
+        # The old `globals` grant must fail loudly rather than be ignored, or a
+        # caller would believe they had supplied something they had not.
+        result = subprocess.run(
+            [str(BIN), "--store", str(self.store), "exec", self.analysis, "readConfig",
+             "--args", "[]", "--allow-effects", "unknown_calls,globals"],
+            cwd=ROOT, capture_output=True, text=True, timeout=120,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unknown_effect_grant", result.stderr)
+
+    def test_module_level_state_is_present_rather_than_declared(self):
+        # `BASE` is module state. It lives in the copied module, so the run needs
+        # the acknowledgement for the unmodelled facts but no declaration of the
+        # value itself.
+        # Module-level state is inside the copied module, so it needs no
+        # declaration -- only the acknowledgement that module state is not a
+        # parameter.
+        record = self.exec("useModuleConst", [5], grants=GRANTS)
+        self.assertEqual(record["verdict"], "returned", record.get("thrown"))
+        self.assertEqual(decode(record["value"]), 15)
+
+    def test_missing_facts_need_an_acknowledgement_not_a_declaration(self):
+        profile = self.profile("writeField")
+        self.assertIn("unknown_calls", profile["required_grants"])
+        self.assertEqual(profile["required_context"], [],
+                         "an object argument is supplied as an argument, not as context")
+        refused = self.exec("writeField", [{}])
+        self.assertEqual(refused["refusal"]["code"], "missing_requirements")
+        self.assertEqual(refused["refusal"]["missing_grants"], ["unknown_calls"])
+        record = self.exec("writeField", [{"value": 0}], grants=GRANTS,
+                           extra=self.declared_context("writeField"))
+        self.assertEqual(record["verdict"], "returned", record.get("thrown"))
+        self.assertEqual(decode(record["value"]), 2)
 
     # -- scenarios --------------------------------------------------------
     def scenario(self, cases):

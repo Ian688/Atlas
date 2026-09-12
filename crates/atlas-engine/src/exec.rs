@@ -63,6 +63,17 @@ pub struct ExecutionProfile {
     pub unknown_reasons: Vec<String>,
     pub effects: serde_json::Value,
     pub required_grants: Vec<String>,
+    /// Context the caller must *declare* for this function to run: `this_arg`
+    /// and/or `globals`. These are not capabilities -- they do not widen the
+    /// sandbox -- they are inputs Atlas refuses to invent.
+    pub required_context: Vec<String>,
+    /// The external names behind the `globals` requirement. Empty means the
+    /// effect flag was set without a name Atlas could recover.
+    pub required_globals: Vec<String>,
+    /// Context Atlas cannot accept a declaration for in this slice. A captured
+    /// binding is an instance of an enclosing scope, and instantiating that is
+    /// a different problem than reading a value the caller states.
+    pub unsatisfiable_context: Vec<String>,
     pub notes: Vec<String>,
 }
 
@@ -76,12 +87,11 @@ pub struct Grants {
     pub child_process: bool,
     #[serde(default)]
     pub network: bool,
-    /// Static opt-in for calling code Atlas did not model.
+    /// Static opt-in for calling code Atlas did not model, and for acting on
+    /// facts Atlas could not finish. One acknowledgement, because it is one
+    /// statement: "I accept that this run goes beyond what was proved".
     #[serde(default)]
     pub unknown_calls: bool,
-    /// Explicit acknowledgement that the target reads process globals.
-    #[serde(default)]
-    pub globals: bool,
 }
 
 impl Grants {
@@ -99,9 +109,6 @@ impl Grants {
         if self.unknown_calls {
             names.push("unknown_calls".into());
         }
-        if self.globals {
-            names.push("globals".into());
-        }
         names
     }
 
@@ -114,7 +121,6 @@ impl Grants {
                 "child_process" => grants.child_process = true,
                 "network" => grants.network = true,
                 "unknown_calls" => grants.unknown_calls = true,
-                "globals" => grants.globals = true,
                 other => return Err(invalid(&format!("unknown_effect_grant:{other}"))),
             }
         }
@@ -144,6 +150,15 @@ pub struct RunSpec {
     /// Explicit environment allowlist; the child gets nothing else.
     #[serde(default)]
     pub env: BTreeMap<String, String>,
+    /// The receiver to call with, when the function reads `this`. Atlas does
+    /// not synthesise one: the caller declares it, and the record says so.
+    #[serde(default)]
+    pub this_arg: Option<serde_json::Value>,
+    /// Globals the function is known to read, declared explicitly. Set on the
+    /// global object before the module is imported, because a module reads its
+    /// globals at import time as often as at call time.
+    #[serde(default)]
+    pub globals: BTreeMap<String, serde_json::Value>,
     /// A run that used mocks/fixtures must say so, so its result can never be
     /// read as an observation of the real project environment.
     #[serde(default)]
@@ -178,6 +193,19 @@ impl RunSpec {
         if self.args.len() > 64 {
             return Err(invalid("too_many_arguments"));
         }
+        if self.globals.len() > 32 {
+            return Err(invalid("too_many_declared_globals"));
+        }
+        for key in self.globals.keys() {
+            if key.is_empty()
+                || key.len() > 128
+                || !key
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
+            {
+                return Err(invalid("invalid_global_name"));
+            }
+        }
         for key in self.env.keys() {
             if key.is_empty() || key.contains('=') || key.contains('\0') {
                 return Err(invalid("invalid_env_key"));
@@ -200,6 +228,7 @@ pub struct ExecutionDecision {
     pub refusal: Option<Reason>,
     pub required_grants: Vec<String>,
     pub missing_grants: Vec<String>,
+    pub missing_context: Vec<String>,
 }
 
 /// The facts the profile is derived from, read from the published flow record.
@@ -272,9 +301,67 @@ fn params_from_fact(fact: &serde_json::Value) -> (Vec<ParamProfile>, Option<usiz
     (params, arity)
 }
 
-/// Origins observed anywhere in the published block states, counted by kind.
+/// Every `External(name)` origin seen in the published facts, sorted. The names
+/// are what makes "this function needs a global" actionable: a category with no
+/// names tells a caller nothing they can act on.
+fn external_names(
+    fact: &serde_json::Value,
+    blocks: Option<&Vec<serde_json::Value>>,
+) -> Vec<String> {
+    let mut names = std::collections::BTreeSet::new();
+    let mut collect = |origins: &serde_json::Value| {
+        if let Some(items) = origins.as_array() {
+            for origin in items.iter().filter_map(|v| v.as_str()) {
+                if let Some(name) = origin
+                    .strip_prefix("External(")
+                    .and_then(|rest| rest.strip_suffix(')'))
+                {
+                    names.insert(name.to_string());
+                }
+            }
+        }
+    };
+    for key in ["returns", "throws"] {
+        if let Some(value) = fact.get(key).and_then(|v| v.get("origins")) {
+            collect(value);
+        }
+    }
+    if let Some(blocks) = blocks {
+        for block in blocks {
+            if let Some(bindings) = block.get("bindings").and_then(|v| v.as_array()) {
+                for binding in bindings {
+                    if let Some(origins) = binding.get("value").and_then(|v| v.get("origins")) {
+                        collect(origins);
+                    }
+                }
+            }
+        }
+    }
+    names.into_iter().collect()
+}
+
+/// Origins observed anywhere in the published facts, counted by kind.
+///
+/// Block states alone are not enough: a value that only flows to the return (or
+/// the throw) never lands in a binding, so a function like `self() { return
+/// this; }` would look context-free. The returns and throws summaries carry
+/// their own origins and are scanned too.
 fn origin_kinds(fact: &serde_json::Value) -> BTreeMap<String, usize> {
     let mut counts = BTreeMap::new();
+    let count_origins = |value: &serde_json::Value, counts: &mut BTreeMap<String, usize>| {
+        let Some(origins) = value.get("origins").and_then(|v| v.as_array()) else {
+            return;
+        };
+        for origin in origins.iter().filter_map(|v| v.as_str()) {
+            let kind = origin.split('(').next().unwrap_or(origin).to_string();
+            *counts.entry(kind).or_insert(0) += 1;
+        }
+    };
+    for key in ["returns", "throws"] {
+        if let Some(value) = fact.get(key) {
+            count_origins(value, &mut counts);
+        }
+    }
     let Some(blocks) = fact.get("block_states").and_then(|v| v.as_array()) else {
         return counts;
     };
@@ -312,6 +399,7 @@ pub fn profile(
     path: &str,
     name: &str,
     fact: &serde_json::Value,
+    top_level: bool,
 ) -> ExecutionProfile {
     let mut reasons: Vec<Reason> = Vec::new();
     let mut required: BTreeSet<String> = BTreeSet::new();
@@ -343,7 +431,8 @@ pub fn profile(
     // A partial derivation is not a proof of purity: the frontier blocks are
     // exactly the ones whose facts are missing. `complete_within_profile` is
     // the engine's name for "nothing was left unfinished inside the declared
-    // profile"; anything else is partial.
+    // profile"; anything else is partial. None of these can be supplied by a
+    // caller, so all of them need the explicit acknowledgement instead.
     let complete = status == "complete_within_profile";
     if !complete {
         push(
@@ -351,6 +440,7 @@ pub fn profile(
             format!("函数分析状态为 {status}，因此「无未知副作用」没有被证明"),
             "status",
         );
+        required.insert("unknown_calls".into());
     }
     for reason in &unknown_reasons {
         push(
@@ -358,6 +448,7 @@ pub fn profile(
             format!("存在显式未知分量：{reason}"),
             "unknown_reasons",
         );
+        required.insert("unknown_calls".into());
     }
     if let Some(frontier) = fact.get("frontier").and_then(|v| v.as_array())
         && !frontier.is_empty()
@@ -367,6 +458,7 @@ pub fn profile(
             format!("{} 个基本块留在 frontier，其事实不完整", frontier.len()),
             "frontier",
         );
+        required.insert("unknown_calls".into());
     }
 
     // Unsupported constructs cannot be isolated by this runner at all.
@@ -428,7 +520,6 @@ pub fn profile(
             "读取了全局状态，其值由运行环境决定而不是由参数决定".into(),
             "effects.may_access_global",
         );
-        required.insert("globals".into());
     }
     if flag(&effects, "may_read_heap") || flag(&effects, "may_write_heap") {
         push(
@@ -436,20 +527,55 @@ pub fn profile(
             "读写堆对象，结果依赖被传入对象的身份与历史".into(),
             "effects.may_read_heap / may_write_heap",
         );
+        required.insert("unknown_calls".into());
     }
 
     let origins = origin_kinds(fact);
+    let blocks = fact.get("block_states").and_then(|v| v.as_array());
+    let globals = external_names(fact, blocks);
+    let mut required_context: BTreeSet<String> = BTreeSet::new();
+    let mut unsatisfiable: BTreeSet<String> = BTreeSet::new();
+    // A named external is an input the caller can state. An unnamed external
+    // read is only "this function reads something outside its parameters", and
+    // a requirement nobody can act on belongs with the acknowledgement, not
+    // with the inputs.
+    if !globals.is_empty() {
+        required_context.insert("globals".into());
+    } else if flag(&effects, "may_access_global") {
+        required.insert("unknown_calls".into());
+    }
     for kind in ["Capture", "External", "This"] {
         if let Some(count) = origins.get(kind) {
+            let code = match kind {
+                "Capture" => "captured_binding",
+                "External" => "external_binding",
+                _ => "receiver_this",
+            };
             push(
-                match kind {
-                    "Capture" => "captured_binding",
-                    "External" => "external_binding",
-                    _ => "receiver_this",
-                },
+                code,
                 format!("{count} 个值来源是 {kind}，不属于参数命名空间"),
                 "block_states[].bindings[].value.origins",
             );
+            match kind {
+                // A caller can state its receiver and its globals, and the
+                // record then says exactly what was stated.
+                "This" => {
+                    required_context.insert("this_arg".into());
+                }
+                // External names are handled above, from the names themselves.
+                "External" => {}
+                // A capture is module-level state when the function is
+                // top-level: the module is copied, so that state exists at
+                // import time and needs no declaration. A capture in a nested
+                // function is an instance of an enclosing scope, and
+                // constructing one is a different problem than this slice.
+                _ if top_level => {
+                    required.insert("unknown_calls".into());
+                }
+                _ => {
+                    unsatisfiable.insert("captures".into());
+                }
+            }
         }
     }
 
@@ -531,7 +657,8 @@ pub fn profile(
         path: path.into(),
         name: name.into(),
         classification: classification.into(),
-        runnable: classification == CLASS_PURE || classification == CLASS_DRIVER,
+        runnable: (classification == CLASS_PURE || classification == CLASS_DRIVER)
+            || (classification == CLASS_CONTEXT && unsatisfiable.is_empty()),
         reasons,
         params,
         arity,
@@ -540,6 +667,9 @@ pub fn profile(
         unknown_reasons,
         effects,
         required_grants: required.into_iter().collect(),
+        required_context: required_context.into_iter().collect(),
+        required_globals: globals,
+        unsatisfiable_context: unsatisfiable.into_iter().collect(),
         notes,
     }
 }
@@ -562,30 +692,61 @@ pub fn decide(profile: &ExecutionProfile, spec: &RunSpec) -> ExecutionDecision {
             }),
             required_grants: profile.required_grants.clone(),
             missing_grants: Vec::new(),
+            missing_context: Vec::new(),
         };
     }
-    if profile.classification == CLASS_CONTEXT {
+    if !profile.unsatisfiable_context.is_empty() {
         return ExecutionDecision {
             allowed: false,
             refusal: Some(Reason {
                 code: "context_required".into(),
-                detail: "函数依赖参数之外的上下文，本切片不合成上下文，因此拒绝执行".into(),
-                evidence: "execution_profile.reasons".into(),
+                detail: format!(
+                    "函数依赖 Atlas 无法用数据声明的上下文：{}",
+                    profile.unsatisfiable_context.join(", ")
+                ),
+                evidence: "execution_profile.unsatisfiable_context".into(),
             }),
             required_grants: profile.required_grants.clone(),
             missing_grants: Vec::new(),
+            missing_context: profile.required_context.clone(),
         };
     }
-    if !missing.is_empty() {
+    let mut missing_context: Vec<String> = Vec::new();
+    for item in &profile.required_context {
+        match item.as_str() {
+            "this_arg" if spec.this_arg.is_none() => missing_context.push(item.clone()),
+            // Globals are checked by name, so the refusal says exactly which
+            // value has to be stated rather than "some global".
+            "globals" => {
+                for name in &profile.required_globals {
+                    if !spec.globals.contains_key(name) {
+                        missing_context.push(format!("global:{name}"));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    // Everything that is missing is reported at once. Reporting only the first
+    // kind would make a caller fix one thing, re-run, and discover the next.
+    if !missing.is_empty() || !missing_context.is_empty() {
+        let mut parts = Vec::new();
+        if !missing.is_empty() {
+            parts.push(format!("未授予：{}", missing.join(", ")));
+        }
+        if !missing_context.is_empty() {
+            parts.push(format!("上下文未声明：{}", missing_context.join(", ")));
+        }
         return ExecutionDecision {
             allowed: false,
             refusal: Some(Reason {
-                code: "missing_grants".into(),
-                detail: format!("未授予：{}", missing.join(", ")),
-                evidence: "execution_profile.required_grants".into(),
+                code: "missing_requirements".into(),
+                detail: parts.join("；"),
+                evidence: "execution_profile.required_grants / required_context".into(),
             }),
             required_grants: profile.required_grants.clone(),
             missing_grants: missing,
+            missing_context,
         };
     }
     ExecutionDecision {
@@ -593,13 +754,13 @@ pub fn decide(profile: &ExecutionProfile, spec: &RunSpec) -> ExecutionDecision {
         refusal: None,
         required_grants: profile.required_grants.clone(),
         missing_grants: Vec::new(),
+        missing_context: Vec::new(),
     }
 }
 
 fn granted(grants: &Grants, name: &str) -> bool {
     match name {
         "unknown_calls" => grants.unknown_calls,
-        "globals" => grants.globals,
         "fs_write" => grants.fs_write,
         "child_process" => grants.child_process,
         "network" => grants.network,
@@ -791,6 +952,11 @@ const finish = () => {
 };
 process.on('unhandledRejection', reason => { report.async_events.push({ kind: 'unhandled_rejection', thrown: describe(reason) }); if (report.verdict === 'returned') report.verdict = 'returned_with_async_error'; finish(); });
 process.on('uncaughtException', error => { report.async_events.push({ kind: 'uncaught_exception', thrown: describe(error) }); if (report.verdict === 'returned') report.verdict = 'returned_with_async_error'; finish(); });
+// Declared globals are installed before the import: a module reads its globals
+// at import time as often as at call time. Atlas does not invent them -- each
+// one is a value the caller stated, and the record says which.
+report.declared_globals = Object.keys(payload.globals || {});
+for (const [name, value] of Object.entries(payload.globals || {})) globalThis[name] = value;
 try {
   const namespace = await import(payload.module_url);
   const candidates = [];
@@ -809,7 +975,10 @@ try {
     report.export_name = matches[0][0];
     report.matched_by = 'source_identity';
     try {
-      const raw = matches[0][1](...payload.args);
+      const raw = payload.this_arg === null || payload.this_arg === undefined
+        ? matches[0][1](...payload.args)
+        : matches[0][1].apply(payload.this_arg, payload.args);
+      report.receiver_declared = payload.this_arg !== null && payload.this_arg !== undefined;
       const thenable = raw !== null && (typeof raw === 'object' || typeof raw === 'function') && typeof raw.then === 'function';
       report.awaited = thenable;
       const settled = thenable ? await raw : raw;
@@ -846,6 +1015,8 @@ pub fn harness_payload(
         "target_source": prepared.target_source,
         "export_name": export_name,
         "args": spec.args,
+        "this_arg": spec.this_arg,
+        "globals": spec.globals,
         "report_marker": report_marker,
         "console_limit": spec.output_limit.min(64 * 1024),
     }))?)
@@ -920,7 +1091,7 @@ mod tests {
 
     #[test]
     fn clean_function_is_pure_and_params_are_ordered() {
-        let p = profile("a", "s", "x.ts", "add", &clean());
+        let p = profile("a", "s", "x.ts", "add", &clean(), true);
         assert_eq!(p.classification, CLASS_PURE);
         assert!(p.runnable);
         assert_eq!(p.arity, Some(2));
@@ -933,7 +1104,7 @@ mod tests {
     fn unknown_call_requires_explicit_grant() {
         let mut f = clean();
         f["effects"]["unknown_call"] = true.into();
-        let p = profile("a", "s", "x.ts", "f", &f);
+        let p = profile("a", "s", "x.ts", "f", &f, true);
         assert_eq!(p.classification, CLASS_DRIVER);
         assert!(p.required_grants.contains(&"unknown_calls".to_string()));
         let mut spec = RunSpec {
@@ -946,34 +1117,102 @@ mod tests {
             grants: Grants::default(),
             node: "node".into(),
             env: BTreeMap::new(),
+            this_arg: None,
+            globals: BTreeMap::new(),
             fixtures: false,
             fixture_note: None,
             label: None,
         };
         let refused = decide(&p, &spec);
         assert!(!refused.allowed);
-        assert_eq!(refused.refusal.unwrap().code, "missing_grants");
+        assert_eq!(refused.refusal.unwrap().code, "missing_requirements");
+        assert_eq!(refused.missing_grants, vec!["unknown_calls".to_string()]);
         spec.grants.unknown_calls = true;
         assert!(decide(&p, &spec).allowed);
     }
 
     #[test]
-    fn partial_analysis_is_never_pure() {
+    fn partial_analysis_is_never_pure_and_needs_an_acknowledgement() {
         let mut f = clean();
         f["status"] = "partial_budget".into();
         f["frontier"] = serde_json::json!([3]);
-        let p = profile("a", "s", "x.ts", "f", &f);
+        let p = profile("a", "s", "x.ts", "f", &f, true);
         assert_eq!(p.classification, CLASS_CONTEXT);
-        assert!(!p.runnable);
         assert!(p.reasons.iter().any(|r| r.code == "analysis_partial"));
         assert!(p.reasons.iter().any(|r| r.code == "frontier_blocks"));
+        // Missing facts are not something a caller can supply, so the only way
+        // to run this is to acknowledge that it goes beyond what was proved.
+        let mut spec = RunSpec {
+            schema: RUN_SPEC_SCHEMA.into(),
+            analysis_id: "a".into(),
+            symbol: "s".into(),
+            args: vec![],
+            timeout_ms: 1000,
+            output_limit: 1024,
+            grants: Grants::default(),
+            node: "node".into(),
+            env: BTreeMap::new(),
+            this_arg: None,
+            globals: BTreeMap::new(),
+            fixtures: false,
+            fixture_note: None,
+            label: None,
+        };
+        assert_eq!(
+            decide(&p, &spec).refusal.unwrap().code,
+            "missing_requirements"
+        );
+        spec.grants.unknown_calls = true;
+        assert!(decide(&p, &spec).allowed);
+    }
+
+    #[test]
+    fn a_receiver_or_a_global_must_be_declared_and_is_then_runnable() {
+        let mut f = clean();
+        f["block_states"] = serde_json::json!([
+            {"block": 0, "bindings": [
+                {"binding": "b:x.ts:30:b", "name": "b", "value": {"origins": ["This"]}},
+                {"binding": "b:x.ts:10:a", "name": "a", "value": {"origins": ["External(console)"]}}
+            ]}
+        ]);
+        let p = profile("a", "s", "x.ts", "method", &f, true);
+        assert_eq!(p.classification, CLASS_CONTEXT);
+        assert_eq!(
+            p.required_context,
+            vec!["globals".to_string(), "this_arg".to_string()]
+        );
+        assert!(p.unsatisfiable_context.is_empty());
+        let spec = RunSpec {
+            schema: RUN_SPEC_SCHEMA.into(),
+            analysis_id: "a".into(),
+            symbol: "s".into(),
+            args: vec![],
+            timeout_ms: 1000,
+            output_limit: 1024,
+            grants: Grants::default(),
+            node: "node".into(),
+            env: BTreeMap::new(),
+            this_arg: None,
+            globals: BTreeMap::new(),
+            fixtures: false,
+            fixture_note: None,
+            label: None,
+        };
+        assert!(!decide(&p, &spec).allowed);
+        assert_eq!(decide(&p, &spec).missing_context.len(), 2);
+        let declared = RunSpec {
+            this_arg: Some(serde_json::json!({"n": 1})),
+            globals: BTreeMap::from([("console".to_string(), serde_json::json!({"log": null}))]),
+            ..spec
+        };
+        assert!(decide(&p, &declared).allowed);
     }
 
     #[test]
     fn dynamic_code_is_unsupported_and_refused() {
         let mut f = clean();
         f["unknown_reasons"] = serde_json::json!(["dynamic_code:with"]);
-        let p = profile("a", "s", "x.ts", "f", &f);
+        let p = profile("a", "s", "x.ts", "f", &f, true);
         assert_eq!(p.classification, CLASS_UNSUPPORTED);
         assert!(!p.runnable);
         let spec = RunSpec {
@@ -985,11 +1224,12 @@ mod tests {
             output_limit: 1024,
             grants: Grants {
                 unknown_calls: true,
-                globals: true,
                 ..Grants::default()
             },
             node: "node".into(),
             env: BTreeMap::new(),
+            this_arg: None,
+            globals: BTreeMap::new(),
             fixtures: false,
             fixture_note: None,
             label: None,
@@ -1007,7 +1247,7 @@ mod tests {
         f["block_states"] = serde_json::json!([
             {"block": 0, "bindings": [{"binding": "b:x.ts:30:b", "name": "b", "value": {"origins": ["Capture(b:x.ts:1:c)"]}}]}
         ]);
-        let p = profile("a", "s", "x.ts", "f", &f);
+        let p = profile("a", "s", "x.ts", "f", &f, true);
         assert_eq!(p.classification, CLASS_CONTEXT);
         assert!(p.reasons.iter().any(|r| r.code == "captured_binding"));
     }

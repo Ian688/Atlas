@@ -445,6 +445,9 @@ function renderExecution(profile,record){
   for(const reason of profile.reasons.slice(0,8))body.append(flowNode('flow-unknown',`理由 · ${reason.code} — ${reason.detail}（证据：${reason.evidence}）`));
   if(!profile.reasons.length)body.append(flowNode('flow-line','没有降级理由：已发布事实中没有任何 unknown 分量。'));
   if(profile.required_grants.length)body.append(flowNode('flow-line',`需要显式授权：${profile.required_grants.join(', ')}`));
+  const context=profile.required_context||[];
+  if(context.length)body.append(flowNode('flow-unknown',`需要调用者声明的输入：${context.join(', ')}${(profile.required_globals||[]).length?`（全局：${profile.required_globals.join(', ')}）`:''}。Atlas 不发明这些值，页面也没有为它们提供输入框；请在 CLI 上用 --this / --global 声明。`));
+  if((profile.unsatisfiable_context||[]).length)body.append(flowNode('flow-unknown',`Atlas 无法用数据声明：${profile.unsatisfiable_context.join(', ')}，因此该函数不可运行。`));
   body.append(flowNode('flow-line',`参数：${profile.params.map(p=>`${p.index}:${p.name}`).join(', ')||'无'}`));
   for(const note of profile.notes.slice(0,4))body.append(flowNode('flow-line',note));
   if(record)renderExecRecord(body,record);
@@ -485,7 +488,9 @@ async function runControlled(){
   let args;
   try{args=JSON.parse($('exec-args').value||'[]');}catch{status('实参不是合法 JSON 数组');return;}
   if(!Array.isArray(args)){status('实参必须是 JSON 数组');return;}
-  const allow_effects=state.execProfile.required_grants.filter(name=>name==='unknown_calls'||name==='globals');
+  // The page can only forward the acknowledgement. A receiver or a global is an
+  // input the caller states, and there is no field for it here on purpose.
+  const allow_effects=state.execProfile.required_grants.filter(name=>name==='unknown_calls');
   const request=state.request;$('exec-run').disabled=true;status('在隔离副本中执行…');
   try{
     const record=await apiJson('exec',{symbol:selected.id,args,allow_effects});

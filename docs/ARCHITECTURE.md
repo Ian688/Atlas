@@ -112,7 +112,9 @@ worker stdin ≤160 MiB、stdout ≤32 MiB、stderr ≤64 KiB，V8 old-space 为
 
 **执行画像**是从已发布的 flow 事实派生的静态充分性分类，不是执行结果。分类顺序是 `unsupported` → `needs_entry_driver` → `needs_context` → `pure_callable`，每条降级理由都带 `code/detail/evidence`，`evidence` 指回它读的那个字段（`effects.unknown_call`、`block_states[].bindings[].value.origins` 等）。关键保守点：`status != complete_within_profile` 一律降级——partial 分析的 frontier 恰恰是事实缺失的块，"没有未知副作用"没有被证明。`needs_context` 在本切片不可运行，因为不合成上下文。
 
-**受控运行**只在一个条件下发生：静态画像允许，且 spec 已显式授予所需项。执行路径：
+画像把要求分成两类，混在一起会让"缺什么"变得不可行动：**可声明的输入**（`this` 与具名全局；调用者用 `--this` / `--global NAME=<json>` 给出，记录里写明声明了什么）与**必须承认的未知**（未建模构造、未完成事实、堆近似、未知调用；用 `unknown_calls` 这一条明确承认）。没有任何名字可指的全局读取不会被要求"声明某个值"——那不可行动；它落在承认项里。读取**模块级状态**不需要声明：模块整体被复制，导入时它就在。嵌套函数的外层绑定无法用数据声明，因此那类函数直接不可运行。
+
+**受控运行**只在一个条件下发生：静态画像允许，且 spec 已显式授予/声明所需项。执行路径：
 
 1. 从**不可变快照**的内容寻址 blob 逐个读取并重新哈希校验，物化到一个 `0700` 的隔离副本（临时目录先 canonicalize，否则 Node 的 loader 会在 `/var → /private/var` 上触发一次未被授权的读而死在 loader 里而不是被测代码里）。
 2. 生成 harness，用**源码同一性**而不是名字来选定目标：模块命名空间里每个可调用值的 `Function.toString()` 归一化后必须与快照中该符号的字节切片一致，唯一命中才调用。因此改名、遮蔽导出、同名不同函数都不会被静默执行；命中不了就是 `target_not_exported`，不猜测。

@@ -186,6 +186,18 @@
       ],
       "note": "宿主接缝接通：合同作为数据发布（GET /api/contract），参考宿主客户端只拿 {url,token}，测试断言适配器源码无任何存储访问、contract 不含 store 路径、非回环 host 被拒。Modus 旧入口未切换：宿主检出不在本工作区，无法做宿主侧 E2E，回退边界与切换前置条件已写进 docs/HOST_API.md。",
       "report": "evidence/development/2026-09-12-w10/REPORT.md"
+    },
+    {
+      "id": "2026-09-12/w08-context-model",
+      "status": "DELIVERED",
+      "work_items": [
+        "W08-declared-inputs-vs-acknowledged-unknowns",
+        "W08-this-arg-and-named-globals",
+        "W08-module-state-is-present",
+        "W08-actionable-refusals"
+      ],
+      "note": "执行画像把要求分成两类：可声明的输入（this、具名全局）与必须承认的未知（未建模构造/未完成事实/堆近似/未知调用）。读取模块级状态不需要声明（模块整体在副本里）；嵌套函数的外层绑定不可运行。拒绝一次性列出缺什么。",
+      "report": "evidence/development/2026-09-12-w08/REPORT.md"
     }
   ],
   "next_work_item": "宿主侧 E2E 与旧入口切换（需要 Modus 检出）；或回到 W08/W09 的深化项",
@@ -548,7 +560,12 @@
         "mock 区分：--fixtures 运行在记录里标 isolation.mocks=true，前端明确提示不得读作真实环境观测",
         "scenario：atlas.scenario.v1 用例集，断言 returns/throws(name,message_contains,code)/denied/awaited；refused 与 failed 分开计数",
         "HTTP 边界：/api/profile、/api/exec、/api/exec-records；页面不能选择 Node 二进制、注入环境或授予 fs_write/child_process/network（字段不在请求类型里），超时夹到 30s；未授权 401",
-        "Web：函数面板增加执行画像与受控运行；不可运行/参数未知时禁用按钮并给出原因；拒绝与观测分别渲染；观测边界始终显示"
+        "Web：函数面板增加执行画像与受控运行；不可运行/参数未知时禁用按钮并给出原因；拒绝与观测分别渲染；观测边界始终显示",
+        "要求分两类：可声明的输入（this_arg 与具名 globals，--this / --global NAME=<json>）与必须承认的未知（analysis_partial/unknown_region/frontier/heap_state/unknown_calls/callsite_incomplete → 单一 unknown_calls 承认项）",
+        "具名 globals 从 External(name) 来源提取，因此要求是可行动的（拒绝里写明 global:NAME）；没有名字可指的全局读取不要求声明一个假值，而是落在承认项里",
+        "模块级状态不需要声明：顶层函数的 Capture 来源视为模块初始化状态（模块整体被复制），只要求承认未知；嵌套函数的外层绑定标记为 unsatisfiable_context，函数不可运行",
+        "拒绝可行动：refusal 带 missing_grants 与 missing_context 列表，一次列全，不让调用者改一个再试一次",
+        "结果记录写明声明了什么：isolation.declared_context 与 trace 事件里的 declared_globals / receiver_declared"
       ],
       "evidence": [
         "crates/atlas-engine/src/exec.rs（8 个单测：分类顺序/arity/参数顺序/partial 降级/dynamic 拒绝/缺授权/路径校验/栈帧映射）",
@@ -558,10 +575,12 @@
         "scripts/test_integration.py test_http_execution_keeps_the_process_boundary_server_side",
         "web/tests/app.behavior.test.mjs（新增 7 项执行面板行为）",
         "workers/typescript/tests/flow.test.mjs（GE-2 回归：嵌套函数不得被外层认领声明）",
-        "evidence/development/2026-09-12-w08/verification.json"
+        "evidence/development/2026-09-12-w08/verification.json",
+        "scripts/test_execution.py（32 个用例，新增 5 项上下文模型用例）",
+        "evidence/development/2026-09-12-w08/REPORT.md（上下文模型一节）"
       ],
       "blockers": [
-        "needs_context 不可运行：本切片不合成上下文（captures/this/模块态），需要上下文实例化与依赖切片",
+        "needs_context 仍不完整：嵌套函数的闭包实例无法用数据声明，因此这类函数不可运行；worker 仍把 ES import 绑定当作 External 名称（导入绑定与真正的全局在已发布事实里无法区分），因此读取导入模块的函数会被要求承认未知——保守但不够精确",
         "没有行级覆盖、运行期调用图与因果链：只有入口调用的返回/抛出与运行时报告的源码位置；未知路径保持未知",
         "effects 只有静态分类标签，没有 Effect journal：fs/net/env/子进程的实际行为由运行时权限模型强制，Atlas 不记录执行期效果清单",
         "fixtures 只是声明标签：不注入 mock、不做依赖切片、不校验 mock 与真实依赖的区别，仅保证运行结果不会被读作真实环境观测",

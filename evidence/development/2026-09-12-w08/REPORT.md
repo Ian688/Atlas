@@ -121,3 +121,38 @@ python3 scripts/verify.py --label w08-execution \
 | `python3 scripts/bench_real_project.py`（manual，见 GE-2 报告） | 0 | 真实 rxjs 全链 |
 
 资格范围：只覆盖上列检查，不构成完整 AL/ET/GE/MT/HI/DV 或成熟 Atlas 验收。
+
+---
+
+## 八、补片（同日）：上下文模型 —— 可声明的输入 vs 必须承认的未知
+
+W08 首片把一切"参数之外的东西"都塞进 `needs_context` 并判定不可运行，这既太粗也太悲观：读一个全局和执行一段未建模的代码不是同一类问题。
+本补片把它拆成两类，并让拒绝变得可行动。
+
+| 类别 | 例子 | 调用者要做什么 |
+|---|---|---|
+| **可声明的输入** | 函数读取 `this`；读取有名字的外部名（`External(name)`） | 用 `--this '<json>'` / `--global NAME=<json>` 给出值；记录里写明声明了什么 |
+| **必须承认的未知** | 未建模构造、未完成的 frontier、堆近似、未知调用、无名的外部读 | `--allow-effects unknown_calls` 明确承认"这次运行超出了被证明的范围" |
+| **不需要声明** | 顶层函数读取模块级状态（`Capture`，模块整体被复制） | 只需承认未知即可运行 |
+| **不可运行** | 嵌套函数引用外层函数的绑定（闭包实例） | 本切片不接受用数据声明一个实例 |
+
+三点理由，每一点都对应一个被修掉的错误行为：
+
+1. **`globals` 不再是权限。** 它曾经是 `--allow-effects` 里的一个授权名，但授予一个权限并不能提供那个值——读到 `undefined` 或 `ReferenceError` 与"被允许读"是两件事。旧的 `globals` 授权名现在会**报错**（`unknown_effect_grant`），而不是被忽略，否则调用者会以为自己提供了什么。
+2. **具名才算要求。** 要求从 `External(name)` 来源提取，拒绝里写 `global:CONFIG` 这样的具体名字。没有名字可指的全局读取不会被要求"声明某个值"——那不可行动；它落在承认项里，而运行会给出真实答案（实测是 `ReferenceError`，这本身是有用的观测）。
+3. **模块状态在副本里。** 顶层函数读取模块级 `const` 时，worker 把它记为 `Capture`。把 Capture 一律当作不可满足是错的：模块整体被复制，导入时那份状态就存在。现在按"函数是否顶层"区分：顶层 → 只要求承认未知；嵌套 → 不可运行。
+
+拒绝也改成一次列全：`refusal` 同时带 `missing_grants` 与 `missing_context`，不让人改一个再试一次。
+
+**实测（真实 CLI 输出）**：
+
+```
+add             pure_callable      runnable  grants=[]                ctx=[]
+self            needs_context      runnable  grants=[]                ctx=['this_arg']
+writeField      needs_context      runnable  grants=['unknown_calls'] ctx=[]
+useModuleConst  needs_context      runnable  grants=['unknown_calls'] ctx=[]
+readConfig      needs_entry_driver runnable  grants=['unknown_calls'] ctx=[]  globals=[]
+divide          needs_entry_driver runnable  grants=['unknown_calls'] ctx=[]
+```
+
+**仍未解决**：worker 仍把 ES `import` 绑定当作 `External` 名称——已发布事实里"导入绑定"与"真正的全局"无法区分，所以读取导入模块的函数会被要求承认未知。保守，但不够精确；要修正得让 worker 把 import 绑定登记为模块绑定并区分二者。
