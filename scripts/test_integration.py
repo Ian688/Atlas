@@ -620,6 +620,38 @@ class Integration(unittest.TestCase):
             fa["interprocedural"]["callsites"][0]["result"]["constants"], [1.0])
         self.assertEqual(fb["interprocedural"]["callsites"][0]["result"]["constants"], [2.0])
 
+    def test_the_worker_heap_ceiling_is_configurable_bounded_and_named(self):
+        """The worker holds the whole program, so its footprint scales with the
+        project. A fixed 512 MiB cap turned a large project into an opaque
+        `worker_exit_failed`; the ceiling is a parameter now, and hitting it is
+        reported as its own failure with the limit that was reached."""
+        self.cli("index", self.project, "--worker-heap-mb", "64", ok=False)
+        self.cli("index", self.project, "--worker-heap-mb", "99999", ok=False)
+        self.assertTrue(self.cli("index", self.project, "--worker-heap-mb", "256")["id"])
+
+        # A real exhaustion, not a simulated one: 14k functions in one file
+        # against a 128 MiB ceiling.
+        big = self.base / "big"
+        big.mkdir()
+        (big / "package.json").write_text('{"name":"big","type":"module"}', encoding="utf-8")
+        (big / "big.js").write_text(
+            "\n".join(
+                f"export function f{i}(x){{const a=[1,2,3];const b={{k:a}};return x+b.k.length+{i};}}"
+                for i in range(14_000)
+            ),
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [str(BIN), "--store", str(self.base / "big-store"), "index", str(big),
+             "--worker-heap-mb", "128", "--timeout-seconds", "600"],
+            cwd=ROOT, capture_output=True, text=True, timeout=600,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("worker_heap_exhausted", result.stderr)
+        self.assertIn("limit_mb=128", result.stderr)
+        self.assertIn("--worker-heap-mb", result.stderr,
+                      "the failure must say what to change")
+
     def test_flow_queries_reject_unknown_symbols(self):
         """D20-lite: invented flow facts cannot be queried into existence."""
         shutil.rmtree(self.project)

@@ -33,12 +33,20 @@ async fn cancelled(cancel: &mut watch::Receiver<bool>) {
     }
 }
 
+/// Heap ceiling for the language worker, in MiB.
+///
+/// The worker holds the whole parsed program and the flow IR for every
+/// function, so its memory scales with the project. A fixed 512 MiB cap turned
+/// a large project into an opaque `worker_exit_failed`; the limit is now a
+/// parameter, and hitting it is reported as its own failure with the ceiling
+/// that was reached.
 pub async fn parse(
     node: &Path,
     worker: &Path,
     request: &ParseRequest,
     deadline: Duration,
     output_limit: usize,
+    heap_mb: u32,
     mut cancel: watch::Receiver<bool>,
 ) -> Result<LanguageFacts, String> {
     if *cancel.borrow() {
@@ -51,7 +59,7 @@ pub async fn parse(
     let worker = worker.canonicalize().map_err(|_| "worker_missing")?;
     let mut command = Command::new(node);
     command
-        .arg("--max-old-space-size=512")
+        .arg(format!("--max-old-space-size={}", heap_mb.max(16)))
         .arg(&worker)
         .current_dir(worker.parent().unwrap())
         .env_clear()
@@ -75,14 +83,14 @@ pub async fn parse(
             Ok::<_, io::Error>(())
         };
         let worker_io = async {
-            let (_, stdout, _stderr) = tokio::try_join!(
+            let (_, stdout, stderr) = tokio::try_join!(
                 write,
                 bounded(stdout, output_limit),
                 bounded(stderr, 64 * 1024)
             )?;
             let status = child.wait().await?;
             if !status.success() {
-                return Err(io::Error::other("worker_exit_failed"));
+                return Err(io::Error::other(classify_exit(&stderr, heap_mb)));
             }
             Ok::<_, io::Error>(stdout)
         };
@@ -114,6 +122,42 @@ pub async fn parse(
         return Err("cancelled_by_signal".into());
     }
     facts
+}
+
+/// Name the failure instead of reporting every non-zero exit the same way.
+///
+/// A heap exhaustion is the one failure an operator can act on, and Node says so
+/// on stderr; anything else keeps the generic name. The stderr tail travels with
+/// the error so the log carries the runtime's own words.
+fn classify_exit(stderr: &[u8], heap_mb: u32) -> String {
+    let text = String::from_utf8_lossy(stderr);
+    let exhausted = text.contains("JavaScript heap out of memory")
+        || text.contains("Allocation failed")
+        || text.contains("Reached heap limit");
+    if exhausted {
+        let tail: String = text
+            .lines()
+            .rev()
+            .take(3)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>()
+            .join(" | ");
+        return format!(
+            "worker_heap_exhausted:limit_mb={heap_mb}:raise --worker-heap-mb:stderr={tail}"
+        );
+    }
+    let tail: String = text
+        .lines()
+        .rev()
+        .take(3)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect::<Vec<_>>()
+        .join(" | ");
+    format!("worker_exit_failed:stderr={tail}")
 }
 
 #[cfg(test)]
@@ -162,6 +206,7 @@ mod tests {
                 &request(),
                 Duration::from_secs(3),
                 1000,
+                512,
                 cancel.clone(),
             )
             .await
@@ -178,6 +223,7 @@ mod tests {
                 &request(),
                 Duration::from_secs(3),
                 1000,
+                512,
                 cancel,
             )
             .await
@@ -206,6 +252,7 @@ mod tests {
             &request(),
             Duration::from_secs(3),
             1000,
+            512,
             cancel,
         )
         .await
@@ -251,6 +298,7 @@ mod tests {
                 &request(),
                 Duration::from_secs(10),
                 1000,
+                512,
                 cancel,
             )
             .await
@@ -282,6 +330,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn an_exhausted_worker_heap_is_named_with_the_ceiling_that_was_hit() {
+        let tmp = tempfile::tempdir().unwrap();
+        let worker = tmp.path().join("worker.mjs");
+        // A worker that allocates until Node's heap ceiling stops it.
+        std::fs::write(
+            &worker,
+            "const held=[];for(;;){held.push(new Array(1_000_000).fill(0));}",
+        )
+        .unwrap();
+        let error = parse(
+            Path::new("node"),
+            &worker,
+            &request(),
+            Duration::from_secs(30),
+            1000,
+            16,
+            tokio::sync::watch::channel(false).1,
+        )
+        .await
+        .unwrap_err();
+        assert!(error.starts_with("worker_heap_exhausted"), "{error}");
+        assert!(error.contains("limit_mb=16"), "{error}");
+        assert!(error.contains("--worker-heap-mb"), "{error}");
+        // Anything else keeps the generic name.
+        assert!(classify_exit(b"SyntaxError: boom", 512).starts_with("worker_exit_failed"));
+    }
+
+    #[tokio::test]
     async fn deadline_kills_worker_and_output_cap_is_effective() {
         let tmp = tempfile::tempdir().unwrap();
         let p = tmp.path().join("worker.mjs");
@@ -295,6 +371,7 @@ mod tests {
                 &request,
                 Duration::from_millis(150),
                 1000,
+                512,
                 tokio::sync::watch::channel(false).1,
             )
             .await
@@ -313,6 +390,7 @@ mod tests {
             &request,
             Duration::from_secs(3),
             1000,
+            512,
             tokio::sync::watch::channel(false).1,
         )
         .await

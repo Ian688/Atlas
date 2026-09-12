@@ -170,6 +170,9 @@ fn all_edges(store: &Store, analysis: &str) -> Result<Vec<Value>, String> {
 pub struct VerifyOptions {
     pub node: PathBuf,
     pub worker: PathBuf,
+    /// Heap ceiling for the language worker, in MiB, carried through from the
+    /// caller exactly like the other runner parameters.
+    pub worker_heap_mb: u32,
     pub timeout: Duration,
     pub scan_deadline: Duration,
     pub index_deadline: Duration,
@@ -214,6 +217,7 @@ pub async fn verify_proposal(
         options.scan_deadline.as_secs(),
         options.index_deadline.as_secs(),
         false,
+        options.worker_heap_mb,
     )
     .map_err(|e| e.to_string())?;
     let control = ExecutionControl::new(Some(

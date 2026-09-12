@@ -6,6 +6,8 @@
 
 ## 启动
 
+语言 worker 的堆上限是可配置的（`--worker-heap-mb`，默认 1024，范围 128–8192）：worker 持有整个程序与全部函数的 Flow IR，footprint 随项目规模增长，固定上限曾把大项目变成一句无法解释的失败。撞到上限时报 `worker_heap_exhausted:limit_mb=…` 并给出要改的参数。
+
 需要 Rust/Cargo、Node.js 和 npm。TypeScript 编译器依赖固定为 5.9.3；Rust 依赖由 Cargo.lock 固定。Node 24+ 为当前声明的开发范围，具体被验证版本查看 [验证记录](evidence/foundation/verification.json)，不能把范围当作各版本均已验收。
 
 在本仓库根目录执行：

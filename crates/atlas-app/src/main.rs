@@ -55,6 +55,9 @@ enum Action {
         /// are unchanged, and report what a partial change would invalidate.
         #[arg(long)]
         incremental: bool,
+        /// Heap ceiling for the language worker, in MiB.
+        #[arg(long, default_value_t = 1024)]
+        worker_heap_mb: u32,
     },
     Report {
         analysis: String,
@@ -250,6 +253,9 @@ enum PatchAction {
         test_argv: Option<String>,
         #[arg(long, default_value_t = 120000)]
         test_timeout_ms: u64,
+        /// Heap ceiling for the language worker, in MiB.
+        #[arg(long, default_value_t = 1024)]
+        worker_heap_mb: u32,
     },
     /// Write the verified files into a checkout, refusing if its bytes moved.
     Apply {
@@ -369,6 +375,10 @@ struct RunnerArgs {
     /// unchanged, and report what a partial change would invalidate.
     #[arg(long)]
     incremental: bool,
+    /// Heap ceiling for the language worker, in MiB. The worker holds the whole
+    /// program, so this has to scale with the project.
+    #[arg(long, default_value_t = 1024)]
+    worker_heap_mb: u32,
 }
 
 #[derive(Subcommand)]
@@ -436,6 +446,10 @@ struct IndexOptions {
     scan_deadline: Duration,
     index_deadline: Duration,
     incremental: bool,
+    /// Heap ceiling for the language worker. Configurable because the worker
+    /// holds the whole program, so its footprint scales with the project; a
+    /// fixed cap turns a large project into an unexplained failure.
+    worker_heap_mb: u32,
 }
 
 impl IndexOptions {
@@ -447,9 +461,11 @@ impl IndexOptions {
             runner.scan_deadline_seconds,
             runner.index_deadline_seconds,
             runner.incremental,
+            runner.worker_heap_mb,
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn new(
         node: PathBuf,
         worker: PathBuf,
@@ -457,6 +473,7 @@ impl IndexOptions {
         scan_deadline_seconds: u64,
         index_deadline_seconds: u64,
         incremental: bool,
+        worker_heap_mb: u32,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         if timeout_seconds == 0 || timeout_seconds > 600 {
             return Err("timeout must be 1..600 seconds".into());
@@ -467,6 +484,9 @@ impl IndexOptions {
         if index_deadline_seconds == 0 || index_deadline_seconds > 3600 {
             return Err("index deadline must be 1..3600 seconds".into());
         }
+        if !(128..=8192).contains(&worker_heap_mb) {
+            return Err("worker heap must be 128..8192 MiB".into());
+        }
         Ok(Self {
             node,
             worker,
@@ -474,6 +494,7 @@ impl IndexOptions {
             scan_deadline: Duration::from_secs(scan_deadline_seconds),
             index_deadline: Duration::from_secs(index_deadline_seconds),
             incremental,
+            worker_heap_mb,
         })
     }
 
@@ -482,12 +503,13 @@ impl IndexOptions {
     fn fingerprint(&self, root: &Path) -> String {
         atlas_engine::digest(
             format!(
-                "atlas.index-request.v1|{}|{}|{:?}|{:?}|{:?}",
+                "atlas.index-request.v1|{}|{}|{:?}|{:?}|{:?}|{}",
                 root.display(),
                 self.node.display(),
                 self.timeout,
                 self.scan_deadline,
-                self.index_deadline
+                self.index_deadline,
+                self.worker_heap_mb
             )
             .as_bytes(),
         )
@@ -504,6 +526,7 @@ impl IndexOptions {
             scan_deadline_seconds: self.scan_deadline.as_secs(),
             index_deadline_seconds: self.index_deadline.as_secs(),
             incremental: self.incremental,
+            worker_heap_mb: self.worker_heap_mb,
         })?)
     }
 
@@ -517,6 +540,7 @@ impl IndexOptions {
             stored.scan_deadline_seconds,
             stored.index_deadline_seconds,
             stored.incremental,
+            stored.worker_heap_mb,
         )
     }
 }
@@ -535,6 +559,9 @@ struct StoredVerify {
     #[serde(default)]
     test_argv: Option<Vec<String>>,
     test_timeout_ms: u64,
+    /// Defaulted so a row enqueued before this option existed still runs.
+    #[serde(default = "default_worker_heap_mb")]
+    worker_heap_mb: u32,
 }
 
 impl StoredVerify {
@@ -547,6 +574,7 @@ impl StoredVerify {
             || self.scan_deadline_seconds > 3600
             || self.index_deadline_seconds == 0
             || self.index_deadline_seconds > 3600
+            || !(128..=8192).contains(&self.worker_heap_mb)
         {
             return Err("stored_verify_deadlines_out_of_range".into());
         }
@@ -558,6 +586,7 @@ impl StoredVerify {
             index_deadline: Duration::from_secs(self.index_deadline_seconds),
             test_argv: self.test_argv.clone(),
             test_timeout: Duration::from_millis(self.test_timeout_ms.max(1)),
+            worker_heap_mb: self.worker_heap_mb,
         })
     }
 }
@@ -572,6 +601,13 @@ struct StoredOptions {
     /// Defaulted so a job enqueued before this option existed still runs.
     #[serde(default)]
     incremental: bool,
+    /// Defaulted for the same reason; 1024 is the current default ceiling.
+    #[serde(default = "default_worker_heap_mb")]
+    worker_heap_mb: u32,
+}
+
+fn default_worker_heap_mb() -> u32 {
+    1024
 }
 
 /// A lease holder identity: unique per process run, so two runs of the same
@@ -666,6 +702,7 @@ async fn run_pipeline(
         &request,
         options.timeout.min(remaining),
         32 * 1024 * 1024,
+        options.worker_heap_mb,
         cancel_rx,
     )
     .await?;
@@ -972,6 +1009,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             scan_deadline_seconds,
             index_deadline_seconds,
             incremental: want_incremental,
+            worker_heap_mb,
         } => {
             let options = IndexOptions::new(
                 node,
@@ -980,6 +1018,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 scan_deadline_seconds,
                 index_deadline_seconds,
                 want_incremental,
+                worker_heap_mb,
             )?;
             let control =
                 ExecutionControl::new(Some(std::time::Instant::now() + options.index_deadline));
@@ -1456,6 +1495,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 index_deadline_seconds,
                 test_argv,
                 test_timeout_ms,
+                worker_heap_mb,
             } => {
                 let test_argv: Option<Vec<String>> = match test_argv.as_deref() {
                     Some(text) => Some(serde_json::from_str(text)?),
@@ -1464,6 +1504,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let options = patchwork::VerifyOptions {
                     node,
                     worker,
+                    worker_heap_mb,
                     timeout: Duration::from_secs(timeout_seconds),
                     scan_deadline: Duration::from_secs(scan_deadline_seconds),
                     index_deadline: Duration::from_secs(index_deadline_seconds),
@@ -1487,6 +1528,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         index_deadline_seconds: options.index_deadline.as_secs(),
                         test_argv: options.test_argv.clone(),
                         test_timeout_ms: options.test_timeout.as_millis() as u64,
+                        worker_heap_mb: options.worker_heap_mb,
                     })?;
                     // Identity: the base analysis groups the request, and the
                     // proposal id is the key, so one proposal is verified once
