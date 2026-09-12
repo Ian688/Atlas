@@ -1,0 +1,84 @@
+$ /usr/bin/time -l /Users/yinsijie/CodeRepo/Atlas/target/debug/atlas --store /Users/yinsijie/CodeRepo/Atlas/local-state/bench/reuse-probe/store-plain index /Users/yinsijie/CodeRepo/Atlas/local-state/bench/reuse-probe/project --node node --worker /Users/yinsijie/CodeRepo/Atlas/workers/typescript/worker.mjs --timeout-seconds 600 --scan-deadline-seconds 300 --index-deadline-seconds 1800 --incremental
+cwd: /Users/yinsijie/CodeRepo/Atlas
+--- stdout ---
+{
+  "binary_fingerprint": "ac2a70796de0ea0918be9534662754f3bd19a54873ed76020ffa63fec808b16c",
+  "call_count": 1,
+  "coverage": {
+    "catalog_entries": 4,
+    "disposition:captured": 2,
+    "disposition:directory": 2,
+    "encountered_source_files": 2,
+    "flow_complete_within_profile": 2,
+    "flow_frontier_functions": 0,
+    "flow_functions": 2,
+    "flow_partial": 0,
+    "flow_unknown_regions": 0,
+    "interproc_recursive_sccs": 0,
+    "interproc_sccs": 2,
+    "parsed_source_files": 2
+  },
+  "diagnostics": [],
+  "edge_count": 7,
+  "engine": "foundation-flow-0.2.2",
+  "file_count": 2,
+  "flow_digest": "22a25a7681bee6f6fa4222552ecf3dbbd78c0cd685f8ddb6c5a5e89bcdac6c28",
+  "function_count": 2,
+  "id": "75ed632d210c1afdff5b5419705fcee5c430175ff1805a2ccd4aafbd6cd39496",
+  "incremental": {
+    "changes": [],
+    "files": {
+      "by_dependency": 0,
+      "new": 0,
+      "own_content": 0,
+      "parsed": 2,
+      "reusable": 0
+    },
+    "note": "派生流程控制流与抽象解释是全程序 SCC 不动点，因此一次局部改动仍会重新派生全部函数；reusable 表示下一次若实现增量不动点后可跳过的函数所在文件数。",
+    "outcome": "derived",
+    "run_key": "26aa9d8ba5147dbb37d41ec0ca3ab2c7dac865542350e5fb0f816e1042272675",
+    "seconds": {
+      "derivation": 0.006699393,
+      "scan": 0.004601434,
+      "total": 0.469042989,
+      "worker": 0.452097188
+    },
+    "snapshot_id": "635fc5583622bcff0c15a84105f07a17f5c06fbb8f075a6d766028db8f1372d6",
+    "withdrawn": []
+  },
+  "limitations": [
+    "Lexical declaration candidates, not a complete runtime call graph or execution trace.",
+    "Snapshot captures files over an interval; it is not an atomic filesystem transaction.",
+    "Only captured UTF-8 JS/TS inputs; external dependencies, standard library and project tsconfig are not loaded.",
+    "Ignored directories are explicit boundaries; their unvisited descendants are not counted.",
+    "Local flow facts cover declared profile js-structured-control.v1 only; other constructs are explicit unknowns. Interprocedural summaries are symbolic per function, with up to 8 scalar-argument calling contexts per callee; other calls use the symbolic fallback. Captured origins are not re-substituted and unknown callees stay top."
+  ],
+  "node_count": 6,
+  "producer": "typescript/5.9.3;worker/0.2.1",
+  "recursive_components": [],
+  "schema": "atlas.analysis.v1",
+  "snapshot_id": "635fc5583622bcff0c15a84105f07a17f5c06fbb8f075a6d766028db8f1372d6",
+  "unresolved_call_count": 0
+}
+--- stderr ---
+        0.48 real         0.38 user         0.07 sys
+           124923904  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               34855  page reclaims
+                 237  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   1  messages sent
+                   1  messages received
+                   1  signals received
+                   4  voluntary context switches
+                 361  involuntary context switches
+           100896877  instructions retired
+           116957676  cycles elapsed
+             3100672  peak memory footprint
+[exit code: 0]
+[wall seconds: 0.498309]
+[peak rss: 124923904 (measured)]
