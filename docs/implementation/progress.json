@@ -8,7 +8,7 @@
   "active_window": {
     "window": "2026-09-12/w09-quality-check",
     "status": "DELIVERED",
-    "note": "全库对照（6573 函数，非抽样）：CFG 块 47270→47718（69 增 0 减，无回退）；返回值无结论 5630→5627；flow 层调用点 11335→11428（+93，循环体内调用点首次进入 flow 事实）；未解析比例 82.6%→82.8%；for_in_of_iteration 理由消失，for_in_of_element_unknown 新增 68 函数。并纠正第 8 轮的不精确：调用点\"一直存在\"只在调用图层成立，flow 层是新增的。新出现 unmodeled_assignment_target 34 个函数中仅部分与循环相关，原因待查，不假设良性。",
+    "note": "全库对照（6573 函数，非抽样）：CFG 块 47270→47718（69 增 0 减，无回退）；返回值无结论 5630→5627；flow 层调用点 11335→11428（+93）；未解析比例 82.6%→82.8%；for_in_of_iteration 理由消失，for_in_of_element_unknown 新增 68 函数。纠正第 8 轮不精确：调用点\"一直存在\"只在调用图层成立，flow 层是新增的。新出现的 unmodeled_assignment_target 34 例经测量**全部是循环函数（34/34，非循环 0）**，即由我发出的循环变量赋值造成——其中一半循环函数的 assignTarget 建模失败，按缺陷对待（初稿曾误写为\"并非全部由循环造成\"，同一次测量的数字推翻了它，已更正）。",
     "evidence_dir": "evidence/development/2026-09-12-w09-quality-check",
     "verification": "evidence/development/2026-09-12-w09-forin-r3/verification.json"
   },
@@ -564,7 +564,7 @@
       "work_items": [
         "W09-QA"
       ],
-      "note": "全库逐函数对照（facts 表聚合，6573 个同名函数）：结构无回退（块 69 增 0 减）、返回值更精确（3 个从无结论变确定，0 反向）、flow 层调用点 +93；纠正\"调用点一直存在\"的不精确（分层看）；新出现 unmodeled_assignment_target 34 例，仅部分与循环相关，列为待查。",
+      "note": "全库逐函数对照（facts 聚合，6573 同名函数）：结构无回退（块 69 增 0 减）、返回值更精确（3 个从无结论变确定，0 反向）、flow 层调用点 +93；纠正\"调用点一直存在\"的不精确；新出现 unmodeled_assignment_target 34 例**全部是循环函数**，归因于我发出的循环变量赋值，其中一半循环函数 assignTarget 失败，列为缺陷。",
       "report": "evidence/development/2026-09-12-w09-quality-check/CORPUS.md",
       "verification": "evidence/development/2026-09-12-w09-forin-r3/verification.json"
     }
@@ -1461,6 +1461,13 @@
       "measured": "调用图层面确实一直存在；但 flow 事实层面的调用点总数为 11335→11428（+93），循环体内的调用点此前不在 flow 事实里",
       "corrected": "两层必须分开说：调用图不变，flow 事实新增 93 个调用点",
       "found_by": "2026-09-12/w09-corpus-check 全库对照"
+    },
+    {
+      "window": "2026-09-12/w09-corpus-check",
+      "claim": "本轮报告初稿：\"unmodeled_assignment_target 的新增并非全部由循环造成，非循环函数上也出现了\"",
+      "measured": "同一次测量的最后两行：新出现 34 例中，循环函数 34、非循环函数 0",
+      "corrected": "全部 34 例都来自我发出的循环变量赋值；非循环函数上没有任何新增。按缺陷对待",
+      "found_by": "同一次运行内的数字自相矛盾（先写下结论、后看到数字）"
     }
   ]
 }
