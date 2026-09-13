@@ -8,7 +8,7 @@
   "active_window": {
     "window": "2026-09-12/w09-quality-check",
     "status": "DELIVERED",
-    "note": "质量核查（无代码改动）：用第6轮/第7轮两个真实 store 对照同一函数，确认 CFG 3→9 块、返回值从无结论到确定 undefined、理由具名且新增的 capture_or_untracked_binding_read 是被掩盖的真相；同时纠正第7轮的夸大陈述——循环内调用点改前改后都是 2 个，调用点由解析阶段抽取，与 flow lowering 无关。",
+    "note": "全库对照（6573 函数，非抽样）：CFG 块 47270→47718（69 增 0 减，无回退）；返回值无结论 5630→5627；flow 层调用点 11335→11428（+93，循环体内调用点首次进入 flow 事实）；未解析比例 82.6%→82.8%；for_in_of_iteration 理由消失，for_in_of_element_unknown 新增 68 函数。并纠正第 8 轮的不精确：调用点\"一直存在\"只在调用图层成立，flow 层是新增的。新出现 unmodeled_assignment_target 34 个函数中仅部分与循环相关，原因待查，不假设良性。",
     "evidence_dir": "evidence/development/2026-09-12-w09-quality-check",
     "verification": "evidence/development/2026-09-12-w09-forin-r3/verification.json"
   },
@@ -557,10 +557,20 @@
       "note": "对上一轮断言做实测核对：同一函数前后对照（CFG 3→9、返回值 unknown→确定 undefined、新增理由为掩盖的真相、调用点数量不变）。纠正了\"循环内调用全部消失\"的夸大表述并记录在案。残余：只核对 1 个函数；未统计\"调用点存在但目标未解析\"的比例变化。",
       "report": "evidence/development/2026-09-12-w09-quality-check/REPORT.md",
       "verification": "evidence/development/2026-09-12-w09-forin-r3/verification.json"
+    },
+    {
+      "id": "2026-09-12/w09-corpus-check",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09-QA"
+      ],
+      "note": "全库逐函数对照（facts 表聚合，6573 个同名函数）：结构无回退（块 69 增 0 减）、返回值更精确（3 个从无结论变确定，0 反向）、flow 层调用点 +93；纠正\"调用点一直存在\"的不精确（分层看）；新出现 unmodeled_assignment_target 34 例，仅部分与循环相关，列为待查。",
+      "report": "evidence/development/2026-09-12-w09-quality-check/CORPUS.md",
+      "verification": "evidence/development/2026-09-12-w09-forin-r3/verification.json"
     }
   ],
   "next_work_item": "2D 画布的正式层级与空间索引，或大仓库/monorepo 的规模资格",
-  "next_action": "①把质量核查扩大到更多函数（含\"调用点存在但目标未解析\"的比例前后变化）；②UI 清单按字节区间高亮源码；③执行画像主视图；④歧义样本；⑤atlas node CLI。",
+  "next_action": "①查清 unmodeled_assignment_target 新出现的 34 例（其中非循环函数上的部分来源不明，不假设良性）；②未解析率 82.8% 的分解；③UI 清单按区间高亮；④执行画像主视图；⑤歧义样本；⑥atlas node CLI。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
@@ -1444,6 +1454,13 @@
       "measured": "改前改后该函数的调用点都是 2 个（subscriber.next / subscriber.complete），调用点由解析阶段抽取，与 flow lowering 无关",
       "corrected": "语句级未知让循环内部没有任何 flow 事实（CFG 3 块、返回值无结论）；调用点一直存在",
       "found_by": "2026-09-12/w09-quality-check 的真实 store 前后对照"
+    },
+    {
+      "window": "2026-09-12/w09-quality-check",
+      "claim": "第 8 轮：\"调用点一直存在（循环内的调用没有消失）\"",
+      "measured": "调用图层面确实一直存在；但 flow 事实层面的调用点总数为 11335→11428（+93），循环体内的调用点此前不在 flow 事实里",
+      "corrected": "两层必须分开说：调用图不变，flow 事实新增 93 个调用点",
+      "found_by": "2026-09-12/w09-corpus-check 全库对照"
     }
   ]
 }
