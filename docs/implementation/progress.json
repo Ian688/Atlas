@@ -6,10 +6,10 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-quality-check",
+    "window": "2026-09-12/w09-assign-target",
     "status": "DELIVERED",
-    "note": "全库对照（6573 函数，非抽样）：CFG 块 47270→47718（69 增 0 减，无回退）；返回值无结论 5630→5627；flow 层调用点 11335→11428（+93）；未解析比例 82.6%→82.8%；for_in_of_iteration 理由消失，for_in_of_element_unknown 新增 68 函数。纠正第 8 轮不精确：调用点\"一直存在\"只在调用图层成立，flow 层是新增的。新出现的 unmodeled_assignment_target 34 例经测量**全部是循环函数（34/34，非循环 0）**，即由我发出的循环变量赋值造成——其中一半循环函数的 assignTarget 建模失败，按缺陷对待（初稿曾误写为\"并非全部由循环造成\"，同一次测量的数字推翻了它，已更正）。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-quality-check",
+    "note": "归因（无代码改动）：先把 assignTarget 换成直接用 register 返回的绑定 id 重建全库，逐项与上一轮完全相同（317/42、CFG 47718、返回 5627、调用点 11428）→ 候选 (a) 排除，并撤回这次无测量支持的改动；再看源码，42 个「循环+该理由」函数全部含元素访问赋值（t[p]=s[p]、t[p[i]]=s[p[i]]、headers[key]=…，含 TS 自身 __assign/__rest）→ 原因 (b)：assignTarget 不支持 obj[key]，既有限制在循环体被 lower 后如实浮现。下一轮需 worker+引擎两侧一起支持元素访问目标。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-assign-target",
     "verification": "evidence/development/2026-09-12-w09-forin-r3/verification.json"
   },
   "windows": [
@@ -567,10 +567,20 @@
       "note": "全库逐函数对照（facts 聚合，6573 同名函数）：结构无回退（块 69 增 0 减）、返回值更精确（3 个从无结论变确定，0 反向）、flow 层调用点 +93；纠正\"调用点一直存在\"的不精确；新出现 unmodeled_assignment_target 34 例**全部是循环函数**，归因于我发出的循环变量赋值，其中一半循环函数 assignTarget 失败，列为缺陷。",
       "report": "evidence/development/2026-09-12-w09-quality-check/CORPUS.md",
       "verification": "evidence/development/2026-09-12-w09-forin-r3/verification.json"
+    },
+    {
+      "id": "2026-09-12/w09-assign-target",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09-QA"
+      ],
+      "note": "unmodeled_assignment_target 归因：排除自身改动（以全库逐项相同的测量为据并撤回该改动），确认原因是 assignTarget 不支持元素访问赋值目标（42/42 命中源码），属既有限制、非回退。下一步为 worker+引擎两侧支持 element 目标（写堆未知 ⇒ may_write_heap，常量 key 可收敛为 property）。残余：非循环的 275 个函数未逐类归因。",
+      "report": "evidence/development/2026-09-12-w09-assign-target/REPORT.md",
+      "verification": "evidence/development/2026-09-12-w09-forin-r3/verification.json"
     }
   ],
   "next_work_item": "2D 画布的正式层级与空间索引，或大仓库/monorepo 的规模资格",
-  "next_action": "①查清 unmodeled_assignment_target 新出现的 34 例（其中非循环函数上的部分来源不明，不假设良性）；②未解析率 82.8% 的分解；③UI 清单按区间高亮；④执行画像主视图；⑤歧义样本；⑥atlas node CLI。",
+  "next_action": "①worker+引擎两侧支持元素访问赋值目标（obj[key]=v：写堆未知 ⇒ may_write_heap，常量 key 收敛为 property）；②未解析率 82.8% 的分解；③UI 清单按区间高亮；④执行画像主视图；⑤歧义样本；⑥atlas node CLI。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",

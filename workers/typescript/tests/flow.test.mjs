@@ -238,3 +238,4 @@ test('runtime imports are named on every function, and type-only imports are not
   assert.equal(fn.imports.includes('Shape'), false,
     'a type-only import has no runtime binding and must not be listed');
 });
+
