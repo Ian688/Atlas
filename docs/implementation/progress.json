@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-forin",
+    "window": "2026-09-12/w09-quality-check",
     "status": "DELIVERED",
-    "note": "for-in/of 建模为 while + 循环变量赋值（未知值），循环头/体调用不再消失；rxjs 未知区域 79→0（三轮 167→0）。两份旧契约副本已改写（worker 测试、集成测试），旧契约记在注释里。本轮修掉两个自造问题：漏发循环变量赋值导致假的 tdz_read_possible_reference_error；worker 生产者版本两轮未升（0.2.1→0.2.2）。第一次门禁红：只改了 worker 测试、漏了集成测试。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-forin",
-    "verification": "evidence/development/2026-09-12-w09-forin/verification.json"
+    "note": "质量核查（无代码改动）：用第6轮/第7轮两个真实 store 对照同一函数，确认 CFG 3→9 块、返回值从无结论到确定 undefined、理由具名且新增的 capture_or_untracked_binding_read 是被掩盖的真相；同时纠正第7轮的夸大陈述——循环内调用点改前改后都是 2 个，调用点由解析阶段抽取，与 flow lowering 无关。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-quality-check",
+    "verification": "evidence/development/2026-09-12-w09-forin-r3/verification.json"
   },
   "windows": [
     {
@@ -547,10 +547,20 @@
       "note": "for-in/of 建模 + 循环变量赋值 + 无声明形式防护；两份契约副本同步改写。自造问题两个已修：假 TDZ 理由、worker 版本未升。残余：迭代次数/元素形状/in-of 差异未区分，新可见调用未逐条核对。",
       "report": "evidence/development/2026-09-12-w09-forin/REPORT.md",
       "verification": "evidence/development/2026-09-12-w09-forin/verification.json"
+    },
+    {
+      "id": "2026-09-12/w09-quality-check",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09-QA"
+      ],
+      "note": "对上一轮断言做实测核对：同一函数前后对照（CFG 3→9、返回值 unknown→确定 undefined、新增理由为掩盖的真相、调用点数量不变）。纠正了\"循环内调用全部消失\"的夸大表述并记录在案。残余：只核对 1 个函数；未统计\"调用点存在但目标未解析\"的比例变化。",
+      "report": "evidence/development/2026-09-12-w09-quality-check/REPORT.md",
+      "verification": "evidence/development/2026-09-12-w09-forin-r3/verification.json"
     }
   ],
   "next_work_item": "2D 画布的正式层级与空间索引，或大仓库/monorepo 的规模资格",
-  "next_action": "①核对新可见的循环内调用是否被正确解析（质量核查，未知归零不等于解析正确）；②UI 清单按字节区间高亮源码；③执行画像主视图；④歧义样本；⑤atlas node CLI。",
+  "next_action": "①把质量核查扩大到更多函数（含\"调用点存在但目标未解析\"的比例前后变化）；②UI 清单按字节区间高亮源码；③执行画像主视图；④歧义样本；⑤atlas node CLI。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
@@ -1426,5 +1436,14 @@
     "flow_query_s": 0.03,
     "qualification": "debug build synthetic; not a large-project qualification"
   },
-  "review_ledger_note": "2026-09-12: registered the previously unlogged w02 independent review and corrected the stale CHANGES_REQUIRED status on W01-W03 to FIXES_DELIVERED_REREVIEW_PENDING. Qualification is unchanged: only an independent re-review can restore it."
+  "review_ledger_note": "2026-09-12: registered the previously unlogged w02 independent review and corrected the stale CHANGES_REQUIRED status on W01-W03 to FIXES_DELIVERED_REREVIEW_PENDING. Qualification is unchanged: only an independent re-review can restore it.",
+  "corrections": [
+    {
+      "window": "2026-09-12/w09-forin",
+      "claim": "for...of 的语句级未知让\"循环头与循环体里的调用全部消失\"",
+      "measured": "改前改后该函数的调用点都是 2 个（subscriber.next / subscriber.complete），调用点由解析阶段抽取，与 flow lowering 无关",
+      "corrected": "语句级未知让循环内部没有任何 flow 事实（CFG 3 块、返回值无结论）；调用点一直存在",
+      "found_by": "2026-09-12/w09-quality-check 的真实 store 前后对照"
+    }
+  ]
 }
