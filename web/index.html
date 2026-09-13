@@ -12,6 +12,11 @@
   <div class="context-actions"><button id="unknown-open">查看这 167 处未知 →</button></div>
   <div id="unknown-panel" class="unknown-panel" hidden><h4>显式未知清单</h4><div id="unknown-body"></div></div>
 </section>
+<section id="tour" class="tour" hidden>
+  <div class="brief-head"><h2>试这五步</h2><span class="subtle">每一步都是一次真实查询；点一下就能看见结果</span></div>
+  <ol id="tour-steps"></ol>
+  <p class="tour-limits" id="tour-limits"></p>
+</section>
 <main>
 <aside class="explorer"><div class="section-title">找函数 <span id="fn-count">未加载</span></div><input id="fn-search" type="search" aria-label="按函数名查找" placeholder="输入函数名，例如 isFunction"><div class="context-actions"><button id="fn-load">加载全部函数清单</button></div><div id="fn-list"></div><details id="tree-panel" class="tree-panel"><summary>项目清单 <span id="node-count">0 / 0</span></summary><input id="search" type="search" aria-label="过滤已加载对象" placeholder="过滤已加载的文件与函数…"><div id="tree"></div><button id="more" hidden>加载下一页对象</button></details></aside>
 <section class="workbench"><div class="toolbar"><div><strong>关系工作台</strong><span class="subtle">2D / 静态候选</span></div><div class="levels" role="group" aria-label="层级切换"><button id="level-project" class="level-button" aria-pressed="false">项目</button><button id="level-district" class="level-button" aria-pressed="false">目录</button><button id="level-file" class="level-button" aria-pressed="true">文件</button></div><div class="levels" role="group" aria-label="工作区视图"><button id="ws-graph" class="level-button" aria-pressed="true">关系</button><button id="ws-values" class="level-button" aria-pressed="false">值状态</button></div><button id="reset">清除焦点</button></div><div class="legend"><span class="dot blue"></span>词法调用候选 <span class="dot amber"></span>未解析目标 <span id="graph-status">尚未加载</span></div><div class="canvas"><div id="matrix" class="matrix" hidden></div><svg id="graph" viewBox="0 0 850 580" aria-label="文件与函数调用候选图" role="img"></svg><div id="empty">连接后展示本地解析结果</div></div><div class="canvas-footer"><span id="revision">固定分析版本</span><span>线条不代表实际执行或完整数据流</span></div><button id="more-edges" hidden>加载下一页关系</button></section>

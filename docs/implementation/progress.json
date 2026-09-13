@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/agent-brief",
+    "window": "2026-09-12/w09-demo",
     "status": "DELIVERED",
-    "note": "写给下一个 Agent 的交接简报：docs/AGENT-BRIEF.md（用户纠正过的前提、如何自行验证、真实状态与数字、我踩过的 10 个坑、一轮完成标准、队列）。不声称新增能力。",
-    "evidence_dir": "docs/AGENT-BRIEF.md",
-    "verification": "evidence/development/2026-09-12-w09-element-target/verification.json"
+    "note": "打开就能玩的 demo：scripts/demo.sh（一条命令：索引 examples/tour → 起服务（系统选端口）→ 打印带令牌可直接粘贴的地址）+ 页面「试这五步」引导 + 明写做不到的三件事。抓到并修掉三个真问题：脚本读到遗留会话文件而打印死地址；端口被别的 atlas 占用却报\"服务没起来\"（浏览器 200 其实是另一个实例）；给 0 个未知提供查看按钮。未验证：五步中只有第③步端到端验证过，②④⑤ 按钮未被真实点击；无真人测试。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-demo",
+    "verification": "evidence/development/2026-09-12-w09-demo/verification.json"
   },
   "windows": [
     {
@@ -597,10 +597,20 @@
       "note": "Agent 交接简报（文档，无代码改动）。核心是让接手者不必相信任何叙述：验证命令、状态数字、以及 10 条已踩过的坑（契约多副本、worker 版本、UNSTABLE、必须看画面、vm 里的引擎、先写结论会写错、无证据的修复要撤回、子集不能当全量等）。",
       "report": "docs/AGENT-BRIEF.md",
       "verification": "evidence/development/2026-09-12-w09-element-target/verification.json"
+    },
+    {
+      "id": "2026-09-12/w09-demo",
+      "status": "DELIVERED",
+      "work_items": [
+        "demo"
+      ],
+      "note": "可玩 demo：一条命令打开 + 自带 4 文件示例（调用链/循环/副作用/未解析调用）+ 五步引导 + 明示缺口。三个脚本/界面缺陷由实际运行发现并修复。残余：引导按钮只有第③步经深链接验证；无真人测试；示例规模小。",
+      "report": "evidence/development/2026-09-12-w09-demo/REPORT.md",
+      "verification": "evidence/development/2026-09-12-w09-demo/verification.json"
     }
   ],
   "next_work_item": "2D 画布的正式层级与空间索引，或大仓库/monorepo 的规模资格",
-  "next_action": "①常量 key 收敛为 property（obj[\"x\"]=1）；②剩余 10 例 unmodeled_assignment_target 的归因；③ElementWrite 的真实写堆语义（新 OpKind + 求解器）；④未解析率分解；⑤UI 队列（区间高亮、执行画像主视图）；⑥歧义样本；⑦atlas node CLI。",
+  "next_action": "①把五步引导的每个按钮做一次真实点击验证（需要 CDP 驱动或人工）；②执行画像/受控运行主视图；③未知清单按区间高亮；④常量 key 收敛；⑤其余队列不变。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",

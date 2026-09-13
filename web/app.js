@@ -585,7 +585,11 @@ function renderBrief(){
     ? `上面是全量事实。本页只加载了 ${loaded}/${total} 个对象——画布与清单只画已加载的部分，且会自己说明这一点。`
     : `上面是全量事实；本页已加载全部 ${loaded} 个对象。`;
   box.hidden=false;
-  if($('unknown-open'))$('unknown-open').textContent=`查看这 ${Number(c.flow_unknown_regions||0)} 处未知 →`;
+  // 未知为 0 时不要给一个'查看这 0 处'的按钮：那既没用，又让人以为有东西可点。
+  const unknownCount=Number(c.flow_unknown_regions||0);
+  if($('unknown-open')){$('unknown-open').hidden=unknownCount===0;
+    $('unknown-open').textContent=`查看这 ${unknownCount} 处未知 →`;
+    if(unknownCount===0&&$('unknown-panel'))$('unknown-panel').hidden=true;}
   if(state.pendingPanel==='unknowns'&&$('unknown-panel')&&$('unknown-panel').hidden){setUnknownPanel(true);}
 }
 
@@ -725,7 +729,51 @@ function setUnknownPanel(open){
   return true;
 }
 
-function render(){renderTree();renderGraph();renderBrief();applyWorkspace();}
+// 引导：把"能做什么"变成可以点的五步。
+//
+// 用户不该先读懂 Atlas 才敢用它，所以这里不给术语、不给文档链接，只给"点一下会发生什么"。
+// 每一步写着它演示的是哪件事，以及**如果现在做不到，为什么**——不藏。
+async function selectRef(reference){
+  try{
+    const node=await resolveEntity(reference);
+    if(!node){status(`找不到 ${reference}（这一份分析里没有，或名字有歧义）`);return false;}
+    await select(node);
+    return true;
+  }catch(error){
+    status(`打开 ${reference} 失败：${String((error&&error.message)||error)}`);
+    return false;
+  }
+}
+const TOUR_STEPS=[
+  {title:'① 这个项目里有什么',why:'全量事实：文件、函数、调用点、显式未知、强连通分量——不是本页加载的那一页',
+   run:()=>{document.getElementById('brief')?.scrollIntoView({behavior:'smooth',block:'center'});status('上面那五张卡片来自整份分析，不是抽样。');}},
+  {title:'② 打开 redeem：谁调用它、它调用谁',why:'静态调用候选，未解析的会单独列出——不会猜一个目标给你',
+   run:()=>selectRef('src/coupon.js:redeem')},
+  {title:'③ 切到"值状态"：这个值从哪来、哪里是未知',why:'循环里的 total、来自参数的 coupon、以及未知的原因，都在那张块×绑定矩阵里',
+   run:async()=>{await selectRef('src/coupon.js:sumDiscounts');setWorkspace('values');}},
+  {title:'④ 它能不能单独跑',why:'静态充分性分类：纯函数可直接跑；需要入口驱动的会说明缺什么',
+   run:async()=>{const ok=await selectRef('src/ledger.js:onlyPositive');const panel=document.getElementById('exec-panel');if(panel)panel.open=true;if(ok)status('右侧「执行画像与受控运行」已展开；受控运行目前没有主视图，这是已知缺口。');}},
+  {title:'⑤ 哪里是 Atlas 解析不出来的',why:'dispatch 里 handlers[type](order) 是元素访问调用，Atlas 会说"未解析"而不是猜',
+   run:()=>selectRef('src/dispatch.js:dispatch')},
+];
+function renderTour(){
+  const box=$('tour'),list=$('tour-steps'),limits=$('tour-limits');
+  if(!box||!list)return;
+  list.replaceChildren();
+  for(const step of TOUR_STEPS){
+    const li=document.createElement('li');
+    const button=document.createElement('button');
+    button.textContent=step.title;
+    button.onclick=()=>{step.run();};
+    const why=text('p',step.why,'why');
+    li.append(button,why);list.append(li);
+  }
+  // 做不到的地方明说，而不是让用户点到一半才发现。
+  limits.textContent='现在还不能做的（不要以为是你会用错）：受控运行没有主视图，它在右侧栏的折叠面板里；未知清单点开只能打开文件，还不能按字节区间高亮；3D 城市需要浏览器支持 WebGL2。';
+  box.hidden=false;
+}
+
+function render(){renderTree();renderGraph();renderBrief();renderTour();applyWorkspace();}
 // Byte offsets from the engine are UTF-8; the loaded source is a JS string.
 function byteLineMap(source){const encoder=new TextEncoder();const lines=[1];let bytes=0;for(const ch of source){bytes+=encoder.encode(ch).length;if(ch==='\n')lines.push(bytes+1);}return lines;}
 function lineOf(map,byte){let line=1;for(let i=0;i<map.length;i++){if(map[i]<=byte)line=i+1;else break;}return line;}
