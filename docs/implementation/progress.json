@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-finder-first",
+    "window": "2026-09-12/w09-node-identity",
     "status": "DELIVERED",
-    "note": "修上一轮截图发现：把「找函数」排到左栏最上、项目清单折叠。截图确认入口位于首屏可视区。门禁 25/25 exit 0、指纹 541a1498… 双向一致。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-finder-first",
-    "verification": "evidence/development/2026-09-12-w09-finder-first/verification.json"
+    "note": "新增 GET /api/node?entity= 按身份取单个实体（同 reach/source 的引用解析，仅本分析内），页面新增 resolveEntity/openUnloaded：深链接与未加载邻居第一次能走进去。真实验证：按符号 id 与 path:name 都解析到同一节点；深链接截图显示函数被选中、源码与布局引擎状态行正常。门禁 25/25、指纹 de269633… 一致。新发现：未命中返回通用错误而非具名拒绝（reach/source 同缺陷）。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-node-identity",
+    "verification": "evidence/development/2026-09-12-w09-node-identity/verification.json"
   },
   "windows": [
     {
@@ -477,10 +477,20 @@
       "note": "入口可见性修正：finder 提到 explorer 顶部，项目清单折叠为 details。验证=真实截图 + 25/25 门禁 + 指纹一致。仍未做：finder 各状态截图、矩阵进主视图、167 处未知可点开。",
       "report": "evidence/development/2026-09-12-w09-finder-first/REPORT.md",
       "verification": "evidence/development/2026-09-12-w09-finder-first/verification.json"
+    },
+    {
+      "id": "2026-09-12/w09-node-identity",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09-UI"
+      ],
+      "note": "按身份取实体：/api/node + 契约表条目 + 页面 resolveEntity/openUnloaded，打通深链接与不可点击邻居。验证=真实 API（两种引用形式）+ 真实页面深链接截图 + 25/25 门禁。发现未命名拒绝的既有缺陷。",
+      "report": "evidence/development/2026-09-12-w09-node-identity/REPORT.md",
+      "verification": "evidence/development/2026-09-12-w09-node-identity/verification.json"
     }
   ],
   "next_work_item": "2D 画布的正式层级与空间索引，或大仓库/monorepo 的规模资格",
-  "next_action": "①块×绑定状态矩阵提到函数工作台主视图（把抽象解释直接变成画面）；②167 处未知做成可点清单；③补 finder 各状态截图验证。",
+  "next_action": "①把未命中改成具名拒绝（reach/source/flow/node 共用映射层，需用例）；②块×绑定状态矩阵进函数工作台主视图；③167 处未知做成可点清单；④补 atlas node CLI。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",

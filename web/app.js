@@ -210,6 +210,31 @@ function resetDetail(){
   publishSelection(null);renderAnnotations([]);renderFlow(null);renderExecution(null,null);render();
 }
 function metric(value,label){const box=text('div','');box.append(text('b',value),text('span',label));return box;}
+// 按身份取一个实体。
+//
+// 页面只有它翻页翻到过的对象，而 /api/nodes 按 id 排序——目录与文件在前，
+// 所以**第一页里一个函数都没有**。画布或深链接提到的对象因此经常不在本地：
+// 能问服务要这一个实体，才是"图能走"和"每个盒子都写着未加载"的区别。
+async function resolveEntity(reference){
+  const loaded=state.nodes.find(n=>n.id===reference);
+  if(loaded)return loaded;
+  const answer=await api('node',{entity:reference});
+  const node=answer&&answer.node;
+  if(!node)return null;
+  if(!state.nodes.some(n=>n.id===node.id))state.nodes.push(node);
+  return node;
+}
+// 点一个尚未加载的盒子：先解析，再选中；解析不了就明说，不假装打开。
+async function openUnloaded(box){
+  status(`正在按身份解析 ${box.label} …`);
+  try{
+    const node=await resolveEntity(box.id);
+    if(!node){status(`解析失败：${box.id} 不在这一份分析里，或名字有歧义`);return;}
+    await select(node);
+  }catch(error){
+    status(`解析失败：${String((error&&error.message)||error)}`);
+  }
+}
 async function loadNodes(){const page=await api('nodes',{limit:100,...(state.nodePage?.next_cursor?{cursor:state.nodePage.next_cursor}:{})});state.nodes.push(...page.items);state.nodePage=page;$('more').hidden=!page.next_cursor;render();}
 async function loadEdges(){const page=await api('edges',{limit:100,...(state.edgePage?.next_cursor?{cursor:state.edgePage.next_cursor}:{})});state.edges.push(...page.items);state.edgePage=page;$('more-edges').hidden=!page.next_cursor;render();}
 async function connect(){
@@ -244,7 +269,7 @@ async function connect(){
           const relocated=await api('relocate',{entity:pending.entity_id,from:pending.analysis});
           const summary=relocated.relocation||{};
           if(summary.relocated&&relocated.selection){
-            const node=state.nodes.find(n=>n.id===relocated.selection.entity_id);
+            const node=await resolveEntity(relocated.selection.entity_id);
             if(node){
               await select(node);
               status(`已从版本 ${String(pending.analysis).slice(0,8)} 重定位到当前版本：依据 ${summary.matched_by}${summary.bytes_changed?'，源码字节已变化':'，源码字节相同'}。`);
@@ -258,7 +283,7 @@ async function connect(){
           status(`该选区固定在另一个分析版本上，且重定位查询失败：${e.message}。请在这里重新选择。`);
         }
       }else{
-        const node=state.nodes.find(n=>n.id===pending.entity_id);
+        const node=await resolveEntity(pending.entity_id);
         if(node)await select(node);
         else status('选区指向的对象不在当前已加载的节点里，未自动选中。');
       }
@@ -365,7 +390,7 @@ function drawFocusPlan(graph,plan,byId){
     const node=box.fileId?byId.get(box.fileId):null;
     const cls=[box.role==='target'?'selected':'',box.unresolved?'unresolved':'',box.folded?'folded':''].filter(Boolean).join(' ');
     graphNode(graph,{x:box.x+box.w/2,y:box.y+box.h/2,label:box.label,sub:box.sub,width:box.w,height:box.h,cls,
-      onClick:node?()=>select(node):null});
+      onClick:node?()=>select(node):()=>openUnloaded(box)});
   }
   for(const edge of plan.edges){
     const from=slotFor(edge.from,edge.id),to=slotFor(edge.to,edge.id);

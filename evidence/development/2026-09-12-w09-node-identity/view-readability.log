@@ -1,0 +1,2 @@
+fixture realistic: 39 columns carry functions, median/max 0.322, under 1% 0 (linear scale: 19), tiers {'flat': 59, 'linear': 18, 'thin': 5, 'group': 6, 'compressed': 10}
+all readability criteria hold

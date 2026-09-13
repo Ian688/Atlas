@@ -109,6 +109,25 @@ async fn query(
                 )?)
                 .map_err(Into::into)
             }
+            // One entity, by the same reference forms as everywhere else.
+            //
+            // The page needs this because a focus graph or a deep link names
+            // entities that this tab never paged in: /api/nodes walks objects in
+            // id order, so the first page holds directories and files and not a
+            // single function. Without a way to ask for one entity by identity,
+            // the only way to open a neighbour is to page through thousands of
+            // unrelated objects -- which is why boxes on the canvas used to be
+            // labelled "not loaded in this analysis" and could not be clicked.
+            "node" => {
+                let entity = crate::runner::resolve_entity(&app.store, id, q.entity.as_deref().unwrap_or(""))
+                    .map_err(|error| atlas_engine::invalid(&error))?;
+                let node = app.store.node(id, &entity)?;
+                serde_json::to_value(serde_json::json!({
+                    "analysis_id": id,
+                    "node": node,
+                }))
+                .map_err(Into::into)
+            }
             "source" => {
                 let entity = crate::runner::resolve_entity(&app.store, id, q.entity.as_deref().unwrap_or(""))
                     .map_err(|error| atlas_engine::invalid(&error))?;
@@ -315,6 +334,7 @@ macro_rules! endpoint {
 }
 endpoint!(report, "report");
 endpoint!(nodes, "nodes");
+endpoint!(node, "node");
 endpoint!(edges, "edges");
 endpoint!(reach, "reach");
 endpoint!(source, "source");
@@ -974,6 +994,14 @@ async fn exec(
 /// (name, method, transport, purpose, guarantee, limit)
 const CONTRACT: &[(&str, &str, &str, &str, &str, &str)] = &[
     (
+        "node",
+        "GET",
+        "http",
+        "按身份取一个实体（符号 id、path:name 或裸名）",
+        "只在这一份分析内解析；跨分析的名字不会被改指到当前版本的同名对象",
+        "只返回单个对象，不做遍历；未命中就是未命中",
+    ),
+    (
         "contract",
         "GET",
         "http",
@@ -1420,6 +1448,7 @@ pub async fn serve(
         )
         .route("/api/report", get(report))
         .route("/api/nodes", get(nodes))
+        .route("/api/node", get(node))
         .route("/api/edges", get(edges))
         .route("/api/reach", get(reach))
         .route("/api/source", get(source))
