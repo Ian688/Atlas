@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-unknown-list",
+    "window": "2026-09-12/w09-param-shapes",
     "status": "DELIVERED",
-    "note": "显式未知清单：按原因分组、带文件与字节区间、点击按身份打开文件；深链接 &panel=unknowns。清单揭示 167 处 = for_in_of_iteration 79 + rest_parameter 78 + destructuring_parameter 10，94% 来自三个不支持的语言特性；补 rest+解构可消 88 处。门禁 25/25。分析行为本轮未改（只是可见）。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-unknown-list",
-    "verification": "evidence/development/2026-09-12-w09-unknown-list/verification.json"
+    "note": "支持 rest 与解构参数：改为把模式中每个名字登记为普通参数（值未知=结论），仅在模式走不动时才发未知区域。真实 rxjs：显式未知 167→79（−53%），rest 78→0、解构 10→0，只剩 for_in 79；文件/函数/partial 无回退。worker 17/17，门禁 25/25。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-param-shapes",
+    "verification": "evidence/development/2026-09-12-w09-param-shapes/verification.json"
   },
   "windows": [
     {
@@ -517,10 +517,20 @@
       "note": "167 处未知可点清单 + 分组揭示三个缺失语言特性（79/78/10）；点条目按身份打开文件。布局 bug（绝对定位盖住全页）由截图发现并修复。未做：区间高亮、三个特性的实际支持、执行主视图、歧义样本、node CLI。",
       "report": "evidence/development/2026-09-12-w09-unknown-list/REPORT.md",
       "verification": "evidence/development/2026-09-12-w09-unknown-list/verification.json"
+    },
+    {
+      "id": "2026-09-12/w09-param-shapes",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09"
+      ],
+      "note": "参数形状：bindParameterPattern 递归登记解构/rest 绑定的名字为参数，登记为 0 才发具名未知区域。真实数据 167→79，与上一轮 UI 清单的分解预测完全一致。残余：for_in 79 处未处理；形状关系未建模（IR 无该字段，未发明）。",
+      "report": "evidence/development/2026-09-12-w09-param-shapes/REPORT.md",
+      "verification": "evidence/development/2026-09-12-w09-param-shapes/verification.json"
     }
   ],
   "next_work_item": "2D 画布的正式层级与空间索引，或大仓库/monorepo 的规模资格",
-  "next_action": "清单给出了顺序：①支持 rest_parameter 与 destructuring_parameter（可消 88/167 = 53% 的未知）；②未知清单点条目时按字节区间高亮源码；③执行画像/受控运行主视图；④歧义样本；⑤atlas node CLI。",
+  "next_action": "①for_in_of_iteration（79 处，唯一剩余未知来源，全在打包产物）；②UI 清单点条目按字节区间高亮源码；③执行画像主视图；④歧义样本；⑤atlas node CLI。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",

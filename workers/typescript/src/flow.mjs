@@ -74,6 +74,36 @@ class FileBuilder {
     this.currentFunction = null;
   }
 
+  /// Register every name a parameter pattern binds, as an ordinary parameter.
+  ///
+  /// Returns how many were registered, so a pattern this cannot model still
+  /// produces its named unknown region instead of vanishing. The shape relation
+  /// between the names is not modelled (they are independent unknown values, the
+  /// same precision every parameter already has); what changes is that reading
+  /// them is now tracked instead of being an untracked read.
+  bindParameterPattern(nameNode, scope, fn) {
+    let registered = 0;
+    const walk = (node) => {
+      if (!node) return;
+      if (ts.isIdentifier(node)) {
+        const symbol = this.checker.getSymbolAtLocation(node);
+        const id = this.register(symbol, node, 'param', scope);
+        if (id) {
+          fn.params.push(id);
+          registered += 1;
+        }
+        return;
+      }
+      if (ts.isObjectBindingPattern(node) || ts.isArrayBindingPattern(node)) {
+        for (const element of node.elements) {
+          if (ts.isBindingElement(element)) walk(element.name);
+        }
+      }
+    };
+    walk(nameNode);
+    return registered;
+  }
+
   u8(node) {
     return [this.offsets[node.getStart(this.sf)], this.offsets[node.end]];
   }
@@ -209,16 +239,26 @@ class FileBuilder {
     // reference earlier parameters.
     const defaultInitializers = [];
     for (const param of node.parameters) {
-      if (param.dotDotDotToken) {
-        const [ds, de] = this.u8(param);
-        fn.unknown_regions.push({ start: ds, end: de, reason: 'rest_parameter' });
-        this.noteUnknown(ds, de, 'rest_parameter');
-        continue;
-      }
-      if (!ts.isIdentifier(param.name)) {
-        const [ds, de] = this.u8(param.name);
-        fn.unknown_regions.push({ start: ds, end: de, reason: 'destructuring_parameter' });
-        this.noteUnknown(ds, de, 'destructuring_parameter');
+      if (param.dotDotDotToken || !ts.isIdentifier(param.name)) {
+        // A rest parameter is an array of unknown values; a destructuring
+        // pattern binds several unknown values. Neither is a reason to stop
+        // analysing the function. Bailing here was worse than one extra unknown
+        // region: the names never entered the binding table, so every later read
+        // of them became an untracked read and the whole function carried a
+        // hole. Measured on rxjs@7.8.1, these two shapes were 88 of the 167
+        // explicitly unknown regions -- 53% of them.
+        //
+        // The values really are unknown, and that is a conclusion -- the same
+        // conclusion every ordinary parameter gets -- so the names are
+        // registered like ordinary parameters. A pattern this cannot walk (a
+        // computed member, say) still produces the named region, so nothing
+        // disappears silently.
+        const reason = param.dotDotDotToken ? 'rest_parameter' : 'destructuring_parameter';
+        if (this.bindParameterPattern(param.name, fnScope, fn) === 0) {
+          const [ds, de] = this.u8(param.name);
+          fn.unknown_regions.push({ start: ds, end: de, reason });
+          this.noteUnknown(ds, de, reason);
+        }
         continue;
       }
       const sym = this.checker.getSymbolAtLocation(param.name);
