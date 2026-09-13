@@ -5,6 +5,11 @@
 <header><div class="brand"><span class="mark">A</span><div><strong>ATLAS</strong><small>LOCAL CODE WORKBENCH</small></div></div><div class="head-right"><span class="pill">本地解析 · 无 LLM</span><a class="version" href="/city3d" title="同一份分析的三维投影：目录为地块、文件为柱、函数为层">3D 城市 →</a><span class="version">FOUNDATION / 02</span></div></header>
 <section id="connect" class="connect"><label for="token">本地会话令牌</label><input id="token" type="password" autocomplete="off" placeholder="从启动命令返回的 session_file 读取"><button id="connect-button">连接工作台</button><span id="status" role="status">等待连接</span></section>
 <section class="intro"><div><p class="eyebrow">UNDERSTAND BEFORE YOU CHANGE</p><h1>把代码的结构，放在眼前。</h1><p class="subtitle">从文件进入函数，沿静态调用候选探索。每个对象，都可以回到被解析时的源码。</p></div><div id="metrics" class="metrics"><div><b>—</b><span>文件</span></div><div><b>—</b><span>函数</span></div><div><b>—</b><span>调用点</span></div></div></section>
+<section id="brief" class="brief" hidden>
+  <div class="brief-head"><h2>这个项目，最该先知道的五件事</h2><span class="subtle" id="brief-scope">全部来自这一份固定分析（全量事实，不是本页已加载的部分）</span></div>
+  <ol id="brief-list"></ol>
+  <p class="brief-foot" id="brief-foot"></p>
+</section>
 <main>
 <aside class="explorer"><div class="section-title">项目清单 <span id="node-count">0 / 0</span></div><input id="search" type="search" aria-label="过滤已加载对象" placeholder="过滤已加载的文件与函数…"><div id="tree"></div><button id="more" hidden>加载下一页对象</button></aside>
 <section class="workbench"><div class="toolbar"><div><strong>关系工作台</strong><span class="subtle">2D / 静态候选</span></div><div class="levels" role="group" aria-label="层级切换"><button id="level-project" class="level-button" aria-pressed="false">项目</button><button id="level-district" class="level-button" aria-pressed="false">目录</button><button id="level-file" class="level-button" aria-pressed="true">文件</button></div><button id="reset">清除焦点</button></div><div class="legend"><span class="dot blue"></span>词法调用候选 <span class="dot amber"></span>未解析目标 <span id="graph-status">尚未加载</span></div><div class="canvas"><svg id="graph" viewBox="0 0 850 580" aria-label="文件与函数调用候选图" role="img"></svg><div id="empty">连接后展示本地解析结果</div></div><div class="canvas-footer"><span id="revision">固定分析版本</span><span>线条不代表实际执行或完整数据流</span></div><button id="more-edges" hidden>加载下一页关系</button></section>

@@ -531,7 +531,38 @@ function renderOverviewGraph(graph,byId){
   $('graph-status').title=`同一份不可变分析的 ${view.levelLabel} 层视图；事实来自共享层级，预算、层级省略与"本页只加载了一页"分别报告。`;
   return view.blocks.length?cursorY:430;
 }
-function render(){renderTree();renderGraph();}
+// 第一屏：这个项目最该先知道的五件事。
+//
+// 只用整份分析报告里的字段（全量事实），不从"本页已加载的一页"推算任何数字——
+// 那就是之前会把 2080 当成项目函数总数的原因。推导类的数字留在这里说清口径。
+function renderBrief(){
+  const box=$('brief'),list=$('brief-list'),foot=$('brief-foot');
+  if(!box||!list)return;
+  const report=state.report;if(!report){box.hidden=true;return;}
+  const c=report.coverage||{};
+  const n=(v)=>Number(v||0).toLocaleString('en-US');
+  const rows=[
+    ['规模',`文件 <em>${n(c.encountered_source_files)}</em> · 函数 <em>${n(c.flow_functions)}</em> · 调用点 <em>${n(report.call_count)}</em>`],
+    ['解析覆盖',`进入清单 <em>${n(c.catalog_entries)}</em> 项（其中目录 <em>${n(c['disposition:directory'])}</em>）· 已解析源文件 <em>${n(c.parsed_source_files)}</em>`],
+    ['函数级完整度',`有局部事实的函数 <em>${n(c.flow_functions)}</em> · 部分完成 <em>${n(c.flow_partial)}</em> · 前沿未完成 <em>${n(c.flow_frontier_functions)}</em>`],
+    ['显式未知',`<em>${n(c.flow_unknown_regions)}</em> 处未知区域——这些地方 Atlas <b>没有</b>结论，不是"看起来没问题"`],
+    ['跨过程结构',`调用图强连通分量 <em>${n(c.interproc_sccs)}</em> 个，其中递归 <em>${n(c.interproc_recursive_sccs)}</em> 个（重构时要特别小心的地方）`],
+  ];
+  list.replaceChildren();
+  for(const [title,body] of rows){
+    const li=document.createElement('li');
+    const b=document.createElement('b');b.textContent=title;
+    const s=document.createElement('span');s.innerHTML=body;
+    li.append(b,s);list.append(li);
+  }
+  const loaded=state.nodes.length,total=state.nodePage?.total??loaded;
+  foot.textContent=loaded<total
+    ? `上面是全量事实。本页只加载了 ${loaded}/${total} 个对象——画布与清单只画已加载的部分，且会自己说明这一点。`
+    : `上面是全量事实；本页已加载全部 ${loaded} 个对象。`;
+  box.hidden=false;
+}
+
+function render(){renderTree();renderGraph();renderBrief();}
 // Byte offsets from the engine are UTF-8; the loaded source is a JS string.
 function byteLineMap(source){const encoder=new TextEncoder();const lines=[1];let bytes=0;for(const ch of source){bytes+=encoder.encode(ch).length;if(ch==='\n')lines.push(bytes+1);}return lines;}
 function lineOf(map,byte){let line=1;for(let i=0;i<map.length;i++){if(map[i]<=byte)line=i+1;else break;}return line;}
