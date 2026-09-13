@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-layered-layout",
+    "window": "2026-09-12/w09-function-finder",
     "status": "DELIVERED",
-    "note": "2D 调用视图改为真正的分层布局：本地钉版 elkjs 0.12.0（未修改、EPL-2.0、进入指纹）+ 端口 + 折叠摘要边；引擎无坐标结果具名拒绝、迟到布局按 generation 丢弃；布局判据进入门禁（确定性、0 标签碰撞、折叠必须产生摘要边）。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-layered-layout",
-    "verification": "evidence/development/2026-09-12-w09-layered-layout/verification.json"
+    "note": "呈现优先第一轮：第一屏改为「这个项目最该先知道的五件事」（全量事实，不从已加载子集推算）+ 常驻诚实边界行；新增有界翻页的「找函数」（24 页上限、显示是否穷尽、命中上限 200）。真实接口验证：18 页 / 8938 对象 → 6573 函数。未修发现：finder 被排在长树之下、掉出可视区。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-function-finder",
+    "verification": "evidence/development/2026-09-12-w09-function-finder/verification.json"
   },
   "windows": [
     {
@@ -457,10 +457,20 @@
       "note": "规格明确要求布局用 ELK 方向而不是手搓坐标，并要求先在 fixture 上评估。评估结果：elkjs 0.12.0、无依赖、未修改、1.61MB、EPL-2.0；真实规模焦点图 30–115ms（纯 node），浏览器内 21 块约 230ms 且 engine=elk_pinned。适配器 Atlas 侧：按距离分层、未解析保留为边界桩、超预算折叠为摘要边（带成员）或折叠标记；端口逐边独立；交叉/标签碰撞/确定性可测。三个由基准抓出的真 bug：分布到未绘制节点的摘要边被守卫丢弃、折叠尾巴每个成员生成一个标记、缺失坐标被当成 0（后者改为具名拒绝 elk_returned_no_coordinates）。elkjs 无同步 API，故布局异步；迟到结果按 generation 丢弃。未做：layout worker/deadline/取消、3D 全部缺口、2D 概览仍为网格。",
       "report": "evidence/development/2026-09-12-w09-layered-layout/REPORT.md",
       "verification": "evidence/development/2026-09-12-w09-layered-layout/verification.json"
+    },
+    {
+      "id": "2026-09-12/w09-function-finder",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09-UI"
+      ],
+      "note": "UI 优先的第一次真实交付（非 mockup）：①第一屏五件事；②找函数，打通「选中函数」这条此前不存在的入口。门禁 25/25 exit 0、指纹 45681d70… 双向一致。未修：finder 位置在长树之下、可视区外；矩阵未提到主视图；167 处未知不可点开。",
+      "report": "evidence/development/2026-09-12-w09-function-finder/REPORT.md",
+      "verification": "evidence/development/2026-09-12-w09-function-finder/verification.json"
     }
   ],
   "next_work_item": "2D 画布的正式层级与空间索引，或大仓库/monorepo 的规模资格",
-  "next_action": "继续深度路线：2D 概览也用布局（或明确它是列表）；布局移到 worker 并加 deadline/取消/缓存；然后 3D 的玻璃/边界端口/正交视角/相机保存/按需重绘/搜索定位/visibility_reason。广度仍暂停（W07 资格、W10 宿主侧）。",
+  "next_action": "①把 finder 提到 explorer 顶部并复跑门禁；②块×绑定状态矩阵提到函数工作台主视图；③167 处未知做成可点清单；④补 finder 选中后的截图验证。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
