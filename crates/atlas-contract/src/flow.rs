@@ -284,8 +284,18 @@ pub enum AssignTarget {
         object: Box<Expr>,
         name: String,
     },
-    /// Destructuring, element access, computed members and other targets:
-    /// may write bindings/heap in unmodeled ways.
+    /// `obj[key] = value`, where the key is not a literal name.
+    ///
+    /// The location is not nameable, so this cannot be a property target and
+    /// must not be reported as writing any particular binding. It is still a
+    /// write, and the object and key expressions are still evaluated -- that is
+    /// the difference from `Unknown`, which said the target was not modelled at
+    /// all and dropped both subexpressions' effects with it.
+    Element {
+        object: Box<Expr>,
+        key: Box<Expr>,
+    },
+    /// Destructuring and other targets that are not modelled at all.
     Unknown,
 }
 

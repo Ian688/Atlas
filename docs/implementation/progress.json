@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-assign-target",
+    "window": "2026-09-12/w09-element-target",
     "status": "DELIVERED",
-    "note": "归因（无代码改动）：先把 assignTarget 换成直接用 register 返回的绑定 id 重建全库，逐项与上一轮完全相同（317/42、CFG 47718、返回 5627、调用点 11428）→ 候选 (a) 排除，并撤回这次无测量支持的改动；再看源码，42 个「循环+该理由」函数全部含元素访问赋值（t[p]=s[p]、t[p[i]]=s[p[i]]、headers[key]=…，含 TS 自身 __assign/__rest）→ 原因 (b)：assignTarget 不支持 obj[key]，既有限制在循环体被 lower 后如实浮现。下一轮需 worker+引擎两侧一起支持元素访问目标。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-assign-target",
-    "verification": "evidence/development/2026-09-12-w09-forin-r3/verification.json"
+    "note": "元素访问赋值目标两侧一起改：合约加 AssignTarget::Element、worker 产出 element、引擎按 JS 顺序求值 object/key/value 并以 element_write_location_unknown 具名记录写入。真实 rxjs：带 unmodeled_assignment_target 的函数 317→10，新理由 307 个函数，flow 调用点 +12，块数减少 0（无回退）。刻意未做：新 OpKind 的写堆语义、常量 key 收敛为 property、其余 10 例与非循环 275 例的逐类归因。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-element-target",
+    "verification": "evidence/development/2026-09-12-w09-element-target/verification.json"
   },
   "windows": [
     {
@@ -577,10 +577,20 @@
       "note": "unmodeled_assignment_target 归因：排除自身改动（以全库逐项相同的测量为据并撤回该改动），确认原因是 assignTarget 不支持元素访问赋值目标（42/42 命中源码），属既有限制、非回退。下一步为 worker+引擎两侧支持 element 目标（写堆未知 ⇒ may_write_heap，常量 key 可收敛为 property）。残余：非循环的 275 个函数未逐类归因。",
       "report": "evidence/development/2026-09-12-w09-assign-target/REPORT.md",
       "verification": "evidence/development/2026-09-12-w09-forin-r3/verification.json"
+    },
+    {
+      "id": "2026-09-12/w09-element-target",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09"
+      ],
+      "note": "元素访问赋值（obj[key]=v）三处改动：合约 Element 变体、worker 产出、引擎求值三子表达式并具名\"位置未知\"。测量：317→10（该理由）、307 个函数带新理由、调用点 +12、0 回退。未做：ElementWrite 的写堆语义、常量 key 收敛、剩余 10 例归因。",
+      "report": "evidence/development/2026-09-12-w09-element-target/REPORT.md",
+      "verification": "evidence/development/2026-09-12-w09-element-target/verification.json"
     }
   ],
   "next_work_item": "2D 画布的正式层级与空间索引，或大仓库/monorepo 的规模资格",
-  "next_action": "①worker+引擎两侧支持元素访问赋值目标（obj[key]=v：写堆未知 ⇒ may_write_heap，常量 key 收敛为 property）；②未解析率 82.8% 的分解；③UI 清单按区间高亮；④执行画像主视图；⑤歧义样本；⑥atlas node CLI。",
+  "next_action": "①常量 key 收敛为 property（obj[\"x\"]=1）；②剩余 10 例 unmodeled_assignment_target 的归因；③ElementWrite 的真实写堆语义（新 OpKind + 求解器）；④未解析率分解；⑤UI 队列（区间高亮、执行画像主视图）；⑥歧义样本；⑦atlas node CLI。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",

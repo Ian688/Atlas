@@ -668,6 +668,18 @@ class FileBuilder {
     if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.name)) {
       return { target: 'property', object: this.lower(node.expression, fn), name: node.name.text };
     }
+    if (ts.isElementAccessExpression(node)) {
+      // `obj[key] = value`: the location is not a name, so it is an element
+      // target rather than a property one. Previously this was `unknown`, which
+      // meant the object and key expressions were never lowered -- their calls
+      // and effects disappeared with the target. Measured on rxjs, this shape
+      // was the entire reason 317 functions carried
+      // unmodeled_assignment_target:=.
+      const key = node.argumentExpression
+        ? this.lower(node.argumentExpression, fn)
+        : { start: this.offsets[node.getStart(this.sf)], end: this.offsets[node.end], expr: 'unknown', reason: 'element_key_missing' };
+      return { target: 'element', object: this.lower(node.expression, fn), key };
+    }
     return { target: 'unknown' };
   }
 }

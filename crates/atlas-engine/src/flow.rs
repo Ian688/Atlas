@@ -686,8 +686,13 @@ fn check_expr_spans(
     match &expr.kind {
         ExprKind::Assign { target, value, .. } => {
             check(value)?;
-            if let AssignTarget::Property { object, .. } = target {
-                check(object)?;
+            match target {
+                AssignTarget::Property { object, .. } => check(object)?,
+                AssignTarget::Element { object, key } => {
+                    check(object)?;
+                    check(key)?;
+                }
+                _ => {}
             }
         }
         ExprKind::Binary { left, right, .. } | ExprKind::ShortCircuit { left, right, .. } => {
@@ -1248,6 +1253,31 @@ impl Builder {
                         object: object_op,
                         name: name.clone(),
                         value: value_op,
+                    },
+                    true,
+                ))
+            }
+            AssignTarget::Element { object, key } => {
+                // JS order: object, then key, then the RHS, then the write.
+                //
+                // The location is not nameable, so this is honestly a write to
+                // an unknown location -- not a claim that some binding was
+                // written, and not the older claim that the target was not
+                // modelled. The difference is measurable: object and key are
+                // evaluated now, so a call inside either of them is a real op
+                // with real effects instead of vanishing with the target.
+                let mut current = Some(block);
+                let object_op = self.eval(&mut current, object, ctx)?;
+                let key_op = self.eval(&mut current, key, ctx)?;
+                let value_op = self.eval(&mut current, value, ctx)?;
+                let block = current.ok_or_else(|| invalid("flow_expression_after_terminator"))?;
+                let _ = (object_op, key_op, value_op);
+                Ok(self.emit(
+                    block,
+                    expr.start,
+                    expr.end,
+                    OpKind::UnknownOp {
+                        reason: format!("element_write_location_unknown:{op}"),
                     },
                     true,
                 ))
