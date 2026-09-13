@@ -1,0 +1,30 @@
+ok   loading the module performs no query and needs no GPU
+ok   districts are the top-level directories, and root files get their own
+ok   column height follows the engine count, and missing slabs are reported
+ok   an unresolved call becomes a visible stub, never a dropped edge
+ok   calls are aggregated per file pair, and self-calls are not drawn
+ok   every cap is reported instead of quietly shrinking the picture
+ok   the layout is deterministic and columns never overlap
+ok   a file that was never analysed is not drawn as an analysed one
+ok   an empty analysis produces an empty city, not a broken one
+ok   picking agrees with the camera the city was drawn with
+ok   without WebGL2 it says so rather than showing an empty stage
+ok   a shared selection resolves to the column that really holds that entity
+ok   a selection from another analysis is refused with its version named
+ok   a selection for an entity this projection does not have is refused, not approximated
+ok   run markers map onto the layout without changing the static picture
+ok   the observed line names the verdicts and admits what it could not place
+ok   observed runs and static candidates use different wire colours
+ok   the hierarchy survives a bounded file budget: caps change what is drawn, not what is counted
+ok   every level aggregates to the same facts, and says so
+ok   a coarse level reports the facts it did not draw as a level property
+ok   a level view cannot disagree with the hierarchy it came from
+ok   a run marker at a coarse level is placed, and named as an aggregate
+ok   a selection at a coarse level names the file and admits the aggregation
+ok   a coarse block is drawn, and a one-file district is still that file
+ok   switching level keeps the object, re-derives the markers and never re-anchors
+ok   the shared scale is monotone, tiered, and compresses instead of lying
+ok   the readability criterion is met, and it is not vacuous
+ok   a compressed column is marked, and its layers fit inside its own height
+
+all 28 city3d checks passed
