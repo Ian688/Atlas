@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id);
-const state = {token:'',nodes:[],edges:[],nodePage:null,edgePage:null,selected:null,focus:null,request:0,exportUrl:null,execProfile:null,report:null,selection:null,pendingSelection:null,annotations:[],patches:[],execRender:0,ancestorChain:null,contract:null,level:'file',hierarchy:null,levelView:null,index:null,focusLayout:null,focusLayoutKey:null,layoutGen:0};
+const state = {token:'',nodes:[],edges:[],nodePage:null,edgePage:null,selected:null,focus:null,request:0,exportUrl:null,execProfile:null,report:null,selection:null,pendingSelection:null,annotations:[],patches:[],execRender:0,ancestorChain:null,contract:null,level:'file',hierarchy:null,levelView:null,index:null,focusLayout:null,focusLayoutKey:null,layoutGen:0,workspace:'graph'};
 const ns='http://www.w3.org/2000/svg';
 function svg(tag, attrs={}, text) {const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));if(text!==undefined)e.textContent=text;return e;}
 function text(tag,value,cls) {const e=document.createElement(tag);e.textContent=value;if(cls)e.className=cls;return e;}
@@ -637,7 +637,42 @@ function renderFunctionHits(){
 }
 const FN_HIT_LIMIT=200;
 
-function render(){renderTree();renderGraph();renderBrief();}
+// 工作区视图：关系 / 值状态。
+//
+// 值状态视图不重画矩阵，而是把**已经渲染好的那张矩阵**搬到主视图来——同一个渲染器、
+// 同一份数据，只是换了位置。重写一遍渲染只会制造第二个真相。
+function setWorkspace(view){
+  if(view!=='graph'&&view!=='values'){status(`未知工作区视图 ${view}`);return false;}
+  state.workspace=view;
+  const g=$('ws-graph'),v=$('ws-values');
+  if(g)g.setAttribute('aria-pressed',String(view==='graph'));
+  if(v)v.setAttribute('aria-pressed',String(view==='values'));
+  render();
+  return true;
+}
+function applyWorkspace(){
+  const box=$('matrix'),svgEl=$('graph'),panel=$('flow-panel'),body=$('flow-body');
+  if(!box||!svgEl)return;
+  const wantsValues=state.workspace==='values'&&state.selected&&state.selected.kind==='function';
+  if(!wantsValues){
+    box.hidden=true;svgEl.hidden=false;
+    if(panel&&body&&body.childElementCount&&!body.closest('.matrix'))panel.hidden=false;
+    return;
+  }
+  if(!body||!body.childElementCount){
+    box.replaceChildren(text('h4','值状态矩阵（块 × 绑定）',''),
+      text('p','还没有这个函数的值状态：它可能没有局部事实，或尚未返回。','matrix-note'));
+    box.hidden=false;svgEl.hidden=true;
+    return;
+  }
+  // 移动现有节点：内容与顺序都不变，只是画在主视图里。
+  const moved=[];for(const child of [...body.children])moved.push(child);
+  box.replaceChildren(...moved);
+  box.hidden=false;svgEl.hidden=true;
+  if(panel)panel.hidden=true;
+}
+
+function render(){renderTree();renderGraph();renderBrief();applyWorkspace();}
 // Byte offsets from the engine are UTF-8; the loaded source is a JS string.
 function byteLineMap(source){const encoder=new TextEncoder();const lines=[1];let bytes=0;for(const ch of source){bytes+=encoder.encode(ch).length;if(ch==='\n')lines.push(bytes+1);}return lines;}
 function lineOf(map,byte){let line=1;for(let i=0;i<map.length;i++){if(map[i]<=byte)line=i+1;else break;}return line;}
@@ -1019,7 +1054,7 @@ async function select(node){
       try{
         const flow=await api('flow',{entity:node.id});
         if(request!==state.request)return;
-        renderFlow(flow,node.id);
+        renderFlow(flow,node.id);applyWorkspace();
       }catch{if(request===state.request)renderFlow(null);}
       // The static profile is separate from the flow fact on purpose: a symbol
       // can have flow facts and still be unclassifiable, and the panel must be
@@ -1042,7 +1077,7 @@ async function select(node){
 }
 $('patch-propose').onclick=()=>proposePatch();
 $('annotation-add').onclick=()=>proposeAnnotation();
-$('fn-load').onclick=()=>loadFunctionList();$('fn-search').oninput=()=>renderFunctionHits();
+$('fn-load').onclick=()=>loadFunctionList();$('ws-graph').onclick=()=>setWorkspace('graph');$('ws-values').onclick=()=>setWorkspace('values');$('fn-search').oninput=()=>renderFunctionHits();
 $('exec-run').onclick=()=>runControlled();installBridge();$('connect-button').onclick=connect;$('token').onkeydown=e=>{if(e.key==='Enter')connect();};$('search').oninput=renderTree;
 // The level switch only changes which blocks the overview draws. It does not
 // clear the focus and does not re-anchor a selection: with a function focused
@@ -1075,4 +1110,5 @@ $('context-copy').onclick=async()=>{try{await navigator.clipboard.writeText($('c
 // optionally, the selection another projection was looking at.
 {const fragment=parseFragment();
  if(fragment.selection||fragment.analysis){state.pendingSelection={entity_id:fragment.selection||'',analysis:fragment.analysis||''};}
+ if(fragment.view==='values'||fragment.view==='graph'){state.workspace=fragment.view;const g=$('ws-graph'),v=$('ws-values');if(g)g.setAttribute('aria-pressed',String(fragment.view==='graph'));if(v)v.setAttribute('aria-pressed',String(fragment.view==='values'));}
  if(fragment.token){history.replaceState(null,'',location.pathname);$('token').value=fragment.token;connect();}}

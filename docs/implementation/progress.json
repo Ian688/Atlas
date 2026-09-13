@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-named-refusals",
+    "window": "2026-09-12/w09-values-workspace",
     "status": "DELIVERED",
-    "note": "错误映射层：查询端点的未命中不再塌缩成通用码，改为具名拒绝（entity_not_found 等），完整原因放 detail。reach/source/flow/profile 共用该分支故一并修复。真实验证 + test_integration 新增断言（18 OK）。门禁 25/25、指纹 2f920f71… 一致。未验证：ambiguous_entity 分支。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-named-refusals",
-    "verification": "evidence/development/2026-09-12-w09-named-refusals/verification.json"
+    "note": "工作区视图切换（关系/值状态）+ 矩阵进主视图：矩阵用 DOM 搬移而非重画，保持单一渲染器；深链接支持 view=。真实截图验证 innerFrom 的算法行、来源/未知、效果、SCC、14 块×2 绑定矩阵全部可见。门禁 25/25、指纹一致。过程中两次错误（时序、替换打错位置）均由截图发现。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-values-workspace",
+    "verification": "evidence/development/2026-09-12-w09-values-workspace/verification.json"
   },
   "windows": [
     {
@@ -497,10 +497,20 @@
       "note": "具名拒绝：Ok(Err) 分支保留解析器给出的具名码（entity_not_found 等）并把完整原因放进 detail；影响所有 query 端点。验证=真实服务三例 + 新增集成断言 + 25/25 门禁。缺口：歧义分支未被触发。",
       "report": "evidence/development/2026-09-12-w09-named-refusals/REPORT.md",
       "verification": "evidence/development/2026-09-12-w09-named-refusals/verification.json"
+    },
+    {
+      "id": "2026-09-12/w09-values-workspace",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09-UI"
+      ],
+      "note": "值状态矩阵进主视图：工具条新增关系/值状态切换，矩阵由 DOM 搬移到 #matrix（同一渲染器），深链接 &view= 可分享视图。验证=真实页面深链接截图 + 25/25 门禁 + 44/44 行为用例。未做：167 处未知可点开、执行画像主视图、歧义样本、node CLI。",
+      "report": "evidence/development/2026-09-12-w09-values-workspace/REPORT.md",
+      "verification": "evidence/development/2026-09-12-w09-values-workspace/verification.json"
     }
   ],
   "next_work_item": "2D 画布的正式层级与空间索引，或大仓库/monorepo 的规模资格",
-  "next_action": "①块×绑定状态矩阵进函数工作台主视图；②167 处未知做成可点清单；③构造真实歧义样本验证 ambiguous_entity；④atlas node CLI。",
+  "next_action": "①167 处未知做成可点清单（现在只是数字）；②执行画像/受控运行的主视图；③构造真实歧义样本验证 ambiguous_entity；④atlas node CLI。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
