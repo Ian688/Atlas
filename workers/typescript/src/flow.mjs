@@ -47,7 +47,7 @@ export function buildFlow(context) {
   const flow = {
     schema: 'atlas.flow-ir.v1',
     snapshot_id: context.snapshotId,
-    producer: `typescript/${ts.version};worker/0.2.1`,
+    producer: `typescript/${ts.version};worker/0.2.2`,
     profile: 'js-structured-control.v1',
     functions: [],
     diagnostics: [],

@@ -32,7 +32,7 @@ export function parse(request) {
   const program = ts.createProgram([...sources.keys()].filter(p => supported.test(p)), options, host);
   const checker = program.getTypeChecker();
   const result = { schema: 'atlas.language-facts.v1', snapshot_id: request.snapshot_id,
-    producer: `typescript/${ts.version};worker/0.2.1`, parsed_files: [], symbols: [], calls: [], imports: [], diagnostics: [], dynamic_files: [] };
+    producer: `typescript/${ts.version};worker/0.2.2`, parsed_files: [], symbols: [], calls: [], imports: [], diagnostics: [], dynamic_files: [] };
   const functions = new Map(), declarationIds = new Map(), symbolIds = new Map(), sourceMaps = new Map();
   const recordsByFile = new Map();
   const scriptBindings = new Map(), ambiguousScriptIds = new Set();
