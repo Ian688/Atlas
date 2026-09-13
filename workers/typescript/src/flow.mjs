@@ -402,8 +402,36 @@ class FileBuilder {
       };
     }
     if (ts.isForInStatement(node) || ts.isForOfStatement(node)) {
-      this.noteUnknown(start, end, 'for_in_of_iteration');
-      return { start, end, stmt: 'unknown', reason: 'for_in_of_iteration' };
+      // `for (const x of items) body` runs an unknown number of times and binds
+      // x to an unknown element. Returning a statement-level unknown also threw
+      // away every call in the header and the body -- on rxjs that was 79
+      // regions, in code whose calls then became invisible to every downstream
+      // fact. The loop is modelled with forms the IR already has: a `while`
+      // whose condition is unknown (so it may run zero times), the iterated
+      // expression lowered as the condition so its calls stay visible, and the
+      // bound name registered with its real kind and an unknown value, which is
+      // what a loop variable is on any given iteration.
+      const loopScope = this.scopeFor('for', start, scope);
+      // `for (x of y)` without a declaration binds an existing name; only the
+      // declaration form creates bindings here.
+      if (ts.isVariableDeclarationList(node.initializer)) {
+        const isConst = (node.initializer.flags & ts.NodeFlags.Const) !== 0;
+        for (const declaration of node.initializer.declarations) {
+          if (ts.isIdentifier(declaration.name)) {
+            const symbol = this.checker.getSymbolAtLocation(declaration.name);
+            this.register(symbol, declaration.name, isConst ? 'const' : 'let', loopScope);
+          } else {
+            this.bindParameterPattern(declaration.name, loopScope, fn);
+          }
+        }
+      }
+      return {
+        start,
+        end,
+        stmt: 'while',
+        cond: this.lower(node.expression, fn),
+        body: [this.lowerStmt(node.statement, fn, loopScope)],
+      };
     }
     if (ts.isSwitchStatement(node)) {
       const switchScope = this.scopeFor('switch', start, scope);

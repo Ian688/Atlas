@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-param-shapes",
+    "window": "2026-09-12/w09-forin",
     "status": "DELIVERED",
-    "note": "支持 rest 与解构参数：改为把模式中每个名字登记为普通参数（值未知=结论），仅在模式走不动时才发未知区域。真实 rxjs：显式未知 167→79（−53%），rest 78→0、解构 10→0，只剩 for_in 79；文件/函数/partial 无回退。worker 17/17，门禁 25/25。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-param-shapes",
-    "verification": "evidence/development/2026-09-12-w09-param-shapes/verification.json"
+    "note": "for...in/of 用 IR 已有形式建模（while + 被迭代表达式作条件 + 循环变量按真实关键字登记为未知值），循环头与体的调用不再消失。真实 rxjs：显式未知 79→0（初始 167→0）。测试契约同步改写（旧契约记在注释里）。worker 17/17，门禁 25/25。诚实标注：归零≠精确建模（迭代次数、元素形状、in/of 语义差异仍未区分）。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-forin",
+    "verification": "evidence/development/2026-09-12-w09-forin/verification.json"
   },
   "windows": [
     {
@@ -527,10 +527,20 @@
       "note": "参数形状：bindParameterPattern 递归登记解构/rest 绑定的名字为参数，登记为 0 才发具名未知区域。真实数据 167→79，与上一轮 UI 清单的分解预测完全一致。残余：for_in 79 处未处理；形状关系未建模（IR 无该字段，未发明）。",
       "report": "evidence/development/2026-09-12-w09-param-shapes/REPORT.md",
       "verification": "evidence/development/2026-09-12-w09-param-shapes/verification.json"
+    },
+    {
+      "id": "2026-09-12/w09-forin",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09"
+      ],
+      "note": "for-in/of 建模为 unknown-cond while，循环变量注册为 const/let 未知值；无声明形式防护。rxjs 未知区域 79→0（三轮 167→0）。两条测试失败均由测试当场抓出并修正（漏改断言尾部、断言形态过严）。残余：迭代次数/元素形状/in-of 差异未区分；新可见调用未逐条核对。",
+      "report": "evidence/development/2026-09-12-w09-forin/REPORT.md",
+      "verification": "evidence/development/2026-09-12-w09-forin/verification.json"
     }
   ],
   "next_work_item": "2D 画布的正式层级与空间索引，或大仓库/monorepo 的规模资格",
-  "next_action": "①for_in_of_iteration（79 处，唯一剩余未知来源，全在打包产物）；②UI 清单点条目按字节区间高亮源码；③执行画像主视图；④歧义样本；⑤atlas node CLI。",
+  "next_action": "①核对新可见的循环内调用是否被正确解析（未知归零后的质量核查）；②UI 清单点条目按字节区间高亮源码；③执行画像主视图；④歧义样本；⑤atlas node CLI。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",

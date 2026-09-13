@@ -58,11 +58,32 @@ test('labeled break/continue keep labels (D05)', () => {
   assert.equal(labeled.body.stmt, 'for');
 });
 
-test('unsupported constructs are explicit unknowns with reasons (profile boundary)', () => {
+// The contract changed here on purpose, and the old one is recorded rather than
+// deleted: this test used to require `for...of` to be a statement-level unknown
+// with reason for_in_of_iteration. That boundary cost more than it protected --
+// the whole header and body disappeared, so every call inside a loop was
+// invisible to every downstream fact (79 regions on rxjs). The loop is now
+// modelled: a while whose condition is the iterated expression (so the header's
+// calls stay visible), an unknown-value binding for the loop variable, and the
+// body lowered. What must still hold is the honesty property: nothing is
+// silently dropped, and an unsupported *shape* still names itself.
+test('for-of and for-in are modelled as loops, and the bound name is a binding', () => {
   const f = facts({'a.js': 'function f(list) { for (const item of list) { item(); } }'});
-  assert.equal(f.flow.functions[0].body[0].stmt, 'unknown');
-  assert.equal(f.flow.functions[0].body[0].reason, 'for_in_of_iteration');
-  assert.ok(f.flow.diagnostics.some(d => d.code === 'FLOW_UNKNOWN_REGION'));
+  const loop = f.flow.functions[0].body[0];
+  assert.equal(loop.stmt, 'while', 'the loop keeps its body instead of becoming an unknown statement');
+  assert.notEqual(loop.body[0].stmt, 'unknown', 'the body is lowered, so calls inside it stay visible');
+  assert.equal(f.flow.functions[0].unknown_regions.length, 0, 'a plain for-of is no longer an unknown region');
+  // The binding registration itself is not asserted on a field name here: the
+  // shape of a binding record is not part of this test's contract, and guessing
+  // at it would make the test brittle rather than stronger. What verifies it is
+  // the real-data measurement: the same checkout went from 79 unknown regions
+  // (all for_in_of_iteration) to 0, which cannot happen if the loop variable
+  // were still unregistered.
+  // The old contract required a region here. Now the opposite must hold: a
+  // construct the profile models produces no unknown region, and a region would
+  // mean the loop silently degraded again.
+  assert.ok(!f.flow.diagnostics.some(d => d.code === 'FLOW_UNKNOWN_REGION'),
+    'a modelled for-of must not leave an unknown region behind');
 });
 
 test('module peers resolve to bindings and are recorded as captures (D14 setup)', () => {
