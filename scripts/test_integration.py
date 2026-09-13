@@ -132,6 +132,15 @@ class Integration(unittest.TestCase):
             with request("api/report",auth) as r:self.assertEqual(json.load(r)["id"],a["id"])
             with request("api/context?entity=file%3Asrc%2Fmath.js",auth,"POST") as r:self.assertEqual(json.load(r)["context"]["analysis_id"],a["id"])
             with request("") as r:self.assertIn("frame-ancestors 'none'",r.headers["Content-Security-Policy"]);self.assertIn("ATLAS",r.read().decode())
+            # A refusal has to be named: "this entity is not in the analysis"
+            # and "your query is malformed" are different answers, and a
+            # caller who cannot tell them apart retries the wrong one.
+            with self.assertRaises(urllib.error.HTTPError) as miss: request("api/node?entity=symbol:no%2Fsuch.js%3A1%3A2",auth)
+            self.assertEqual(miss.exception.code,400)
+            self.assertEqual(json.load(miss.exception)["error"],"entity_not_found")
+            miss.exception.close()
+            with request("api/node?entity=file%3Asrc%2Fmath.js",auth) as r:
+                self.assertEqual(json.load(r)["node"]["id"],"file:src/math.js")
             for asset in ["app.js","hierarchy.js","style.css"]:
                 with request(asset) as r:self.assertGreater(len(r.read()),100)
             proc.send_signal(signal.SIGINT);stdout,stderr=proc.communicate(timeout=10)

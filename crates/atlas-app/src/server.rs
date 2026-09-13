@@ -313,11 +313,28 @@ async fn query(
             )
                 .into_response(),
         },
-        Ok(Err(_)) => (
-            StatusCode::BAD_REQUEST,
-            axum::Json(serde_json::json!({"error":"invalid_or_unavailable_query"})),
-        )
-            .into_response(),
+        // A refusal has to be named. The resolver already says which one it is
+        // -- "entity_not_found:<ref>", "ambiguous_entity:<ref>:<n>" -- and
+        // collapsing every failure into one generic code threw away the only
+        // part a caller can act on: "that entity is not in this analysis" and
+        // "your query is malformed" are different answers, and a caller who
+        // cannot tell them apart will retry the wrong one.
+        Ok(Err(error)) => {
+            let reason = match &error {
+                atlas_engine::Error::Invalid(text) => text.clone(),
+                other => other.to_string(),
+            };
+            let code = reason
+                .split(':')
+                .next()
+                .unwrap_or("invalid_or_unavailable_query")
+                .to_string();
+            (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({"error": code, "detail": reason})),
+            )
+                .into_response()
+        }
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "query failed").into_response(),
     }
 }

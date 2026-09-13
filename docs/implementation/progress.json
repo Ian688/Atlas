@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-node-identity",
+    "window": "2026-09-12/w09-named-refusals",
     "status": "DELIVERED",
-    "note": "新增 GET /api/node?entity= 按身份取单个实体（同 reach/source 的引用解析，仅本分析内），页面新增 resolveEntity/openUnloaded：深链接与未加载邻居第一次能走进去。真实验证：按符号 id 与 path:name 都解析到同一节点；深链接截图显示函数被选中、源码与布局引擎状态行正常。门禁 25/25、指纹 de269633… 一致。新发现：未命中返回通用错误而非具名拒绝（reach/source 同缺陷）。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-node-identity",
-    "verification": "evidence/development/2026-09-12-w09-node-identity/verification.json"
+    "note": "错误映射层：查询端点的未命中不再塌缩成通用码，改为具名拒绝（entity_not_found 等），完整原因放 detail。reach/source/flow/profile 共用该分支故一并修复。真实验证 + test_integration 新增断言（18 OK）。门禁 25/25、指纹 2f920f71… 一致。未验证：ambiguous_entity 分支。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-named-refusals",
+    "verification": "evidence/development/2026-09-12-w09-named-refusals/verification.json"
   },
   "windows": [
     {
@@ -487,10 +487,20 @@
       "note": "按身份取实体：/api/node + 契约表条目 + 页面 resolveEntity/openUnloaded，打通深链接与不可点击邻居。验证=真实 API（两种引用形式）+ 真实页面深链接截图 + 25/25 门禁。发现未命名拒绝的既有缺陷。",
       "report": "evidence/development/2026-09-12-w09-node-identity/REPORT.md",
       "verification": "evidence/development/2026-09-12-w09-node-identity/verification.json"
+    },
+    {
+      "id": "2026-09-12/w09-named-refusals",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09"
+      ],
+      "note": "具名拒绝：Ok(Err) 分支保留解析器给出的具名码（entity_not_found 等）并把完整原因放进 detail；影响所有 query 端点。验证=真实服务三例 + 新增集成断言 + 25/25 门禁。缺口：歧义分支未被触发。",
+      "report": "evidence/development/2026-09-12-w09-named-refusals/REPORT.md",
+      "verification": "evidence/development/2026-09-12-w09-named-refusals/verification.json"
     }
   ],
   "next_work_item": "2D 画布的正式层级与空间索引，或大仓库/monorepo 的规模资格",
-  "next_action": "①把未命中改成具名拒绝（reach/source/flow/node 共用映射层，需用例）；②块×绑定状态矩阵进函数工作台主视图；③167 处未知做成可点清单；④补 atlas node CLI。",
+  "next_action": "①块×绑定状态矩阵进函数工作台主视图；②167 处未知做成可点清单；③构造真实歧义样本验证 ambiguous_entity；④atlas node CLI。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
