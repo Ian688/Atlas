@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-function-finder",
+    "window": "2026-09-12/w09-finder-first",
     "status": "DELIVERED",
-    "note": "呈现优先第一轮：第一屏改为「这个项目最该先知道的五件事」（全量事实，不从已加载子集推算）+ 常驻诚实边界行；新增有界翻页的「找函数」（24 页上限、显示是否穷尽、命中上限 200）。真实接口验证：18 页 / 8938 对象 → 6573 函数。未修发现：finder 被排在长树之下、掉出可视区。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-function-finder",
-    "verification": "evidence/development/2026-09-12-w09-function-finder/verification.json"
+    "note": "修上一轮截图发现：把「找函数」排到左栏最上、项目清单折叠。截图确认入口位于首屏可视区。门禁 25/25 exit 0、指纹 541a1498… 双向一致。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-finder-first",
+    "verification": "evidence/development/2026-09-12-w09-finder-first/verification.json"
   },
   "windows": [
     {
@@ -467,10 +467,20 @@
       "note": "UI 优先的第一次真实交付（非 mockup）：①第一屏五件事；②找函数，打通「选中函数」这条此前不存在的入口。门禁 25/25 exit 0、指纹 45681d70… 双向一致。未修：finder 位置在长树之下、可视区外；矩阵未提到主视图；167 处未知不可点开。",
       "report": "evidence/development/2026-09-12-w09-function-finder/REPORT.md",
       "verification": "evidence/development/2026-09-12-w09-function-finder/verification.json"
+    },
+    {
+      "id": "2026-09-12/w09-finder-first",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09-UI"
+      ],
+      "note": "入口可见性修正：finder 提到 explorer 顶部，项目清单折叠为 details。验证=真实截图 + 25/25 门禁 + 指纹一致。仍未做：finder 各状态截图、矩阵进主视图、167 处未知可点开。",
+      "report": "evidence/development/2026-09-12-w09-finder-first/REPORT.md",
+      "verification": "evidence/development/2026-09-12-w09-finder-first/verification.json"
     }
   ],
   "next_work_item": "2D 画布的正式层级与空间索引，或大仓库/monorepo 的规模资格",
-  "next_action": "①把 finder 提到 explorer 顶部并复跑门禁；②块×绑定状态矩阵提到函数工作台主视图；③167 处未知做成可点清单；④补 finder 选中后的截图验证。",
+  "next_action": "①块×绑定状态矩阵提到函数工作台主视图（把抽象解释直接变成画面）；②167 处未知做成可点清单；③补 finder 各状态截图验证。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
