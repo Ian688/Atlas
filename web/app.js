@@ -562,6 +562,56 @@ function renderBrief(){
   box.hidden=false;
 }
 
+// 找一个函数。
+//
+// 为什么需要它：`/api/nodes` 一页 100 条、按 id 排序，目录和文件排在函数前面，
+// 所以第一页里**一个函数都没有**——页面能画图、能列层级，但没有任何路径能让你
+// 选中一个函数，后面所有能力（值分析、执行画像、补丁）都无从进入。
+//
+// 做法是有界翻页：逐页取节点，只留下 kind==='function'，直到页数上限。上限与
+// 已扫描页数一起显示——"清单是全部还是前一段"必须能被看见，不能默认读者知道。
+const FN_MAX_PAGES=24;
+async function loadFunctionList(){
+  const button=$('fn-load');if(button)button.disabled=true;
+  const seen=new Map();let cursor=null,pages=0,exhausted=false;
+  try{
+    while(pages<FN_MAX_PAGES){
+      const query={limit:500,...(cursor?{cursor}:{})};
+      const page=await api('nodes',query);
+      pages++;
+      for(const node of page.items||[])if(node.kind==='function')seen.set(node.id,node);
+      cursor=page.next_cursor;
+      $('fn-count').textContent=`已扫描 ${pages} 页 · ${seen.size} 个函数`;
+      if(!cursor){exhausted=true;break;}
+    }
+  }catch(error){
+    status(`加载函数清单失败：${String((error&&error.message)||error)}`);
+    if(button)button.disabled=false;
+    return;
+  }
+  state.fnList=[...seen.values()];
+  state.fnExhausted=exhausted;state.fnPages=pages;
+  $('fn-count').textContent=exhausted?`全部 ${state.fnList.length} 个函数`:`前 ${pages} 页 · ${state.fnList.length} 个函数（未穷尽）`;
+  if(button){button.disabled=false;button.textContent='重新加载函数清单';}
+  renderFunctionHits();
+}
+function renderFunctionHits(){
+  const box=$('fn-list');if(!box)return;
+  const all=state.fnList||[];
+  if(!all.length){box.replaceChildren(text('div','（还没有函数清单——点上面的按钮加载）','node-sub'));return;}
+  const q=($('fn-search')?.value||'').trim().toLowerCase();
+  const hits=(q?all.filter(n=>`${n.name} ${n.path}`.toLowerCase().includes(q)):all).slice(0,FN_HIT_LIMIT);
+  const matched=q?all.filter(n=>`${n.name} ${n.path}`.toLowerCase().includes(q)).length:all.length;
+  box.replaceChildren();
+  box.append(text('div',q?`匹配 ${matched} 个，显示前 ${hits.length} 个`:`显示前 ${hits.length} 个（共 ${all.length}）`,'node-sub'));
+  for(const node of hits){
+    const row=text('button',node.name,`fn-hit${state.selected?.id===node.id?' selected':''}`);
+    row.append(text('small',`${node.path} · 声明 ${node.function_count??'?'} 函数`));
+    row.title=node.id;row.onclick=()=>select(node);box.append(row);
+  }
+}
+const FN_HIT_LIMIT=200;
+
 function render(){renderTree();renderGraph();renderBrief();}
 // Byte offsets from the engine are UTF-8; the loaded source is a JS string.
 function byteLineMap(source){const encoder=new TextEncoder();const lines=[1];let bytes=0;for(const ch of source){bytes+=encoder.encode(ch).length;if(ch==='\n')lines.push(bytes+1);}return lines;}
@@ -967,6 +1017,7 @@ async function select(node){
 }
 $('patch-propose').onclick=()=>proposePatch();
 $('annotation-add').onclick=()=>proposeAnnotation();
+$('fn-load').onclick=()=>loadFunctionList();$('fn-search').oninput=()=>renderFunctionHits();
 $('exec-run').onclick=()=>runControlled();installBridge();$('connect-button').onclick=connect;$('token').onkeydown=e=>{if(e.key==='Enter')connect();};$('search').oninput=renderTree;
 // The level switch only changes which blocks the overview draws. It does not
 // clear the focus and does not re-anchor a selection: with a function focused
