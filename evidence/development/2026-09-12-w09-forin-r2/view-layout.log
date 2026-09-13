@@ -14,7 +14,7 @@
         "unresolved": 1
       },
       "budgetExceeded": false,
-      "engineMs": 109.9,
+      "engineMs": 113.8,
       "metrics": {
         "nodes": 8,
         "edges": 7,
@@ -41,7 +41,7 @@
         "unresolved": 2
       },
       "budgetExceeded": false,
-      "engineMs": 28.7,
+      "engineMs": 29.9,
       "metrics": {
         "nodes": 19,
         "edges": 18,
@@ -68,7 +68,7 @@
         "unresolved": 3
       },
       "budgetExceeded": false,
-      "engineMs": 42.7,
+      "engineMs": 44.2,
       "metrics": {
         "nodes": 40,
         "edges": 39,
@@ -95,7 +95,7 @@
         "unresolved": 4
       },
       "budgetExceeded": true,
-      "engineMs": 81.1,
+      "engineMs": 82.8,
       "metrics": {
         "nodes": 80,
         "edges": 79,

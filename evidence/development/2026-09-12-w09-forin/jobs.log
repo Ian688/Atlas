@@ -1,16 +1,155 @@
-test_a_crashed_run_is_reaped_and_its_request_can_be_retried (__main__.Jobs.test_a_crashed_run_is_reaped_and_its_request_can_be_retried) ... ok
-test_a_live_run_renews_its_lease (__main__.Jobs.test_a_live_run_renews_its_lease) ... ok
+test_a_crashed_run_is_reaped_and_its_request_can_be_retried (__main__.Jobs.test_a_crashed_run_is_reaped_and_its_request_can_be_retried) ... FAIL
+test_a_live_run_renews_its_lease (__main__.Jobs.test_a_live_run_renews_its_lease) ... FAIL
 test_a_queued_request_can_be_cancelled_before_it_runs (__main__.Jobs.test_a_queued_request_can_be_cancelled_before_it_runs) ... ok
 test_a_store_created_before_the_queue_existed_is_migrated_additively (__main__.Jobs.test_a_store_created_before_the_queue_existed_is_migrated_additively) ... ok
 test_a_worker_serves_priority_before_age (__main__.Jobs.test_a_worker_serves_priority_before_age) ... ok
-test_an_unsatisfied_request_may_be_retried (__main__.Jobs.test_an_unsatisfied_request_may_be_retried) ... ok
-test_cancelling_a_job_that_is_not_queued_is_refused (__main__.Jobs.test_cancelling_a_job_that_is_not_queued_is_refused) ... ok
-test_concurrent_submits_elect_exactly_one_runner (__main__.Jobs.test_concurrent_submits_elect_exactly_one_runner) ... ok
-test_enqueueing_queues_without_running_and_a_worker_drains_it (__main__.Jobs.test_enqueueing_queues_without_running_and_a_worker_drains_it) ... ok
-test_identity_separates_owners_of_the_same_request_key (__main__.Jobs.test_identity_separates_owners_of_the_same_request_key) ... ok
-test_the_same_request_runs_once_and_replays_its_result (__main__.Jobs.test_the_same_request_runs_once_and_replays_its_result) ... ok
+test_an_unsatisfied_request_may_be_retried (__main__.Jobs.test_an_unsatisfied_request_may_be_retried) ... FAIL
+test_cancelling_a_job_that_is_not_queued_is_refused (__main__.Jobs.test_cancelling_a_job_that_is_not_queued_is_refused) ... FAIL
+test_concurrent_submits_elect_exactly_one_runner (__main__.Jobs.test_concurrent_submits_elect_exactly_one_runner) ... FAIL
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py:1139: ResourceWarning: subprocess 23367 is still running
+  _warn("subprocess %s is still running" % self.pid,
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/case.py:668: ResourceWarning: unclosed file <_io.TextIOWrapper name=7 encoding='UTF-8'>
+  with outcome.testPartExecutor(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/case.py:668: ResourceWarning: unclosed file <_io.TextIOWrapper name=4 encoding='UTF-8'>
+  with outcome.testPartExecutor(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+test_enqueueing_queues_without_running_and_a_worker_drains_it (__main__.Jobs.test_enqueueing_queues_without_running_and_a_worker_drains_it) ... FAIL
+test_identity_separates_owners_of_the_same_request_key (__main__.Jobs.test_identity_separates_owners_of_the_same_request_key) ... FAIL
+test_the_same_request_runs_once_and_replays_its_result (__main__.Jobs.test_the_same_request_runs_once_and_replays_its_result) ... FAIL
+
+======================================================================
+FAIL: test_a_crashed_run_is_reaped_and_its_request_can_be_retried (__main__.Jobs.test_a_crashed_run_is_reaped_and_its_request_can_be_retried)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_jobs.py", line 213, in test_a_crashed_run_is_reaped_and_its_request_can_be_retried
+    submitted = self.submit("--request-key", "r-crash", owner="carol")
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_jobs.py", line 57, in submit
+    return self.cli(
+           ~~~~~~~~^
+        "job", "submit", project or self.project,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "--owner", owner, "--project", "calc", *extra,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_jobs.py", line 51, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: "worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2"
+
+
+======================================================================
+FAIL: test_a_live_run_renews_its_lease (__main__.Jobs.test_a_live_run_renews_its_lease)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_jobs.py", line 259, in test_a_live_run_renews_its_lease
+    self.assertEqual(process.returncode, 0, stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: "worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2"
+
+
+======================================================================
+FAIL: test_an_unsatisfied_request_may_be_retried (__main__.Jobs.test_an_unsatisfied_request_may_be_retried)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_jobs.py", line 173, in test_an_unsatisfied_request_may_be_retried
+    first = self.submit("--request-key", "r-retry")
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_jobs.py", line 57, in submit
+    return self.cli(
+           ~~~~~~~~^
+        "job", "submit", project or self.project,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "--owner", owner, "--project", "calc", *extra,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_jobs.py", line 51, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: "worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2"
+
+
+======================================================================
+FAIL: test_cancelling_a_job_that_is_not_queued_is_refused (__main__.Jobs.test_cancelling_a_job_that_is_not_queued_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_jobs.py", line 169, in test_cancelling_a_job_that_is_not_queued_is_refused
+    self.assertEqual(self.cli("job", "status", queued["job"]["id"])["state"], "completed",
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                     "a refused cancellation must not change the job")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'failed' != 'completed'
+- failed
++ completed
+ : a refused cancellation must not change the job
+
+======================================================================
+FAIL: test_concurrent_submits_elect_exactly_one_runner (__main__.Jobs.test_concurrent_submits_elect_exactly_one_runner)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_jobs.py", line 203, in test_concurrent_submits_elect_exactly_one_runner
+    self.assertEqual(process.returncode, 0, stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: "worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2"
+
+
+======================================================================
+FAIL: test_enqueueing_queues_without_running_and_a_worker_drains_it (__main__.Jobs.test_enqueueing_queues_without_running_and_a_worker_drains_it)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_jobs.py", line 139, in test_enqueueing_queues_without_running_and_a_worker_drains_it
+    self.assertEqual(worked["outcomes"][0]["outcome"], "completed")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'failed' != 'completed'
+- failed
++ completed
+
+
+======================================================================
+FAIL: test_identity_separates_owners_of_the_same_request_key (__main__.Jobs.test_identity_separates_owners_of_the_same_request_key)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_jobs.py", line 119, in test_identity_separates_owners_of_the_same_request_key
+    alice = self.submit("--request-key", "r1", owner="alice")
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_jobs.py", line 57, in submit
+    return self.cli(
+           ~~~~~~~~^
+        "job", "submit", project or self.project,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "--owner", owner, "--project", "calc", *extra,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_jobs.py", line 51, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: "worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2"
+
+
+======================================================================
+FAIL: test_the_same_request_runs_once_and_replays_its_result (__main__.Jobs.test_the_same_request_runs_once_and_replays_its_result)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_jobs.py", line 102, in test_the_same_request_runs_once_and_replays_its_result
+    first = self.submit("--request-key", "r1")
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_jobs.py", line 57, in submit
+    return self.cli(
+           ~~~~~~~~^
+        "job", "submit", project or self.project,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "--owner", owner, "--project", "calc", *extra,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_jobs.py", line 51, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: "worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2"
+
 
 ----------------------------------------------------------------------
-Ran 11 tests in 15.662s
+Ran 11 tests in 12.409s
 
-OK
+FAILED (failures=8)

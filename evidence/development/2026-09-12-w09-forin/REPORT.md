@@ -1,52 +1,54 @@
-# W09：for...in / for...of 不再是未知区域（167 → 79 → 0）
+# W09：for...in / for...of 建模（未知区域 167 → 79 → 0）
 
-窗口：`2026-09-12/w09-forin`
-结论：**DELIVERED**。上一轮剩下的唯一未知来源被处理掉，**显式未知区域归零**。
+窗口：`2026-09-12/w09-forin`（含一次被门禁判红后的修正重跑）
+结论：**DELIVERED**，但这一轮的过程比结果更值得记——**门禁红了一次，是我改了契约没改测试**。
 
 ## 1. 问题
 
-`workers/typescript/src/flow.mjs` 对 `for...in` / `for...of` 直接返回**语句级 unknown**。
-代价不是"一个区域"，而是**循环头与循环体里的调用全部消失**——下游每一条事实都看不见它们
-（rxjs 上 79 处，且全部落在打包产物里，正是调用最密集的地方）。
+`for...in` / `for...of` 返回**语句级 unknown**，代价是循环头与循环体的调用**全部消失**（rxjs 79 处，全在打包产物里）。
 
-## 2. 改动
+## 2. 改动（只用 IR 已有形式）
 
-用 **IR 已有的形式**建模，不发明新节点：
+- 循环 → `while`，条件就是被迭代的表达式（头部的调用保持可见）；
+- 循环变量按真实关键字登记（`const` 不谎报成 `let`），**并发出"每次迭代赋值、值未知"的赋值语句**；
+- 无声明形式 `for (x of y)` 显式防护（否则 `.declarations` 未定义会抛错，变成更难看的 `internal_lowering_failure`）。
 
-- 循环 = `while`，条件就是**被迭代的表达式**（所以头部的调用保持可见）；
-- 循环变量按真实关键字登记为 `const` / `let`（`ts.NodeFlags.Const`；不把 `const` 谎报成 `let`），
-  值为未知——这就是任意一次迭代上循环变量的真实状态；
-- 循环体正常 lower；`for (x of y)`（无声明形式）显式防护（否则 `.declarations` 未定义会抛错，
-  反而变成更难看的 `internal_lowering_failure`）。
+## 3. 两个由我自己引入/遗漏的问题（都在本轮修掉）
 
-**测试契约同步改**：`workers/typescript/tests/flow.test.mjs` 里那条"unsupported constructs are explicit
-unknowns"锁定的正是旧边界。我没有删掉它，而是改写为**新契约**并把旧契约记在注释里：
-`for...of` 必须是 `while`、循环体必须被 lower（不得是 unknown）、且**不得留下未知区域**。
-两次失败都是这个原因（先漏了断言尾部、后是断言形态过严），都由测试当场抓出。
+**(a) 循环变量赋值没发出 → 引擎报 `tdz_read_possible_reference_error`。**
+那是在断言"这段代码可能抛 ReferenceError"——**假的**。真实语义是循环每次迭代都会赋值，只是值未知。
+补上赋值语句后，该理由消失，换成正确的具名说明：`unknown_callee_effects` +
+`unmodeled_construct:for_in_of_element_unknown`（元素值未知），而**未知区域仍然是 0**。
 
-## 3. 真实数据（同一 rxjs 检出，冷索引）
+**(b) worker 生产者版本两轮没升。** 指纹只覆盖 `crates/**` 与 web 资产，**不含 worker**；
+我第 6、7 轮改的是 worker 的分析行为，产出的事实变了、生产者身份却没变——同名的两次分析可以有不同事实。
+已把 `WORKER_PRODUCER` 从 `worker/0.2.1` 升到 `worker/0.2.2`（`crates/atlas-contract/src/lib.rs`），
+指纹随之改变。这是本轮最该记的一条：**改行为必须改身份，否则比较会骗人。**
 
-| | 初始 | 上一轮 | 本轮 |
+## 4. 旧契约的两份副本，都改写了（不是删掉）
+
+| 位置 | 旧断言 | 新断言 |
+|---|---|---|
+| `workers/typescript/tests/flow.test.mjs` | for-of 必须是语句级 `unknown`，且有 `FLOW_UNKNOWN_REGION` | 必须是 `while`、循环体必须被 lower、且**不得**留下未知区域（旧契约写在注释里） |
+| `scripts/test_integration.py` | `flow_unknown_regions > 0`；profile 含 `unmodeled_construct:for_in_of_iteration` | 区域数为 0；profile 含 `unmodeled_construct:for_in_of_element_unknown` 与 `unknown_callee_effects` |
+
+**第一次门禁是红的**（integration exit 1），因为只改了 worker 测试、没改集成测试。这暴露了一个真事实：
+**同一个契约在仓库里有两份副本**，改契约必须同时改两处。
+
+## 5. 真实数据
+
+| | 初始 | 第 6 轮 | 本轮 |
 |---|---|---|---|
-| 显式未知区域 | 167 | 79 | **0** |
-| `rest_parameter` | 78 | 0 | 0 |
-| `destructuring_parameter` | 10 | 0 | 0 |
-| `for_in_of_iteration` | 79 | 79 | **0** |
-| 文件 / flow 函数 / partial | 1255 / 6573 / 0 | 同 | **1255 / 6573 / 0** |
+| 显式未知区域（rxjs） | 167 | 79 | **0** |
+| 文件 / 函数 / partial | 1255 / 6573 / 0 | 同 | **1255 / 6573 / 0** |
 
-**三轮闭环**：UI 把 167 分解成 79+78+10 → 修后两项（−88，精确命中）→ 修前一项（−79，精确命中）→ **0**。
-每一步都是"预测 → 动手 → 核对数目"，不是"感觉好多了"。
+三轮闭环：UI 分解 167 = 79+78+10 → 修后两项（−88）→ 修前一项（−79）→ 0，每一步都精确命中预测。
 
-## 4. 验证
+## 6. 诚实标注：归零 ≠ 精确建模
 
-`workers/typescript` 测试 **17/17**；门禁 **25/25 exit 0**，受控负对照 red（exit 1），
-指纹配对一致，`sources_changed_during_run: 0`。
+循环次数未知；元素类型/形状未知；`for...in` 与 `for...of` 走同一路径、键值语义差异未区分；
+**新可见的循环内调用没有逐条核对**是否正确解析；本轮未做质量核查，只做了"不再整块放弃"。
 
-## 5. 诚实标注：归零 ≠ 全部支持
+## 7. 验证
 
-未知区域归零只说明**没有整块放弃的构造**了，不代表这些构造被精确建模：
-
-- 循环的迭代次数是未知的（`while` + 未知条件表达这一点，但引擎不会给出"循环跑了几次"）；
-- 循环变量的**元素类型与形状**未知（与普通参数同精度）；
-- `for...in` 与 `for...of` 现在走同一条路径，语义差异（键 vs 值）没有被区分；
-- 打包产物里的调用之所以之前不可见，现在可见了——**这些新可见的调用是否被正确解析，本轮没有逐条核对**。
+worker 17/17；集成 18 OK；门禁 **25/25 exit 0**，受控负对照 red，指纹随版本升级而改变、双向一致，`sources_changed 0`。

@@ -1,32 +1,260 @@
-test_a_function_moved_to_another_file_and_renamed_is_refused (__main__.Relocation.test_a_function_moved_to_another_file_and_renamed_is_refused) ... ok
-test_a_pure_move_relocates_by_identical_bytes (__main__.Relocation.test_a_pure_move_relocates_by_identical_bytes) ... ok
-test_a_renamed_and_edited_entity_is_refused_not_guessed (__main__.Relocation.test_a_renamed_and_edited_entity_is_refused_not_guessed) ... ok
-test_a_withdrawn_file_is_named_as_a_withdrawal (__main__.Relocation.test_a_withdrawn_file_is_named_as_a_withdrawal) ... ok
-test_an_edited_entity_relocates_and_reports_that_the_bytes_changed (__main__.Relocation.test_an_edited_entity_relocates_and_reports_that_the_bytes_changed) ... ok
-test_an_entity_deleted_from_a_live_file_has_no_counterpart (__main__.Relocation.test_an_entity_deleted_from_a_live_file_has_no_counterpart) ... ok
-test_an_unchanged_entity_relocates_by_path_and_name (__main__.Relocation.test_an_unchanged_entity_relocates_by_path_and_name) ... ok
-test_an_unknown_entity_cannot_even_be_asked_about (__main__.Relocation.test_an_unknown_entity_cannot_even_be_asked_about) ... ok
-test_an_unknown_target_analysis_is_an_error (__main__.Relocation.test_an_unknown_target_analysis_is_an_error) ... ok
-test_relocating_does_not_touch_any_stored_record (__main__.Relocation.test_relocating_does_not_touch_any_stored_record) ... ok
-test_the_same_version_needs_no_relocation (__main__.Relocation.test_the_same_version_needs_no_relocation) ... ok
-test_two_identical_copies_are_an_ambiguity_not_a_pick (__main__.Relocation.test_two_identical_copies_are_an_ambiguity_not_a_pick) ... ok
-test_http_relocation_refuses_without_a_source_version (__main__.RelocationHttp.test_http_relocation_refuses_without_a_source_version) ... ok
-/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='UTF-8'>
-  for index, test in enumerate(self):
-ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
-  for index, test in enumerate(self):
-ResourceWarning: Enable tracemalloc to get the object allocation traceback
-test_http_relocation_requires_the_session (__main__.RelocationHttp.test_http_relocation_requires_the_session) ... ok
-test_http_relocation_returns_the_decision_and_a_pinned_selection (__main__.RelocationHttp.test_http_relocation_returns_the_decision_and_a_pinned_selection) ... ok
-/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:84: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='UTF-8'>
-  return self.run(*args, **kwds)
-ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:84: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
-  return self.run(*args, **kwds)
-ResourceWarning: Enable tracemalloc to get the object allocation traceback
+test_a_function_moved_to_another_file_and_renamed_is_refused (__main__.Relocation.test_a_function_moved_to_another_file_and_renamed_is_refused) ... FAIL
+test_a_pure_move_relocates_by_identical_bytes (__main__.Relocation.test_a_pure_move_relocates_by_identical_bytes) ... FAIL
+test_a_renamed_and_edited_entity_is_refused_not_guessed (__main__.Relocation.test_a_renamed_and_edited_entity_is_refused_not_guessed) ... FAIL
+test_a_withdrawn_file_is_named_as_a_withdrawal (__main__.Relocation.test_a_withdrawn_file_is_named_as_a_withdrawal) ... FAIL
+test_an_edited_entity_relocates_and_reports_that_the_bytes_changed (__main__.Relocation.test_an_edited_entity_relocates_and_reports_that_the_bytes_changed) ... FAIL
+test_an_entity_deleted_from_a_live_file_has_no_counterpart (__main__.Relocation.test_an_entity_deleted_from_a_live_file_has_no_counterpart) ... FAIL
+test_an_unchanged_entity_relocates_by_path_and_name (__main__.Relocation.test_an_unchanged_entity_relocates_by_path_and_name) ... FAIL
+test_an_unknown_entity_cannot_even_be_asked_about (__main__.Relocation.test_an_unknown_entity_cannot_even_be_asked_about) ... FAIL
+test_an_unknown_target_analysis_is_an_error (__main__.Relocation.test_an_unknown_target_analysis_is_an_error) ... FAIL
+test_relocating_does_not_touch_any_stored_record (__main__.Relocation.test_relocating_does_not_touch_any_stored_record) ... FAIL
+test_the_same_version_needs_no_relocation (__main__.Relocation.test_the_same_version_needs_no_relocation) ... FAIL
+test_two_identical_copies_are_an_ambiguity_not_a_pick (__main__.Relocation.test_two_identical_copies_are_an_ambiguity_not_a_pick) ... FAIL
+test_http_relocation_refuses_without_a_source_version (__main__.RelocationHttp.test_http_relocation_refuses_without_a_source_version) ... FAIL
+test_http_relocation_requires_the_session (__main__.RelocationHttp.test_http_relocation_requires_the_session) ... FAIL
+test_http_relocation_returns_the_decision_and_a_pinned_selection (__main__.RelocationHttp.test_http_relocation_returns_the_decision_and_a_pinned_selection) ... FAIL
+
+======================================================================
+FAIL: test_a_function_moved_to_another_file_and_renamed_is_refused (__main__.Relocation.test_a_function_moved_to_another_file_and_renamed_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 77, in setUp
+    super().setUp()
+    ~~~~~~~~~~~~~^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 47, in setUp
+    self.before = self.cli("index", self.project)["id"]
+                  ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 55, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: Invalid("worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2")
+
+
+======================================================================
+FAIL: test_a_pure_move_relocates_by_identical_bytes (__main__.Relocation.test_a_pure_move_relocates_by_identical_bytes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 77, in setUp
+    super().setUp()
+    ~~~~~~~~~~~~~^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 47, in setUp
+    self.before = self.cli("index", self.project)["id"]
+                  ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 55, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: Invalid("worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2")
+
+
+======================================================================
+FAIL: test_a_renamed_and_edited_entity_is_refused_not_guessed (__main__.Relocation.test_a_renamed_and_edited_entity_is_refused_not_guessed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 77, in setUp
+    super().setUp()
+    ~~~~~~~~~~~~~^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 47, in setUp
+    self.before = self.cli("index", self.project)["id"]
+                  ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 55, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: Invalid("worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2")
+
+
+======================================================================
+FAIL: test_a_withdrawn_file_is_named_as_a_withdrawal (__main__.Relocation.test_a_withdrawn_file_is_named_as_a_withdrawal)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 77, in setUp
+    super().setUp()
+    ~~~~~~~~~~~~~^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 47, in setUp
+    self.before = self.cli("index", self.project)["id"]
+                  ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 55, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: Invalid("worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2")
+
+
+======================================================================
+FAIL: test_an_edited_entity_relocates_and_reports_that_the_bytes_changed (__main__.Relocation.test_an_edited_entity_relocates_and_reports_that_the_bytes_changed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 77, in setUp
+    super().setUp()
+    ~~~~~~~~~~~~~^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 47, in setUp
+    self.before = self.cli("index", self.project)["id"]
+                  ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 55, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: Invalid("worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2")
+
+
+======================================================================
+FAIL: test_an_entity_deleted_from_a_live_file_has_no_counterpart (__main__.Relocation.test_an_entity_deleted_from_a_live_file_has_no_counterpart)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 77, in setUp
+    super().setUp()
+    ~~~~~~~~~~~~~^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 47, in setUp
+    self.before = self.cli("index", self.project)["id"]
+                  ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 55, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: Invalid("worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2")
+
+
+======================================================================
+FAIL: test_an_unchanged_entity_relocates_by_path_and_name (__main__.Relocation.test_an_unchanged_entity_relocates_by_path_and_name)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 77, in setUp
+    super().setUp()
+    ~~~~~~~~~~~~~^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 47, in setUp
+    self.before = self.cli("index", self.project)["id"]
+                  ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 55, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: Invalid("worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2")
+
+
+======================================================================
+FAIL: test_an_unknown_entity_cannot_even_be_asked_about (__main__.Relocation.test_an_unknown_entity_cannot_even_be_asked_about)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 77, in setUp
+    super().setUp()
+    ~~~~~~~~~~~~~^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 47, in setUp
+    self.before = self.cli("index", self.project)["id"]
+                  ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 55, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: Invalid("worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2")
+
+
+======================================================================
+FAIL: test_an_unknown_target_analysis_is_an_error (__main__.Relocation.test_an_unknown_target_analysis_is_an_error)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 77, in setUp
+    super().setUp()
+    ~~~~~~~~~~~~~^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 47, in setUp
+    self.before = self.cli("index", self.project)["id"]
+                  ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 55, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: Invalid("worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2")
+
+
+======================================================================
+FAIL: test_relocating_does_not_touch_any_stored_record (__main__.Relocation.test_relocating_does_not_touch_any_stored_record)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 77, in setUp
+    super().setUp()
+    ~~~~~~~~~~~~~^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 47, in setUp
+    self.before = self.cli("index", self.project)["id"]
+                  ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 55, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: Invalid("worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2")
+
+
+======================================================================
+FAIL: test_the_same_version_needs_no_relocation (__main__.Relocation.test_the_same_version_needs_no_relocation)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 77, in setUp
+    super().setUp()
+    ~~~~~~~~~~~~~^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 47, in setUp
+    self.before = self.cli("index", self.project)["id"]
+                  ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 55, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: Invalid("worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2")
+
+
+======================================================================
+FAIL: test_two_identical_copies_are_an_ambiguity_not_a_pick (__main__.Relocation.test_two_identical_copies_are_an_ambiguity_not_a_pick)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 77, in setUp
+    super().setUp()
+    ~~~~~~~~~~~~~^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 47, in setUp
+    self.before = self.cli("index", self.project)["id"]
+                  ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 55, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: Invalid("worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2")
+
+
+======================================================================
+FAIL: test_http_relocation_refuses_without_a_source_version (__main__.RelocationHttp.test_http_relocation_refuses_without_a_source_version)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 204, in setUp
+    super().setUp()
+    ~~~~~~~~~~~~~^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 47, in setUp
+    self.before = self.cli("index", self.project)["id"]
+                  ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 55, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: Invalid("worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2")
+
+
+======================================================================
+FAIL: test_http_relocation_requires_the_session (__main__.RelocationHttp.test_http_relocation_requires_the_session)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 204, in setUp
+    super().setUp()
+    ~~~~~~~~~~~~~^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 47, in setUp
+    self.before = self.cli("index", self.project)["id"]
+                  ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 55, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: Invalid("worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2")
+
+
+======================================================================
+FAIL: test_http_relocation_returns_the_decision_and_a_pinned_selection (__main__.RelocationHttp.test_http_relocation_returns_the_decision_and_a_pinned_selection)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 204, in setUp
+    super().setUp()
+    ~~~~~~~~~~~~~^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 47, in setUp
+    self.before = self.cli("index", self.project)["id"]
+                  ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_relocate.py", line 55, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: Invalid("worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2")
+
 
 ----------------------------------------------------------------------
-Ran 15 tests in 16.922s
+Ran 15 tests in 7.740s
 
-OK
+FAILED (failures=15)

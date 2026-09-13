@@ -160,7 +160,14 @@ class Integration(unittest.TestCase):
         self.assertEqual(a["coverage"]["flow_functions"], 15)
 
         self.assertEqual(a["coverage"]["flow_partial"], 0)
-        self.assertGreater(a["coverage"]["flow_unknown_regions"], 0, "for-of must surface as an explicit unknown")
+        # This assertion used to require flow_unknown_regions > 0 for this
+        # fixture, because for-of was a statement-level unknown. The profile
+        # now models for-of as a loop, so the contract is the opposite: the
+        # construct must not leave an unknown region behind. What must still
+        # hold is that a construct the profile really cannot model names
+        # itself -- that is asserted in the worker tests.
+        self.assertEqual(a["coverage"]["flow_unknown_regions"], 0,
+                         "a modelled for-of must not leave an unknown region")
         report = self.cli("report", a["id"])
         self.assertTrue(any("js-structured-control.v1" in item for item in report["limitations"]))
         symbols = {n["name"]: n["id"] for n in self.cli("nodes", a["id"], "--kind", "function")["items"]}
@@ -224,7 +231,13 @@ class Integration(unittest.TestCase):
 
         # Declared-unsupported constructs stay explicit unknowns end to end.
         loop_callers = self.cli("flow", a["id"], symbols["loopCallers"])
-        self.assertIn("unmodeled_construct:for_in_of_iteration", loop_callers["unknown_reasons"])
+        # The reason changed with the contract: the construct is modelled now,
+        # so the honest statement is no longer "the loop is unmodelled" but
+        # "the element value is unknown, and calling it has unknown effects".
+        # It must still be named -- and the region count must still be zero,
+        # because nothing was abandoned.
+        self.assertIn("unmodeled_construct:for_in_of_element_unknown", loop_callers["unknown_reasons"])
+        self.assertIn("unknown_callee_effects", loop_callers["unknown_reasons"])
 
         # HTTP serves the same fact for the same analysis version.
         proc = subprocess.Popen([str(BIN), "--store", str(self.store), "serve", a["id"]], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)

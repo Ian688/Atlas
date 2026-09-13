@@ -18,7 +18,7 @@ pub const ENGINE_VERSION: &str = "foundation-flow-0.2.2";
 /// externals are imports, so its output would be read as "this function reads a
 /// global" when it reads its own module). A version that cannot express the
 /// current semantics is refused by name instead of being interpreted wrongly.
-pub const WORKER_PRODUCER: &str = "typescript/5.9.3;worker/0.2.1";
+pub const WORKER_PRODUCER: &str = "typescript/5.9.3;worker/0.2.2";
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ScanLimits {

@@ -1,10 +1,71 @@
-test_a_spent_budget_is_a_named_refusal_not_a_raw_sqlite_error (__main__.StoreConcurrency.test_a_spent_budget_is_a_named_refusal_not_a_raw_sqlite_error) ... ok
-test_a_write_waits_for_a_held_writer_instead_of_failing (__main__.StoreConcurrency.test_a_write_waits_for_a_held_writer_instead_of_failing) ... ok
-test_concurrent_first_opens_converge_on_one_analysis (__main__.StoreConcurrency.test_concurrent_first_opens_converge_on_one_analysis) ... ok
-test_reading_does_not_queue_behind_a_writer (__main__.StoreConcurrency.test_reading_does_not_queue_behind_a_writer) ... ok
-test_the_same_request_key_from_two_processes_is_one_job (__main__.StoreConcurrency.test_the_same_request_key_from_two_processes_is_one_job) ... ok
+test_a_spent_budget_is_a_named_refusal_not_a_raw_sqlite_error (__main__.StoreConcurrency.test_a_spent_budget_is_a_named_refusal_not_a_raw_sqlite_error) ... FAIL
+test_a_write_waits_for_a_held_writer_instead_of_failing (__main__.StoreConcurrency.test_a_write_waits_for_a_held_writer_instead_of_failing) ... FAIL
+test_concurrent_first_opens_converge_on_one_analysis (__main__.StoreConcurrency.test_concurrent_first_opens_converge_on_one_analysis) ... FAIL
+test_reading_does_not_queue_behind_a_writer (__main__.StoreConcurrency.test_reading_does_not_queue_behind_a_writer) ... FAIL
+test_the_same_request_key_from_two_processes_is_one_job (__main__.StoreConcurrency.test_the_same_request_key_from_two_processes_is_one_job) ... FAIL
+
+======================================================================
+FAIL: test_a_spent_budget_is_a_named_refusal_not_a_raw_sqlite_error (__main__.StoreConcurrency.test_a_spent_budget_is_a_named_refusal_not_a_raw_sqlite_error)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_store_concurrency.py", line 136, in test_a_spent_budget_is_a_named_refusal_not_a_raw_sqlite_error
+    self.cli("index", self.project)
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_store_concurrency.py", line 114, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: Invalid("worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2")
+
+
+======================================================================
+FAIL: test_a_write_waits_for_a_held_writer_instead_of_failing (__main__.StoreConcurrency.test_a_write_waits_for_a_held_writer_instead_of_failing)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_store_concurrency.py", line 122, in test_a_write_waits_for_a_held_writer_instead_of_failing
+    self.cli("index", self.project)
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_store_concurrency.py", line 114, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: Invalid("worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2")
+
+
+======================================================================
+FAIL: test_concurrent_first_opens_converge_on_one_analysis (__main__.StoreConcurrency.test_concurrent_first_opens_converge_on_one_analysis)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_store_concurrency.py", line 169, in test_concurrent_first_opens_converge_on_one_analysis
+    self.assertEqual(code, 0, stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: Invalid("worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2")
+
+
+======================================================================
+FAIL: test_reading_does_not_queue_behind_a_writer (__main__.StoreConcurrency.test_reading_does_not_queue_behind_a_writer)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_store_concurrency.py", line 147, in test_reading_does_not_queue_behind_a_writer
+    report = self.cli("index", self.project)
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_store_concurrency.py", line 114, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: Invalid("worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2")
+
+
+======================================================================
+FAIL: test_the_same_request_key_from_two_processes_is_one_job (__main__.StoreConcurrency.test_the_same_request_key_from_two_processes_is_one_job)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_store_concurrency.py", line 179, in test_the_same_request_key_from_two_processes_is_one_job
+    self.cli("index", self.project)
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yinsijie/CodeRepo/Atlas/scripts/test_store_concurrency.py", line 114, in cli
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Error: Invalid("worker_producer_not_supported:got=typescript/5.9.3;worker/0.2.1:expected=typescript/5.9.3;worker/0.2.2")
+
 
 ----------------------------------------------------------------------
-Ran 5 tests in 25.451s
+Ran 5 tests in 4.140s
 
-OK
+FAILED (failures=5)

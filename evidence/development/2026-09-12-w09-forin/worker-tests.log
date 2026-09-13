@@ -1,29 +1,29 @@
-✔ flow IR carries version, profile and per-function anchors (29.49295ms)
-✔ block shadowing produces distinct binding ids (D01) (5.41069ms)
-✔ TDZ use-before-declare still resolves to the real binding (D01) (16.188857ms)
-✔ short-circuit and conditional operators become structured control (D02) (1.920592ms)
-✔ try/catch/finally lowers with catch param binding and anchors (D03/D04) (2.378397ms)
-✔ labeled break/continue keep labels (D05) (4.121777ms)
-✔ for-of and for-in are modelled as loops, and the bound name is a binding (1.987763ms)
-✔ module peers resolve to bindings and are recorded as captures (D14 setup) (1.697904ms)
-✔ object and array literals keep field names and element anchors (2.374993ms)
-✔ destructuring declarations become explicit unknowns, not silent copies (profile) (2.178045ms)
-✔ alpha-renaming preserves flow structure modulo identity (D21) (7.377694ms)
-✔ a folded global name loses to a shadowing binding (V-08b) (7.318485ms)
-✔ the unshadowed global undefined still folds to a constant (V-08b) (1.018023ms)
-✔ non-finite numeric literals are explicit unknowns, not unwireable constants (1.60066ms)
-✔ finite numeric literals are unaffected by the non-finite guard (1.137557ms)
-✔ a nested function keeps its own declarations out of the enclosing function (GE-2 regression) (6.181385ms)
-✔ runtime imports are named on every function, and type-only imports are not (12.683196ms)
-✔ cross-file alias and re-export resolve using captured sources (50.81459ms)
-✔ lexical shadowing does not bind to a global namesake (2.481137ms)
-✔ reassigned function declarations are marked; indirect and constructor calls stay unknown (7.949012ms)
-✔ duplicate script declarations are ambiguous, not first-declaration wins (2.465627ms)
-✔ UTF-8 byte spans retain Chinese and emoji source anchors (3.322969ms)
-✔ nested calls with identical start offsets have distinct full-span IDs (1.876246ms)
-✔ compiler host never falls back to ambient source or config reads (2.518885ms)
-✔ syntax failures and dynamic language features are explicit (3.627103ms)
-✔ request isolation rejects traversal and duplicates; source is never evaluated (3.139812ms)
+✔ flow IR carries version, profile and per-function anchors (29.251442ms)
+✔ block shadowing produces distinct binding ids (D01) (5.087336ms)
+✔ TDZ use-before-declare still resolves to the real binding (D01) (15.927123ms)
+✔ short-circuit and conditional operators become structured control (D02) (2.158423ms)
+✔ try/catch/finally lowers with catch param binding and anchors (D03/D04) (2.425675ms)
+✔ labeled break/continue keep labels (D05) (3.668033ms)
+✔ for-of and for-in are modelled as loops, and the bound name is a binding (1.972836ms)
+✔ module peers resolve to bindings and are recorded as captures (D14 setup) (1.626024ms)
+✔ object and array literals keep field names and element anchors (2.404467ms)
+✔ destructuring declarations become explicit unknowns, not silent copies (profile) (2.342467ms)
+✔ alpha-renaming preserves flow structure modulo identity (D21) (6.233646ms)
+✔ a folded global name loses to a shadowing binding (V-08b) (5.082231ms)
+✔ the unshadowed global undefined still folds to a constant (V-08b) (0.908334ms)
+✔ non-finite numeric literals are explicit unknowns, not unwireable constants (1.02858ms)
+✔ finite numeric literals are unaffected by the non-finite guard (1.040862ms)
+✔ a nested function keeps its own declarations out of the enclosing function (GE-2 regression) (4.706805ms)
+✔ runtime imports are named on every function, and type-only imports are not (13.001709ms)
+✔ cross-file alias and re-export resolve using captured sources (50.029759ms)
+✔ lexical shadowing does not bind to a global namesake (2.450384ms)
+✔ reassigned function declarations are marked; indirect and constructor calls stay unknown (5.669411ms)
+✔ duplicate script declarations are ambiguous, not first-declaration wins (2.169993ms)
+✔ UTF-8 byte spans retain Chinese and emoji source anchors (2.397022ms)
+✔ nested calls with identical start offsets have distinct full-span IDs (1.63551ms)
+✔ compiler host never falls back to ambient source or config reads (2.31185ms)
+✔ syntax failures and dynamic language features are explicit (2.335608ms)
+✔ request isolation rejects traversal and duplicates; source is never evaluated (3.052797ms)
 ℹ tests 26
 ℹ suites 0
 ℹ pass 26
@@ -31,6 +31,6 @@
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 583.536611
+ℹ duration_ms 512.389463
 npm notice run @atlas/typescript-worker@0.1.0 test
 npm notice run node --test tests/*.test.mjs

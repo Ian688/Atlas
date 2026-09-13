@@ -414,15 +414,35 @@ class FileBuilder {
       const loopScope = this.scopeFor('for', start, scope);
       // `for (x of y)` without a declaration binds an existing name; only the
       // declaration form creates bindings here.
+      const binders = [];
       if (ts.isVariableDeclarationList(node.initializer)) {
         const isConst = (node.initializer.flags & ts.NodeFlags.Const) !== 0;
         for (const declaration of node.initializer.declarations) {
-          if (ts.isIdentifier(declaration.name)) {
-            const symbol = this.checker.getSymbolAtLocation(declaration.name);
-            this.register(symbol, declaration.name, isConst ? 'const' : 'let', loopScope);
-          } else {
+          if (!ts.isIdentifier(declaration.name)) {
             this.bindParameterPattern(declaration.name, loopScope, fn);
+            continue;
           }
+          const symbol = this.checker.getSymbolAtLocation(declaration.name);
+          this.register(symbol, declaration.name, isConst ? 'const' : 'let', loopScope);
+          // The loop assigns the variable on every iteration; not emitting that
+          // assignment made reads of it look possibly-uninitialized, and the
+          // profile then reported `tdz_read_possible_reference_error` -- a claim
+          // that the code may throw a ReferenceError, which is false. The value
+          // assigned is unknown; that it is assigned is not.
+          const [ds, de] = this.u8(declaration.name);
+          binders.push({
+            start: ds,
+            end: de,
+            stmt: 'expression',
+            expr: {
+              start: ds,
+              end: de,
+              expr: 'assign',
+              op: '=',
+              target: this.assignTarget(declaration.name, fn),
+              value: { start: ds, end: de, expr: 'unknown', reason: 'for_in_of_element_unknown' },
+            },
+          });
         }
       }
       return {
@@ -430,7 +450,7 @@ class FileBuilder {
         end,
         stmt: 'while',
         cond: this.lower(node.expression, fn),
-        body: [this.lowerStmt(node.statement, fn, loopScope)],
+        body: [...binders, this.lowerStmt(node.statement, fn, loopScope)],
       };
     }
     if (ts.isSwitchStatement(node)) {
