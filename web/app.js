@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id);
-const state = {token:'',nodes:[],edges:[],nodePage:null,edgePage:null,selected:null,focus:null,request:0,exportUrl:null,execProfile:null,report:null,selection:null,pendingSelection:null,annotations:[],patches:[],execRender:0,ancestorChain:null,contract:null,level:'file',hierarchy:null,levelView:null,index:null,focusLayout:null,focusLayoutKey:null,layoutGen:0,workspace:'graph'};
+const state = {token:'',nodes:[],edges:[],nodePage:null,edgePage:null,selected:null,focus:null,request:0,exportUrl:null,execProfile:null,report:null,selection:null,pendingSelection:null,annotations:[],patches:[],execRender:0,ancestorChain:null,contract:null,level:'file',hierarchy:null,levelView:null,index:null,focusLayout:null,focusLayoutKey:null,layoutGen:0,workspace:'graph',pendingPanel:null};
 const ns='http://www.w3.org/2000/svg';
 function svg(tag, attrs={}, text) {const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));if(text!==undefined)e.textContent=text;return e;}
 function text(tag,value,cls) {const e=document.createElement(tag);e.textContent=value;if(cls)e.className=cls;return e;}
@@ -585,6 +585,8 @@ function renderBrief(){
     ? `上面是全量事实。本页只加载了 ${loaded}/${total} 个对象——画布与清单只画已加载的部分，且会自己说明这一点。`
     : `上面是全量事实；本页已加载全部 ${loaded} 个对象。`;
   box.hidden=false;
+  if($('unknown-open'))$('unknown-open').textContent=`查看这 ${Number(c.flow_unknown_regions||0)} 处未知 →`;
+  if(state.pendingPanel==='unknowns'&&$('unknown-panel')&&$('unknown-panel').hidden){setUnknownPanel(true);}
 }
 
 // 找一个函数。
@@ -670,6 +672,57 @@ function applyWorkspace(){
   box.replaceChildren(...moved);
   box.hidden=false;svgEl.hidden=true;
   if(panel)panel.hidden=true;
+}
+
+// 显式未知清单。
+//
+// 首屏那张卡片只给了一个数字（167）。数字本身是真的，但它不可行动：不知道在哪、
+// 是什么原因、能不能点开。报告里的 diagnostics 每条都带 code / detail（原因 + 字节区间）/
+// path，所以清单可以按原因分组、逐条定位到文件，并在状态里报出字节区间。
+// 显示有上限时明说"其余 N 处同因（按上限省略，不是不存在）"。
+const UNKNOWN_ROWS_PER_REASON=12;
+function renderUnknowns(){
+  const box=$('unknown-body');if(!box)return;
+  const diag=(state.report&&state.report.diagnostics)||[];
+  if(!diag.length){box.replaceChildren(text('p','这一份分析没有报告任何显式未知区域。','matrix-note'));return;}
+  const byReason=new Map();
+  for(const item of diag){
+    const reason=String(item.detail||'').split(' ')[0]||'未说明';
+    if(!byReason.has(reason))byReason.set(reason,[]);
+    byReason.get(reason).push(item);
+  }
+  const parts=[text('p',`共 ${diag.length} 处，按原因分组；每一处都带文件与字节区间，点开即定位。`,'matrix-note')];
+  for(const [reason,items] of [...byReason.entries()].sort((a,b)=>b[1].length-a[1].length)){
+    parts.push(text('h4',`${reason} · ${items.length} 处`,''));
+    for(const item of items.slice(0,UNKNOWN_ROWS_PER_REASON)){
+      const span=String(item.detail||'').split(' ').slice(1).join(' ')||'（未给区间）';
+      const row=text('button',`${item.path}  ${span}`,'fn-hit');
+      row.title=`${item.code} · ${item.path} · ${item.detail}`;
+      row.onclick=()=>openUnknownRegion(item);
+      parts.push(row);
+    }
+    if(items.length>UNKNOWN_ROWS_PER_REASON)parts.push(text('p',`…其余 ${items.length-UNKNOWN_ROWS_PER_REASON} 处同因（按显示上限省略，不是不存在）`,'matrix-note'));
+  }
+  box.replaceChildren(...parts);
+}
+// 点一处未知：打开它所在的**文件**（按身份解析，不靠翻页），并把字节区间报出来。
+// 不假装打开某个函数——报告给的是区域，不是符号。
+async function openUnknownRegion(item){
+  status(`正在打开 ${item.path} …`);
+  try{
+    const node=await resolveEntity(`file:${item.path}`);
+    if(!node){status(`打不开：${item.path} 不在这份分析里`);return;}
+    await select(node);
+    status(`已打开 ${item.path}；未知区域 ${String(item.detail).split(' ')[0]} 在字节 ${String(item.detail).split(' ').slice(1).join(' ')}`);
+  }catch(error){
+    status(`打不开：${String((error&&error.message)||error)}`);
+  }
+}
+function setUnknownPanel(open){
+  const panel=$('unknown-panel');if(!panel)return false;
+  panel.hidden=!open;
+  if(open)renderUnknowns();
+  return true;
 }
 
 function render(){renderTree();renderGraph();renderBrief();applyWorkspace();}
@@ -1077,7 +1130,7 @@ async function select(node){
 }
 $('patch-propose').onclick=()=>proposePatch();
 $('annotation-add').onclick=()=>proposeAnnotation();
-$('fn-load').onclick=()=>loadFunctionList();$('ws-graph').onclick=()=>setWorkspace('graph');$('ws-values').onclick=()=>setWorkspace('values');$('fn-search').oninput=()=>renderFunctionHits();
+$('fn-load').onclick=()=>loadFunctionList();$('unknown-open').onclick=()=>{const panel=$('unknown-panel');setUnknownPanel(Boolean(panel&&panel.hidden));};$('ws-graph').onclick=()=>setWorkspace('graph');$('ws-values').onclick=()=>setWorkspace('values');$('fn-search').oninput=()=>renderFunctionHits();
 $('exec-run').onclick=()=>runControlled();installBridge();$('connect-button').onclick=connect;$('token').onkeydown=e=>{if(e.key==='Enter')connect();};$('search').oninput=renderTree;
 // The level switch only changes which blocks the overview draws. It does not
 // clear the focus and does not re-anchor a selection: with a function focused
@@ -1110,5 +1163,6 @@ $('context-copy').onclick=async()=>{try{await navigator.clipboard.writeText($('c
 // optionally, the selection another projection was looking at.
 {const fragment=parseFragment();
  if(fragment.selection||fragment.analysis){state.pendingSelection={entity_id:fragment.selection||'',analysis:fragment.analysis||''};}
+ if(fragment.panel==='unknowns'){state.pendingPanel='unknowns';}
  if(fragment.view==='values'||fragment.view==='graph'){state.workspace=fragment.view;const g=$('ws-graph'),v=$('ws-values');if(g)g.setAttribute('aria-pressed',String(fragment.view==='graph'));if(v)v.setAttribute('aria-pressed',String(fragment.view==='values'));}
  if(fragment.token){history.replaceState(null,'',location.pathname);$('token').value=fragment.token;connect();}}

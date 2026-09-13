@@ -6,11 +6,11 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-values-workspace",
+    "window": "2026-09-12/w09-unknown-list",
     "status": "DELIVERED",
-    "note": "工作区视图切换（关系/值状态）+ 矩阵进主视图：矩阵用 DOM 搬移而非重画，保持单一渲染器；深链接支持 view=。真实截图验证 innerFrom 的算法行、来源/未知、效果、SCC、14 块×2 绑定矩阵全部可见。门禁 25/25、指纹一致。过程中两次错误（时序、替换打错位置）均由截图发现。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-values-workspace",
-    "verification": "evidence/development/2026-09-12-w09-values-workspace/verification.json"
+    "note": "显式未知清单：按原因分组、带文件与字节区间、点击按身份打开文件；深链接 &panel=unknowns。清单揭示 167 处 = for_in_of_iteration 79 + rest_parameter 78 + destructuring_parameter 10，94% 来自三个不支持的语言特性；补 rest+解构可消 88 处。门禁 25/25。分析行为本轮未改（只是可见）。",
+    "evidence_dir": "evidence/development/2026-09-12-w09-unknown-list",
+    "verification": "evidence/development/2026-09-12-w09-unknown-list/verification.json"
   },
   "windows": [
     {
@@ -507,10 +507,20 @@
       "note": "值状态矩阵进主视图：工具条新增关系/值状态切换，矩阵由 DOM 搬移到 #matrix（同一渲染器），深链接 &view= 可分享视图。验证=真实页面深链接截图 + 25/25 门禁 + 44/44 行为用例。未做：167 处未知可点开、执行画像主视图、歧义样本、node CLI。",
       "report": "evidence/development/2026-09-12-w09-values-workspace/REPORT.md",
       "verification": "evidence/development/2026-09-12-w09-values-workspace/verification.json"
+    },
+    {
+      "id": "2026-09-12/w09-unknown-list",
+      "status": "DELIVERED",
+      "work_items": [
+        "W09-UI"
+      ],
+      "note": "167 处未知可点清单 + 分组揭示三个缺失语言特性（79/78/10）；点条目按身份打开文件。布局 bug（绝对定位盖住全页）由截图发现并修复。未做：区间高亮、三个特性的实际支持、执行主视图、歧义样本、node CLI。",
+      "report": "evidence/development/2026-09-12-w09-unknown-list/REPORT.md",
+      "verification": "evidence/development/2026-09-12-w09-unknown-list/verification.json"
     }
   ],
   "next_work_item": "2D 画布的正式层级与空间索引，或大仓库/monorepo 的规模资格",
-  "next_action": "①167 处未知做成可点清单（现在只是数字）；②执行画像/受控运行的主视图；③构造真实歧义样本验证 ambiguous_entity；④atlas node CLI。",
+  "next_action": "清单给出了顺序：①支持 rest_parameter 与 destructuring_parameter（可消 88/167 = 53% 的未知）；②未知清单点条目时按字节区间高亮源码；③执行画像/受控运行主视图；④歧义样本；⑤atlas node CLI。",
   "baseline": {
     "foundation_evidence": "../../evidence/foundation/verification.json",
     "status": "REFERENCE_ONLY",
