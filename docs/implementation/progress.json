@@ -6,10 +6,10 @@
   "repository": "/Users/yinsijie/CodeRepo/Atlas",
   "mode": "external_agent_continuous",
   "active_window": {
-    "window": "2026-09-12/w09-element-target",
+    "window": "2026-09-12/agent-brief",
     "status": "DELIVERED",
-    "note": "元素访问赋值目标两侧一起改：合约加 AssignTarget::Element、worker 产出 element、引擎按 JS 顺序求值 object/key/value 并以 element_write_location_unknown 具名记录写入。真实 rxjs：带 unmodeled_assignment_target 的函数 317→10，新理由 307 个函数，flow 调用点 +12，块数减少 0（无回退）。刻意未做：新 OpKind 的写堆语义、常量 key 收敛为 property、其余 10 例与非循环 275 例的逐类归因。",
-    "evidence_dir": "evidence/development/2026-09-12-w09-element-target",
+    "note": "写给下一个 Agent 的交接简报：docs/AGENT-BRIEF.md（用户纠正过的前提、如何自行验证、真实状态与数字、我踩过的 10 个坑、一轮完成标准、队列）。不声称新增能力。",
+    "evidence_dir": "docs/AGENT-BRIEF.md",
     "verification": "evidence/development/2026-09-12-w09-element-target/verification.json"
   },
   "windows": [
@@ -586,6 +586,16 @@
       ],
       "note": "元素访问赋值（obj[key]=v）三处改动：合约 Element 变体、worker 产出、引擎求值三子表达式并具名\"位置未知\"。测量：317→10（该理由）、307 个函数带新理由、调用点 +12、0 回退。未做：ElementWrite 的写堆语义、常量 key 收敛、剩余 10 例归因。",
       "report": "evidence/development/2026-09-12-w09-element-target/REPORT.md",
+      "verification": "evidence/development/2026-09-12-w09-element-target/verification.json"
+    },
+    {
+      "id": "2026-09-12/agent-brief",
+      "status": "DELIVERED",
+      "work_items": [
+        "handoff"
+      ],
+      "note": "Agent 交接简报（文档，无代码改动）。核心是让接手者不必相信任何叙述：验证命令、状态数字、以及 10 条已踩过的坑（契约多副本、worker 版本、UNSTABLE、必须看画面、vm 里的引擎、先写结论会写错、无证据的修复要撤回、子集不能当全量等）。",
+      "report": "docs/AGENT-BRIEF.md",
       "verification": "evidence/development/2026-09-12-w09-element-target/verification.json"
     }
   ],
