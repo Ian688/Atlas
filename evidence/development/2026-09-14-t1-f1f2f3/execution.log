@@ -1,0 +1,76 @@
+test_a_cancelled_scenario_stops_instead_of_marching_through_the_cases (__main__.Execution.test_a_cancelled_scenario_stops_instead_of_marching_through_the_cases) ... ok
+test_a_chain_deeper_than_one_level_is_refused_by_name (__main__.Execution.test_a_chain_deeper_than_one_level_is_refused_by_name) ... ok
+test_a_chain_deeper_than_one_level_runs_when_the_ancestors_are_named (__main__.Execution.test_a_chain_deeper_than_one_level_runs_when_the_ancestors_are_named) ... ok
+test_a_chain_that_is_not_a_containment_path_is_rejected (__main__.Execution.test_a_chain_that_is_not_a_containment_path_is_rejected) ... ok
+test_a_chain_that_returns_the_wrong_function_fails_at_that_stage (__main__.Execution.test_a_chain_that_returns_the_wrong_function_fails_at_that_stage) ... ok
+test_a_clean_function_is_profiled_pure_and_the_reasons_cite_evidence (__main__.Execution.test_a_clean_function_is_profiled_pure_and_the_reasons_cite_evidence) ... ok
+test_a_closure_runs_through_the_function_that_encloses_it (__main__.Execution.test_a_closure_runs_through_the_function_that_encloses_it) ... ok
+test_a_computed_dynamic_import_is_a_named_risk_not_a_silent_success (__main__.Execution.test_a_computed_dynamic_import_is_a_named_risk_not_a_silent_success) ... ok
+test_a_denied_attempt_is_journalled_with_its_permission_and_target (__main__.Execution.test_a_denied_attempt_is_journalled_with_its_permission_and_target) ... ok
+test_a_dependency_slice_carries_the_transitive_import_closure (__main__.Execution.test_a_dependency_slice_carries_the_transitive_import_closure) ... ok
+test_a_file_write_is_denied_by_the_operating_system_not_by_atlas (__main__.Execution.test_a_file_write_is_denied_by_the_operating_system_not_by_atlas) ... ok
+test_a_fixture_run_says_it_used_fixtures (__main__.Execution.test_a_fixture_run_says_it_used_fixtures) ... ok
+test_a_function_that_reads_the_outside_world_is_not_called_pure (__main__.Execution.test_a_function_that_reads_the_outside_world_is_not_called_pure) ... ok
+test_a_granted_write_lands_in_the_copy_and_never_in_the_project (__main__.Execution.test_a_granted_write_lands_in_the_copy_and_never_in_the_project) ... ok
+test_a_nested_closure_cannot_be_run_directly_and_says_how_it_can (__main__.Execution.test_a_nested_closure_cannot_be_run_directly_and_says_how_it_can) ... ok
+test_a_non_exported_function_is_never_executed (__main__.Execution.test_a_non_exported_function_is_never_executed) ... ok
+test_a_pure_call_returns_the_real_value (__main__.Execution.test_a_pure_call_returns_the_real_value) ... ok
+test_a_receiver_is_declared_by_the_caller_and_recorded_as_declared (__main__.Execution.test_a_receiver_is_declared_by_the_caller_and_recorded_as_declared) ... ok
+test_a_refusal_starts_no_process (__main__.Execution.test_a_refusal_starts_no_process) ... ok
+test_a_runtime_builtin_is_never_asked_for_as_an_input (__main__.Execution.test_a_runtime_builtin_is_never_asked_for_as_an_input) ... ok
+test_a_scenario_case_that_is_refused_is_not_a_pass (__main__.Execution.test_a_scenario_case_that_is_refused_is_not_a_pass) ... ok
+test_a_scenario_matches_thrown_errors (__main__.Execution.test_a_scenario_matches_thrown_errors) ... ok
+test_a_scenario_reports_passes_and_failures_separately (__main__.Execution.test_a_scenario_reports_passes_and_failures_separately) ... ok
+test_a_scenario_result_is_published_and_readable_back (__main__.Execution.test_a_scenario_result_is_published_and_readable_back) ... ok
+test_a_slice_narrows_the_read_boundary_and_the_record_says_how_to_recheck (__main__.Execution.test_a_slice_narrows_the_read_boundary_and_the_record_says_how_to_recheck) ... ok
+test_a_throw_is_observed_with_its_source_location (__main__.Execution.test_a_throw_is_observed_with_its_source_location) ... ok
+test_a_timeout_kills_the_run_and_is_reported_as_a_timeout (__main__.Execution.test_a_timeout_kills_the_run_and_is_reported_as_a_timeout) ... ok
+test_a_true_global_is_named_so_the_caller_knows_what_to_declare (__main__.Execution.test_a_true_global_is_named_so_the_caller_knows_what_to_declare) ... ok
+test_a_via_symbol_that_is_not_the_enclosing_function_is_refused (__main__.Execution.test_a_via_symbol_that_is_not_the_enclosing_function_is_refused) ... ok
+test_an_allowed_run_does_not_claim_it_had_no_effects (__main__.Execution.test_an_allowed_run_does_not_claim_it_had_no_effects) ... ok
+test_an_async_function_is_awaited_and_marked_as_awaited (__main__.Execution.test_an_async_function_is_awaited_and_marked_as_awaited) ... ok
+test_an_enclosing_call_that_returns_a_different_function_is_not_a_target_call (__main__.Execution.test_an_enclosing_call_that_returns_a_different_function_is_not_a_target_call) ... ok
+test_an_enclosing_call_that_returns_a_non_function_is_recorded_as_such (__main__.Execution.test_an_enclosing_call_that_returns_a_non_function_is_recorded_as_such) ... ok
+test_an_exhausted_output_budget_is_not_reported_as_a_harness_error (__main__.Execution.test_an_exhausted_output_budget_is_not_reported_as_a_harness_error) ... ok
+test_an_imported_binding_is_not_a_global_to_declare (__main__.Execution.test_an_imported_binding_is_not_a_global_to_declare) ... ok
+test_an_invalid_scenario_is_rejected (__main__.Execution.test_an_invalid_scenario_is_rejected) ... ok
+test_an_unknown_effect_grant_name_is_rejected (__main__.Execution.test_an_unknown_effect_grant_name_is_rejected) ... ok
+test_an_unknown_materialise_mode_is_rejected (__main__.Execution.test_an_unknown_materialise_mode_is_rejected) ... ok
+test_ancestors_without_the_enclosing_function_are_rejected (__main__.Execution.test_ancestors_without_the_enclosing_function_are_rejected) ... ok
+test_arguments_are_really_used_by_the_called_code (__main__.Execution.test_arguments_are_really_used_by_the_called_code) ... ok
+test_child_processes_are_denied_without_the_grant (__main__.Execution.test_child_processes_are_denied_without_the_grant) ... ok
+test_console_output_is_captured_separately_from_the_result (__main__.Execution.test_console_output_is_captured_separately_from_the_result) ... ok
+test_execution_uses_the_pinned_bytes_after_the_project_changes (__main__.Execution.test_execution_uses_the_pinned_bytes_after_the_project_changes) ... ok
+test_missing_facts_need_an_acknowledgement_not_a_declaration (__main__.Execution.test_missing_facts_need_an_acknowledgement_not_a_declaration) ... ok
+test_module_level_state_is_present_rather_than_declared (__main__.Execution.test_module_level_state_is_present_rather_than_declared) ... ok
+test_network_is_denied_without_the_grant (__main__.Execution.test_network_is_denied_without_the_grant) ... ok
+test_reading_outside_the_isolated_copy_is_denied (__main__.Execution.test_reading_outside_the_isolated_copy_is_denied) ... ok
+test_records_are_immutable_and_readable_back (__main__.Execution.test_records_are_immutable_and_readable_back) ... ok
+test_sigint_cancels_a_running_call_and_reports_it_as_cancelled (__main__.Execution.test_sigint_cancels_a_running_call_and_reports_it_as_cancelled) ... ok
+test_the_default_copy_is_still_the_whole_snapshot (__main__.Execution.test_the_default_copy_is_still_the_whole_snapshot) ... ok
+test_the_journal_names_the_permission_kind_for_each_blocked_attempt (__main__.Execution.test_the_journal_names_the_permission_kind_for_each_blocked_attempt) ... ok
+test_the_permission_model_is_probed_rather_than_assumed (__main__.Execution.test_the_permission_model_is_probed_rather_than_assumed) ... ok
+test_the_plan_for_a_via_run_names_both_stages (__main__.Execution.test_the_plan_for_a_via_run_names_both_stages) ... ok
+test_the_plan_stage_reports_the_decision_without_running (__main__.Execution.test_the_plan_stage_reports_the_decision_without_running) ... ok
+test_the_same_spec_is_the_same_record (__main__.Execution.test_the_same_spec_is_the_same_record) ... ok
+test_the_trace_never_claims_more_than_was_observed (__main__.Execution.test_the_trace_never_claims_more_than_was_observed) ... ok
+test_a_closure_runs_over_http_through_its_enclosing_function (__main__.HttpClosure.test_a_closure_runs_over_http_through_its_enclosing_function) ... ok
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='utf-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:107: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='utf-8'>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+test_an_http_via_run_without_the_acknowledgement_is_refused_not_run (__main__.HttpClosure.test_an_http_via_run_without_the_acknowledgement_is_refused_not_run) ... ok
+test_an_http_via_that_is_not_the_enclosing_function_is_refused (__main__.HttpClosure.test_an_http_via_that_is_not_the_enclosing_function_is_refused) ... ok
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:84: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='utf-8'>
+  return self.run(*args, **kwds)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/suite.py:84: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='utf-8'>
+  return self.run(*args, **kwds)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+
+----------------------------------------------------------------------
+Ran 59 tests in 65.373s
+
+OK

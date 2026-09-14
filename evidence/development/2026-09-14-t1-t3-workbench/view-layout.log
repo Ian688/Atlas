@@ -1,0 +1,127 @@
+{
+  "schema": "atlas.layout-evaluation.v1",
+  "engine": "elkjs@0.12.0 (web/vendor/elk.bundled.js, pinned, unmodified)",
+  "host": "node v26.5.1",
+  "scenarios": [
+    {
+      "scenario": "focus_small",
+      "requested": 7,
+      "drawn": 8,
+      "folded": 0,
+      "omitted": {
+        "nodes": 0,
+        "unattributed": 0,
+        "unresolved": 1
+      },
+      "budgetExceeded": false,
+      "engineMs": 104.7,
+      "metrics": {
+        "nodes": 8,
+        "edges": 7,
+        "crossings": 0,
+        "labelCollisions": 0,
+        "crossingBasis": "straight_chord_between_ports",
+        "labelBasis": "char_width_6.6"
+      },
+      "bounds": {
+        "width": 874,
+        "height": 386
+      },
+      "ports": 14,
+      "summaryEdges": 0
+    },
+    {
+      "scenario": "focus_typical",
+      "requested": 17,
+      "drawn": 19,
+      "folded": 0,
+      "omitted": {
+        "nodes": 0,
+        "unattributed": 0,
+        "unresolved": 2
+      },
+      "budgetExceeded": false,
+      "engineMs": 28,
+      "metrics": {
+        "nodes": 19,
+        "edges": 18,
+        "crossings": 0,
+        "labelCollisions": 0,
+        "crossingBasis": "straight_chord_between_ports",
+        "labelBasis": "char_width_6.6"
+      },
+      "bounds": {
+        "width": 874,
+        "height": 1028
+      },
+      "ports": 36,
+      "summaryEdges": 0
+    },
+    {
+      "scenario": "focus_depth2",
+      "requested": 37,
+      "drawn": 40,
+      "folded": 0,
+      "omitted": {
+        "nodes": 0,
+        "unattributed": 0,
+        "unresolved": 3
+      },
+      "budgetExceeded": false,
+      "engineMs": 40.9,
+      "metrics": {
+        "nodes": 40,
+        "edges": 39,
+        "crossings": 0,
+        "labelCollisions": 0,
+        "crossingBasis": "straight_chord_between_ports",
+        "labelBasis": "char_width_6.6"
+      },
+      "bounds": {
+        "width": 1202,
+        "height": 1670
+      },
+      "ports": 78,
+      "summaryEdges": 0
+    },
+    {
+      "scenario": "focus_folded",
+      "requested": 121,
+      "drawn": 80,
+      "folded": 81,
+      "omitted": {
+        "nodes": 81,
+        "unattributed": 0,
+        "unresolved": 4
+      },
+      "budgetExceeded": true,
+      "engineMs": 76.1,
+      "metrics": {
+        "nodes": 80,
+        "edges": 79,
+        "crossings": 0,
+        "labelCollisions": 0,
+        "crossingBasis": "straight_chord_between_ports",
+        "labelBasis": "char_width_6.6"
+      },
+      "bounds": {
+        "width": 1008,
+        "height": 3176
+      },
+      "ports": 158,
+      "summaryEdges": 36
+    }
+  ],
+  "deterministic": true,
+  "coordinate_less_result": "elk_returned_no_coordinates:1/1",
+  "criteria": {
+    "passed": 18,
+    "total": 18,
+    "failed": []
+  },
+  "notes": [
+    "Engine time is layout only; it excludes building the model from facts.",
+    "Crossings count straight chords between ports, not the drawn curves.",
+    "Label boxes are estimated from character count, so collisions are comparable, not pixel-exact."
+  ]
+}

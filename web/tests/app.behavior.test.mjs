@@ -31,7 +31,7 @@ const LAYOUT = path.join(HERE, '..', 'layout.js');
 
 class El {
   constructor(id) {
-    this.id = id;
+    this._id = id;
     this._text = [];
     this._children = [];
     this.hidden = false;
@@ -40,6 +40,10 @@ class El {
     this.className = '';
     this.title = '';
   }
+  // Elements created by app code register themselves under their id, so
+  // getElementById can reach dynamically built forms, not just static markup.
+  set id(v) { this._id = v; if (typeof v === 'string' && !v.startsWith('#') && registerEl) registerEl(v, this); }
+  get id() { return this._id; }
   set textContent(v) { this._text = v == null ? [] : [String(v)]; }
   get textContent() { return this._text.join(''); }
   append(...nodes) {
@@ -55,16 +59,18 @@ class El {
   getBoundingClientRect() { return { width: 1, height: 1, top: 0, left: 0 }; }
 }
 
-function makeDom() {
+function makeDom(options = {}) {
   const elements = new Map();
+  registerEl = null;
   const el = (id) => {
     if (!elements.has(id)) elements.set(id, new El(id));
     return elements.get(id);
   };
+  registerEl = (id, node) => { elements.set(id, node); };
   const document = {
     getElementById: (id) => el(id),
-    createElement: (tag) => new El(`#${tag}`),
-    createElementNS: (_ns, tag) => new El(`#${tag}`),
+    createElement: (tag) => Object.assign(new El(`#${tag}`), { tagName: tag.toUpperCase() }),
+    createElementNS: (_ns, tag) => Object.assign(new El(`#${tag}`), { tagName: tag.toUpperCase() }),
   };
   return { document, el };
 }
@@ -87,16 +93,30 @@ function makeFetch(routes, requests) {
 }
 
 function boot(routes, options = {}) {
-  const { document, el } = makeDom();
+  const { document, el } = makeDom(options);
   const requests = [];
+  const location = { hash: options.hash || '', pathname: options.pathname || '/' };
+  const storage = options.sharedStorage || new Map();
+  const localStorageStub = {
+    getItem: (k) => (storage.has(k) ? storage.get(k) : null),
+    setItem: (k, v) => storage.set(k, String(v)),
+  };
   const sandbox = {
     document,
-    location: { hash: options.hash || '', pathname: options.pathname || '/' },
-    history: { replaceState() {} },
+    localStorage: localStorageStub,
+    location,
+    // The page writes its pinned selection and view state through
+    // replaceState; a stub that ignores the write would make hash assertions
+    // read a page that never moved.
+    history: { replaceState(_s, _t, url) {
+      const u = new URL(url, 'http://127.0.0.1');
+      location.pathname = u.pathname;
+      location.hash = u.hash;
+    } },
     navigator: { clipboard: { writeText: async () => {} } },
     URL, URLSearchParams, Blob, TextEncoder, console,
     fetch: makeFetch(routes, requests),
-    setTimeout, clearTimeout,
+    setTimeout, clearTimeout, setInterval, clearInterval,
   };
   // A layout engine can be injected, so the asynchronous path is exercised with
   // a controlled engine instead of the real one: the vendored engine returned
@@ -158,6 +178,7 @@ const routeBase = () => ({
   flow: flowFact(FN_A.id, ['CONST_A']),
 });
 
+let registerEl = null;
 const checks = [];
 function check(name, fn) { checks.push([name, fn]); }
 
@@ -191,15 +212,22 @@ check('a failed selection clears the previous flow facts', async () => {
   t.el('token').value = 'TOKEN-1';
   await t.run('connect()');
   await t.run(`select(${JSON.stringify(FN_A)})`);
-  assert.equal(t.el('flow-panel').hidden, false, 'fnA flow must render');
+  // The values view is a lens now: the flow renders under「值从哪来」.
+  assert.equal(t.run("setLens('values')"), true, 'the values lens must exist');
+  assert.equal(t.el('flow-panel').hidden, false, 'fnA flow must render in the values lens');
   assert.match(t.el('flow-body').textContent, /CONST_A/, 'fnA facts must be on screen');
 
   // fnB's source/reach now fail: the panel must not keep fnA's conclusion.
+  // Resources load independently now, so fnB's own flow query still runs and
+  // happens to answer with fnA's fact — the panel must refuse it by name.
   t.routes.source = { __status: 401 };
   t.routes.reach = { __status: 401 };
   await t.run(`select(${JSON.stringify(FN_B)})`);
-  assert.equal(t.el('flow-panel').hidden, true, 'the flow panel must be cleared on failure');
-  assert.doesNotMatch(t.el('flow-body').textContent, /CONST_A/, 'fnA facts must not survive under fnB');
+  const flowShown = t.el('flow-body').textContent;
+  assert.doesNotMatch(flowShown, /CONST_A/, 'fnA facts must not survive under fnB');
+  if (!t.el('flow-panel').hidden) {
+    assert.match(flowShown, /已拒绝显示/, 'a visible panel must be an explicit refusal, not leftover facts');
+  }
   assert.match(t.el('selection-name').textContent, /fnB/, 'the header names the new selection');
   assert.match(t.el('selection-facts').textContent, /会话已失效/, 'a 401 must be explained, not hidden');
 });
@@ -570,7 +598,7 @@ check('the effect journal is shown, and an empty journal is not read as "no effe
   await t.run('connect()');
   await t.run(`select(${JSON.stringify(FN_A)})`);
   await t.run('runControlled()');
-  const shown = t.el('exec-body').textContent;
+  const shown = t.el('exec-result').textContent;
   assert.match(shown, /授予边界：fs_write=false/, 'the granted bound must be visible');
   assert.match(shown, /FileSystemWrite/, 'the blocked permission kind must be shown');
   assert.match(shown, /\/tmp\/escape\.txt/, 'the target of the blocked attempt must be shown');
@@ -578,7 +606,7 @@ check('the effect journal is shown, and an empty journal is not read as "no effe
   // And with nothing denied, the panel must not claim there were no effects.
   t.routes.exec = record();
   await t.run('runControlled()');
-  const quiet = t.el('exec-body').textContent;
+  const quiet = t.el('exec-result').textContent;
   assert.match(quiet, /不等于没有副作用/, 'an empty journal must not read as "nothing happened"');
 });
 
@@ -620,6 +648,8 @@ check('pressing run posts the pinned request and draws the observed boundary', a
   assert.equal(t.el('exec-run').disabled, false, 'a pure callable must be runnable');
 
   t.el('exec-args').value = '[1,2]';
+  await t.run(`execDraft(${JSON.stringify(FN_A.id)}).advanced = true`);
+  await t.run('renderExecForm(state.execProfile)');
   await t.run('runControlled()');
   const posted = t.requests.filter((r) => r.name === 'exec');
   assert.equal(posted.length, 1, 'exactly one run must be requested');
@@ -629,7 +659,7 @@ check('pressing run posts the pinned request and draws the observed boundary', a
   assert.deepEqual(body.args, [1, 2], 'the page must send the arguments it displayed');
   assert.deepEqual(body.allow_effects, ['unknown_calls'], 'only the profile-required grants are forwarded');
 
-  const shown = t.el('exec-body').textContent;
+  const shown = t.el('exec-result').textContent;
   assert.match(shown, /观测结果 returned/, 'the observed verdict must be shown');
   assert.match(shown, /返回值 3/, 'the real returned value must be shown');
   assert.match(shown, /coverage=not_sampled/, 'the observation boundary must always be stated');
@@ -648,7 +678,7 @@ check('a refused record is shown as a refusal, never as a result', async () => {
   await t.run('connect()');
   await t.run(`select(${JSON.stringify(FN_A)})`);
   await t.run('runControlled()');
-  const shown = t.el('exec-body').textContent;
+  const shown = t.el('exec-result').textContent;
   assert.match(shown, /拒绝执行/, 'the refusal must be named');
   assert.match(shown, /missing_grants/, 'the refusal code must be shown');
   assert.match(shown, /没有进程被启动/, 'a refusal must not read as a failed execution');
@@ -669,7 +699,7 @@ check('a mock-labelled run says so and an observed record keeps its identity', a
   await t.run('connect()');
   await t.run(`select(${JSON.stringify(FN_A)})`);
   await t.run('runControlled()');
-  const shown = t.el('exec-body').textContent;
+  const shown = t.el('exec-result').textContent;
   assert.match(shown, /mock\/fixture/, 'a fixture run must be labelled');
   assert.match(shown, /不得当作真实环境观测/, 'a fixture result must not read as a real observation');
   assert.match(shown, /TypeError: boom/, 'the thrown error must be shown');
@@ -716,6 +746,8 @@ check('a nested closure is offered only through its real enclosing function', as
 
   t.el('exec-args').value = '[5]';
   t.el('exec-via-args').value = '[100]';
+  await t.run(`execDraft(${JSON.stringify(FN_A.id)}).advanced = true`);
+  await t.run('renderExecForm(state.execProfile)');
   await t.run('runControlled()');
   const posted = t.requests.filter((r) => r.name === 'exec');
   assert.equal(posted.length, 1, 'exactly one run must be requested');
@@ -723,7 +755,7 @@ check('a nested closure is offered only through its real enclosing function', as
   assert.deepEqual(body.via, { symbol: 'symbol:a.js:40:80', args: [100] }, 'the enclosing call must be stated, not guessed');
   assert.deepEqual(body.args, [5], 'the closure keeps its own arguments');
 
-  const shown = t.el('exec-body').textContent;
+  const shown = t.el('exec-result').textContent;
   assert.match(shown, /阶段 1 调用 increment/, 'the enclosing stage must be shown, not hidden');
   assert.match(shown, /下一级源码同一性 source_identity/, 'the closure instance must be shown as identity-checked');
 });
@@ -784,6 +816,8 @@ check('a closure nested three levels deep discovers its ancestors and posts the 
 
   t.el('exec-args').value = '[3]';
   t.el('exec-via-args').value = '[]';
+  await t.run(`execDraft(${JSON.stringify(FN_A.id)}).advanced = true`);
+  await t.run('renderExecForm(state.execProfile)');
   await t.run('runControlled()');
   const posted = t.requests.filter((r) => r.name === 'exec');
   assert.equal(posted.length, 1);
@@ -791,7 +825,7 @@ check('a closure nested three levels deep discovers its ancestors and posts the 
   assert.deepEqual(body.via, { symbol: enclosing, args: [] });
   assert.deepEqual(body.via_chain, [{ symbol: ancestor, args: [] }],
     'the ancestors are posted outermost first, with their own arguments');
-  const shown = t.el('exec-body').textContent;
+  const shown = t.el('exec-result').textContent;
   assert.match(shown, /祖先链（由外到内）outer → middle/, 'every ancestor must be shown, not just the nearest one');
   assert.match(shown, /阶段 2 调用 inner/, 'each stage is reported separately');
   assert.match(shown, /下一级源码同一性 source_identity/, 'each link is shown as identity-checked');
@@ -821,7 +855,7 @@ check('an unmatched closure instance is shown as an observation, not as the targ
   await t.run('connect()');
   await t.run(`select(${JSON.stringify(FN_A)})`);
   await t.run('runControlled()');
-  const shown = t.el('exec-body').textContent;
+  const shown = t.el('exec-result').textContent;
   assert.match(shown, /closure_identity_mismatch/, 'the verdict must name the mismatch');
   assert.match(shown, /源码同一性 不匹配/, 'the mismatch must be stated explicitly');
   assert.match(shown, /function alpha/, 'the observed (different) source must be shown');
@@ -1034,7 +1068,7 @@ check('a verified proposal shows the graph diff, the observed test and the CLI-o
   assert.match(shown, /变更节点 3/, 'the graph diff must be shown');
   assert.match(shown, /未解析调用 前 2 → 后 1/, 'the derived analysis must be compared');
   assert.match(shown, /退出码 0/, 'the observed test result must be shown');
-  assert.match(shown, /验证与应用只能在本机 CLI 上做/, 'the boundary must be stated');
+  assert.match(shown, /应用与撤销只能在本机 CLI 上做/, 'the write boundary must be stated (verify is a page action now)');
 });
 
 check('a create or delete proposal is shown as that, not as an edit', async () => {
@@ -1254,6 +1288,523 @@ check('a layout that arrives after the selection moved on is discarded', async (
   assert.ok(!stale || stale.stale !== true, 'a stale result must not be adopted');
   if (stale) assert.notEqual(stale.model.targetId, FN_A.id, 'the target must be the new selection');
 });
+// --- F1: the workspace shell -------------------------------------------------
+// The left rail is a server search now. What the page must never do again is
+// page through id-ordered nodes locally and call that "the project searched".
+// These checks pin: the /api/search contract is used and echoed honestly, an
+// empty result reads differently from a failure, a delayed answer from a
+// previous keystroke or selection lands nowhere, and one resource failing does
+// not blank the ones that succeeded.
+function searchPage(query, items, over = {}) {
+  return Object.assign({
+    analysis_id: report.id, query, total: items.length, items, next_cursor: null,
+  }, over);
+}
+
+check('the left rail searches the server and shows matches, not a local filter', async () => {
+  const t = boot(routeBase());
+  const calls = [];
+  t.routes.search = (params) => {
+    calls.push(params);
+    const q = String(params.q || '');
+    const items = [FN_A, FN_B].filter((n) => n.name.toLowerCase().includes(q.toLowerCase()));
+    return searchPage(q, items, { total: items.length + 40, next_cursor: items.length ? 'cur:100' : null });
+  };
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  assert.ok(calls.length >= 1, 'connect must seed the rail with a search');
+  assert.equal(calls[0].kind, 'function', 'the rail asks for functions');
+  assert.ok(String(calls[0].limit) > 0, 'the rail bounds its page');
+
+  t.el('fn-search').value = 'fnB';
+  await t.run('runSearch()');
+  assert.equal(calls[calls.length - 1].q, 'fnB', 'the query travels to the server');
+  const texts = collect(t.el('fn-list')).map((n) => n.textContent || '').join(' | ');
+  assert.match(texts, /fnB/, 'the matching function is listed');
+  assert.match(texts, /a\.js/, 'grouped by file so same names are tellable apart');
+  assert.match(t.el('fn-count').textContent, /匹配 41 个 · 已显示前 1 个/, 'the rail reports match count and shown count, not silent truncation');
+  assert.equal(t.el('fn-more').hidden, false, 'a next_cursor offers more, it does not hide the tail');
+});
+
+check('an empty search result and a failed search read differently', async () => {
+  const t = boot(routeBase());
+  t.routes.search = searchPage('zzz', []);
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  t.el('fn-search').value = 'zzz';
+  await t.run('runSearch()');
+  const texts = collect(t.el('fn-list')).map((n) => n.textContent || '').join(' | ');
+  assert.match(texts, /没有匹配的函数/, 'an empty result is said, with the query echoed');
+  assert.equal(t.el('fn-list').className, '', 'no error styling on an honest empty');
+
+  t.routes.search = { __status: 500 };
+  await t.run('runSearch()');
+  const failed = collect(t.el('fn-list')).map((n) => n.textContent || '').join(' | ');
+  assert.match(failed, /搜索失败/, 'a failure must be named');
+  assert.match(failed, /重试/, 'and a retry must be offered');
+  assert.equal(t.el('fn-more').hidden, true, 'no pagination offered past a failure');
+});
+
+check('a slow search answer from an older keystroke never renders', async () => {
+  const t = boot(routeBase());
+  const release = [];
+  t.routes.search = (params) => new Promise((resolve) => {
+    if (params.q === 'slow') release.push(() => resolve(searchPage('slow', [FN_A])));
+    else resolve(searchPage(params.q, [FN_B]));
+  });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()'); // immediate empty-q answer
+  t.el('fn-search').value = 'slow';
+  const slow = t.run('runSearch()');
+  t.el('fn-search').value = 'fast';
+  await t.run('runSearch()'); // the newer keystroke wins the race
+  const textsNow = collect(t.el('fn-list')).map((n) => n.textContent || '').join(' | ');
+  assert.match(textsNow, /fnB/, 'the newer query has rendered');
+  release[0]();
+  await slow;
+  const textsAfter = collect(t.el('fn-list')).map((n) => n.textContent || '').join(' | ');
+  assert.doesNotMatch(textsAfter, /fnA/, 'the stale answer must be dropped, not appended');
+  assert.match(textsAfter, /fnB/, 'and the current answer must stay');
+});
+
+check('function A proposals that land after switching to B go nowhere', async () => {
+  const t = boot(routeBase());
+  const release = [];
+  t.routes.patches = (params) => new Promise((resolve) => {
+    if (params.entity === FN_A.id) release.push(() => resolve({
+      analysis_id: report.id, entity_id: FN_A.id, proposals: [proposal()],
+    }));
+    else resolve({ analysis_id: report.id, entity_id: FN_B.id, proposals: [] });
+  });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  const first = t.run(`select(${JSON.stringify(FN_A)})`);
+  await t.run(`select(${JSON.stringify(FN_B)})`); // reader moves on before A answers
+  release[0]();
+  await first;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const shown = t.el('patch-body').textContent;
+  assert.match(shown, /当前选区还没有提案/, "B's empty proposal list is what is shown");
+  assert.doesNotMatch(shown, /make it exact/, "A's late proposal must not render under B");
+  assert.equal(t.evalIn('state.patches.length'), 0, 'and must not enter the shared state');
+});
+
+check('source and relations fail independently, with a retry on the failed one', async () => {
+  const t = boot(routeBase());
+  t.routes.source = { __status: 500 };
+  t.routes.reach = {
+    analysis_id: report.id, direction: 'out', root: FN_A.id,
+    nodes: [FN_A, FN_B],
+    edges: [{ id: 'c1', kind: 'call_candidate', source: FN_A.id, target: FN_B.id, label: 'fnB', basis: 'x', path: 'a.js', start: 1, end: 2 }],
+    unresolved: [], truncated: false,
+  };
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  const sourceArea = t.el('source-status').textContent;
+  assert.match(sourceArea, /源码读取失败/, 'the source panel must name its own failure');
+  assert.match(collect(t.el('source-status')).map((n) => n.textContent || '').join(' '), /重试/, 'and offer its own retry');
+  const graphTexts = collect(t.el('graph')).map((n) => n.textContent || '').join(' | ');
+  assert.match(graphTexts, /fnB/, 'relations succeeded, so the graph must still draw');
+  assert.doesNotMatch(t.el('source').textContent, /^读取固定快照/, 'the source panel must not sit on a loading line forever');
+
+  // The retry re-asks only the failed resource, on the same generation.
+  t.routes.source = { content: 'function fnA(){}', start: 0, end: 10, truncated: false, blob: 'b'.repeat(64) };
+  await t.run('state.sourceRes && loadSource(state.selected, state.request)');
+  assert.doesNotMatch(t.el('source-status').textContent, /源码读取失败/, 'a successful retry clears the error');
+  assert.match(t.el('source').textContent, /function fnA/, 'and shows the source');
+});
+
+check('selection navigation keeps a back stack and a recent list', async () => {
+  const t = boot(routeBase());
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  assert.equal(t.el('nav-back').disabled, true, 'back starts disabled');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  await t.run(`select(${JSON.stringify(FN_B)})`);
+  assert.equal(t.el('nav-back').disabled, false, 'a second selection enables back');
+  assert.match(t.el('selection-name').textContent, /fnB/);
+  await t.run('navBack()');
+  assert.match(t.el('selection-name').textContent, /fnA/, 'back returns to the previous object');
+  assert.equal(t.el('nav-back').disabled, true, 'and the stack is empty again');
+  const recent = collect(t.el('recent-list')).map((n) => n.textContent || '').join(' | ');
+  assert.match(recent, /fnB/, 'the recent list remembers the other object');
+  const published = t.el('inspector');
+  assert.equal(published['data-selection-entity'], FN_A.id, 'the pinned selection follows the back navigation');
+});
+
+check('task tabs exist and the run shortcut follows the selection kind', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = profile();
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  assert.equal(t.evalIn('setMode("review")'), true, 'the review tab exists');
+  assert.equal(t.evalIn('setMode("nope")'), false, 'an unknown mode is refused');
+  assert.equal(t.evalIn('setLens("nope")'), false, 'an unknown lens is refused');
+  assert.equal(t.el('run-shortcut').disabled, false, 'a function offers the run shortcut');
+  assert.equal(t.evalIn('setMode("run")'), true);
+  assert.equal(t.el('task-run').hidden, false, 'the run task area shows for a function');
+  assert.equal(t.el('exec-panel').hidden, false, 'with a profile, the execution panel shows inside it');
+  t.run('resetDetail()');
+  assert.equal(t.el('run-shortcut').disabled, true, 'no selection, no run shortcut');
+});
+
+// --- F2: values and unknowns locate real source windows ----------------------
+// The point of F2 is that a conclusion can show where it comes from: a value
+// row or an unknown row carries a real UTF-8 byte anchor, clicking loads a
+// bounded window of the pinned blob (not the disk file) with line numbers and
+// a highlight, and an unknown without an anchor says so instead of pretending.
+function flowFactAnchored(symbol) {
+  const fact = flowFact(symbol, ['CONST_A']);
+  fact.ops = [
+    { index: 0, kind: 'read_local', detail: 'b:a.js:0:x', start: 0, end: 5, may_throw: false },
+    { index: 1, kind: 'assign_local', detail: 'b:a.js:0:x', start: 0, end: 9, may_throw: false },
+    { index: 2, kind: 'return_local', detail: 'b:a.js:0:x', start: 5, end: 10, may_throw: false },
+    { index: 3, kind: 'property_read', detail: 'for_in_of_element_unknown', start: 7, end: 8, may_throw: true },
+  ];
+  fact.blocks = [{ id: 0, term: 'return', ops: [1, 2], successors: [] }];
+  fact.block_states = [
+    { block: 0, completion: 'Normal', truncated: false, bindings: [
+      { binding: 'b:x', name: 'written', init: 'Initialized', defs: [1], value: {
+        constants: [], typed_constants: [], targets: [], origins: ['CallResult(op1)'], reasons: [], unknown: false,
+      } },
+    ] },
+  ];
+  fact.def_use = [{ binding: 'b:x', name: 'written', defs: [1], uses: [] }];
+  fact.unknown_reasons = ['for_in_of_element_unknown', 'untracked_summary_only'];
+  fact.returns = { constants: [], typed_constants: [], targets: [], origins: [], reasons: [], unknown: false };
+  fact.throws = { constants: [], typed_constants: [], targets: [], origins: [], reasons: [], unknown: false };
+  return fact;
+}
+
+async function bootAnchored(options = {}) {
+  const windows = [];
+  const t = boot({
+    ...routeBase(),
+    flow: flowFactAnchored(FN_A.id),
+    source: (params) => {
+      windows.push({ start: Number(params.start), end: Number(params.end), entity: params.entity });
+      return {
+        content: 'line one\nline two\nline three\n', start: Number(params.start ?? 0),
+        end: Number(params.end ?? 30), truncated: false, blob: 'b'.repeat(64),
+        file_total_bytes: 90, start_line: Number(params.start) === 0 ? 1 : 2,
+        entity_id: params.entity, path: 'a.js',
+      };
+    },
+  }, options);
+  t.windows = windows;
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  return t;
+}
+
+check('value rows carry byte anchors and clicking loads a bounded source window', async () => {
+  const t = await bootAnchored();
+  t.run("setLens('values')");
+  const shown = t.el('flow-body').textContent;
+  assert.match(shown, /written \[Initialized\]/, 'the binding row names the variable');
+  assert.match(shown, /CallResult\(op1\)/, 'the origin summary comes from the published value');
+
+  const rows = collect(t.el('flow-body')).filter((n) => (n.className || '').includes('wb-anchored'));
+  assert.ok(rows.length >= 1, 'at least the binding row is anchored');
+  rows[0].onclick();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const win = t.windows[t.windows.length - 1];
+  assert.deepEqual(
+    { start: win.start, end: win.end },
+    { start: 0, end: 9 + 300 > 10 ? 10 : win.end },
+    'the window stays inside the entity span (pad clamped to byte 10)',
+  );
+  assert.equal(win.entity, FN_A.id, 'the window is pinned to the selected entity');
+  const lines = collect(t.el('source')).filter((n) => (n.className || '').includes('src-line'));
+  assert.ok(lines.length >= 3, 'the window renders as numbered lines');
+  assert.match(t.el('source-status').textContent, /源码定位/, 'the panel names what was located');
+  assert.match(t.el('source-status').textContent, /显示完整对象/, 'and offers the way back');
+});
+
+check('unknown rows with anchors locate, anchor-less unknowns say so', async () => {
+  const t = await bootAnchored();
+  t.run("setLens('unknowns')");
+  const shown = t.el('unknown-body').textContent;
+  assert.match(shown, /for_in_of_element_unknown · 1 处可定位/, 'an anchored unknown offers a locate');
+  assert.match(shown, /untracked_summary_only · 无单一源码锚点/, 'a summary-only unknown admits it has no anchor');
+
+  const anchored = collect(t.el('unknown-body')).find((n) => (n.className || '').includes('wb-anchored'));
+  anchored.onclick();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const win = t.windows[t.windows.length - 1];
+  // op bytes are 7-8; the padded window is clamped to the entity's own span (0..10).
+  assert.deepEqual({ start: win.start, end: win.end }, { start: 0, end: 10 }, 'the unknown locates its op bytes, clamped to the entity');
+  const hl = collect(t.el('source')).filter((n) => (n.className || '').includes('src-hl'));
+  assert.ok(hl.length >= 1, 'the located line is highlighted');
+});
+
+check('a failed source window reports the failure and keeps the old view', async () => {
+  const t = await bootAnchored();
+  t.routes.source = { __status: 400 };
+  t.run("setLens('values')");
+  const rows = collect(t.el('flow-body')).filter((n) => (n.className || '').includes('wb-anchored'));
+  rows[0].onclick();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.match(t.el('status').textContent, /源码定位失败/, 'the failure must be named');
+  assert.ok(t.el('source').textContent.includes('line'), 'the previous source view is not blanked');
+});
+
+check('diagnostics unknowns open the file at the real byte window', async () => {
+  const t = boot(routeBase());
+  t.routes.report = { ...report, diagnostics: [
+    { code: 'unparsed_construct', path: 'a.js', detail: 'dynamic_dispatch 4 9' },
+  ] };
+  const windows = [];
+  t.routes.source = (params) => {
+    windows.push({ start: Number(params.start), end: Number(params.end) });
+    return { content: 'abcd efgh ij', start: Number(params.start ?? 0), end: Number(params.end ?? 12),
+      truncated: false, blob: 'b'.repeat(64), file_total_bytes: 12, start_line: 1, entity_id: params.entity };
+  };
+  t.routes.node = (params) => ({ analysis_id: report.id, node: { id: 'file:a.js', kind: 'file', name: 'a.js', path: 'a.js', start: 0, end: 12 } });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  t.run("setLens('unknowns')");
+  await t.run(`openUnknownRegion(${JSON.stringify({ code: 'unparsed_construct', path: 'a.js', detail: 'dynamic_dispatch 4 9' })})`);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.ok(t.windows || windows.length, 'a window request must have been made');
+  const win = windows[windows.length - 1];
+  assert.deepEqual({ start: win.start, end: win.end }, { start: 0, end: 12 },
+    'the file window is padded around the reported bytes and clamped to the file');
+});
+
+// --- F3: the run form ---------------------------------------------------------
+// The form is the product surface of a run: per-parameter inputs driven by the
+// published profile, declared receiver/globals only where the profile asks for
+// them, inline input errors that never POST, and a history that can refill an
+// input without auto-running. The run button follows the profile exactly as
+// before; the form changes where the arguments come from.
+function profileWithParams() {
+  return profile({
+    params: [{ index: 0, name: 'coupon' }, { index: 1, name: 'order' }],
+    arity: 2,
+    required_context: ['this_arg', 'globals'],
+    required_globals: ['MAX_DISCOUNT'],
+  });
+}
+
+check('the form renders per-parameter inputs and posts the declared inputs', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = profileWithParams();
+  t.routes.exec = record();
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  assert.equal(t.el('exec-form').hidden, false, 'the form shows for a classified function');
+  assert.equal(t.el('exec-param-0').tagName, 'TEXTAREA', 'parameter 0 has its own field');
+  assert.match(collect(t.el('exec-fields')).map((n) => n.textContent || '').join(' '), /coupon/, 'the published parameter name labels the field');
+  assert.ok(t.el('exec-receiver'), 'a this_arg requirement gets a receiver input');
+  const globalsInputs = collect(t.el('exec-context')).filter((n) => (n.id || '').startsWith('exec-global'));
+  assert.ok(globalsInputs.length >= 1, 'named globals get inputs');
+
+  // Fill per parameter: draft lives per selection.
+  t.el('exec-param-0').value = '{"amount":100}';
+  t.el('exec-param-0').oninput();
+  t.el('exec-param-1').value = '[1,2]';
+  t.el('exec-param-1').oninput();
+  t.el('exec-receiver').value = '{"account":"A"}';
+  t.el('exec-receiver').oninput();
+  t.el('exec-global-0').value = '500';
+  t.el('exec-global-0').oninput();
+  await t.run('runControlled()');
+  const posted = t.requests.filter((r) => r.name === 'exec');
+  assert.equal(posted.length, 1, 'exactly one run requested');
+  const body = JSON.parse(posted[0].body);
+  assert.deepEqual(body.args, [{ amount: 100 }, [1, 2]], 'the per-parameter fields become the positional args');
+  assert.deepEqual(body.this_arg, { account: 'A' }, 'the receiver is declared, not guessed');
+  assert.deepEqual(body.globals, { MAX_DISCOUNT: 500 }, 'named globals travel as inputs');
+});
+
+check('an empty parameter field or bad JSON shows an inline error and never POSTs', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = profileWithParams();
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  await t.run('runControlled()');
+  assert.equal(t.el('exec-input-error').hidden, false, 'the error shows next to the form');
+  assert.match(t.el('exec-input-error').textContent, /coupon/, 'it names the offending parameter');
+  assert.equal(t.requests.filter((r) => r.name === 'exec').length, 0, 'no run is requested');
+
+  t.el('exec-param-0').value = '{not json';
+  t.el('exec-param-0').oninput();
+  await t.run('runControlled()');
+  assert.match(t.el('exec-input-error').textContent, /输入格式不正确/, 'bad JSON is an input error');
+  assert.equal(t.requests.filter((r) => r.name === 'exec').length, 0, 'still nothing posted');
+});
+
+check('a profile without context needs shows no receiver or globals inputs', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = profile();
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  assert.equal(t.el('exec-context')._children.length, 0, 'no context inputs the profile did not ask for');
+});
+
+check('history lists records and refills the form without auto-running', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = profileWithParams();
+  t.routes['exec-records'] = [{
+    id: 'r1', verdict: 'returned', duration_ms: 12, symbol: FN_A.id,
+    spec: { args: [{ amount: 7 }, []], this_arg: null, globals: { MAX_DISCOUNT: 50 } },
+  }];
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  assert.equal(t.el('exec-history-panel').hidden, false, 'history shows for a function');
+  assert.match(t.el('exec-history').textContent, /returned/, 'the verdict is listed');
+  const before = t.requests.filter((r) => r.name === 'exec').length;
+  await t.run('refillFromRecord(state.execRecords[0])');
+  assert.equal(t.requests.filter((r) => r.name === 'exec').length, before, 'refill never auto-runs');
+  assert.match(t.el('exec-param-0').value, /"amount":7/, 'parameter 0 was refilled from the record');
+  assert.equal(t.el('exec-global-0').value, '50', 'globals refill too');
+});
+
+// --- F4: page-triggered verification -----------------------------------------
+// The page may start a verification (the server owns every execution
+// parameter) and must show the honest answer: a queued job that ends with
+// test.ran:false is "no test ran", never "passed". A rejected proposal offers
+// no verify button at all, and switching selections stops the polling from
+// attaching results to another proposal.
+check('a proposed patch offers verify, which queues and then reports honestly', async () => {
+  const t = boot(routeBase());
+  t.routes.patches = { analysis_id: report.id, entity_id: FN_A.id, proposals: [proposal()] };
+  t.routes['patch/verify'] = { outcome: 'queued', job: { id: 'j1', state: 'queued' } };
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  const verifyButtons = collect(t.el('patch-body')).filter((n) => (n.textContent || '') === '验证（隔离副本重新派生分析）');
+  assert.ok(verifyButtons.length >= 1, 'a proposed+validated proposal offers a verify action');
+  assert.equal(verifyButtons.filter((n) => n.tagName === 'BUTTON').length, 1, 'exactly one verify button (not its container)');
+  await t.run('startVerify(' + JSON.stringify('p'.repeat(64)) + ')');
+  const posted = t.requests.filter((r) => r.name === 'patch/verify' && r.body);
+  assert.equal(posted.length, 1, 'verify POSTs to the server endpoint');
+  assert.equal(JSON.parse(posted[0].body).id, 'p'.repeat(64), 'the proposal id travels unchanged');
+  const shown = t.el('patch-body').textContent;
+  assert.match(shown, /验证中…/, 'the button shows the in-flight state');
+});
+
+check('a rejected proposal offers no verify button', async () => {
+  const t = boot(routeBase());
+  t.routes.patches = { analysis_id: report.id, entity_id: FN_A.id, proposals: [proposal({
+    proposal: { validation: { ok: false, reason: 'patch_does_not_apply:src/a.js:上下文不匹配' } },
+    outer: { state: 'rejected' },
+  })] };
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  const shown = t.el('patch-body').textContent;
+  assert.doesNotMatch(shown, /验证（隔离副本重新派生分析）/, 'an unverifiable proposal has no verify button');
+});
+
+check('a finished verification poll refreshes the proposal list for the same selection', async () => {
+  const t = boot(routeBase());
+  t.routes.patches = { analysis_id: report.id, entity_id: FN_A.id, proposals: [proposal()] };
+  t.routes['patch/verify'] = { outcome: 'queued', job: { id: 'j1', state: 'queued' } };
+  let pollCount = 0;
+  t.routes['patch/verify'] = (params) => {
+    pollCount += 1;
+    if (pollCount < 2) return { proposal: proposal(), job: { id: 'j1', state: 'running' } };
+    return { proposal: proposal({
+      outer: { state: 'verified',
+        verification: { base_analysis_id: report.id, patched_analysis_id: 'q'.repeat(64),
+          graph_diff: { nodes: { changed_count: 1 } }, test: { observed: false, ran: false } } },
+    }), job: { id: 'j1', state: 'completed' } };
+  };
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  await t.run('startVerify(' + JSON.stringify('p'.repeat(64)) + ')');
+  await new Promise((resolve) => setTimeout(resolve, 4600));
+  const shown = t.el('patch-body').textContent;
+  assert.match(shown, /还没有验证|变更节点/, 'after completion the list is refreshed');
+  assert.match(t.el('status').textContent, /验证完成/, 'the completion is announced');
+});
+
+// --- F5: the task survives navigation ----------------------------------------
+// The current task (tab + lens) travels in the URL fragment next to the
+// selection, so closing the page or round-tripping through the 3D city puts
+// the reader back into the same task. The fragment never carries inputs.
+check('tab and lens persist in the fragment and restore on boot', async () => {
+  const t = boot(routeBase(), { hash: `#mode=run&lens=unknowns` });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  assert.equal(t.evalIn('state.mode'), 'run', 'the fragment restores the task tab');
+  assert.equal(t.evalIn('state.lens'), 'unknowns', 'and the lens');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  const hash = await t.run('decodeURIComponent(location.hash)');
+  assert.match(hash, /mode=run/, 'selection updates keep the mode in the fragment');
+  assert.doesNotMatch(hash, /lens=/, 'a lens is only recorded where it means something');
+  const set = t.run('setMode("review") && setLens("values")');
+  assert.equal(set, true);
+  const after = await t.run('location.hash');
+  assert.match(after, /mode=review/, 'a tab switch rewrites the fragment');
+  assert.doesNotMatch(after, /lens=/, 'lens only travels under understand');
+});
+
+// --- D0: review findings R1/R4 ------------------------------------------------
+check('drawn boxes sit on the layout coordinates their ports use (R4)', async () => {
+  const t = await bootFan();
+  const plan = t.evalIn('state.focusLayout');
+  assert.ok(plan, 'a layout plan exists');
+  const rects = collect(t.el('graph')).filter((n) => (n['#tag'] === 'rect') || (n.className === '' && n.x !== undefined && n.width !== undefined));
+  const drawn = collect(t.el('graph')).map((n) => ({ x: Number(n.x), width: Number(n.width), tag: n['#tag'] || n.id }));
+  for (const box of plan.boxes) {
+    const match = drawn.find((r) => Number.isFinite(r.x) && r.width === box.w && Math.abs(r.x - box.x) < 0.001);
+    assert.ok(match, `box ${box.label} must be drawn at its layout left edge ${box.x} (not its centre)`);
+  }
+});
+
+check('verifying a second proposal still POSTs after navigating away mid-verify (R1)', async () => {
+  const t = boot(routeBase());
+  const posts = [];
+  t.routes['patch/verify'] = { outcome: 'queued', job: { id: 'j1', state: 'running' } };
+  t.routes.patches = (params) => ({
+    analysis_id: report.id, entity_id: params.entity,
+    proposals: [
+      proposal({ id: 'p'.repeat(64) }),
+      proposal({ id: 'q'.repeat(64) }),
+    ],
+  });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  await t.run('startVerify(' + JSON.stringify('p'.repeat(64)) + ')');
+  await t.run(`select(${JSON.stringify(FN_B)})`); // navigate away mid-verify
+  await t.run('startVerify(' + JSON.stringify('q'.repeat(64)) + ')'); // another proposal must not be blocked
+  for (const r of t.requests) if (r.name === 'patch/verify' && r.body) posts.push(JSON.parse(r.body).id);
+  assert.deepEqual(posts.sort(), ['p'.repeat(64), 'q'.repeat(64)], 'both verifications reached the server');
+  assert.equal(t.evalIn('Object.keys(verifyPolls).length'), 2, 'both polls track their own job');
+});
+
+check('run inputs persist locally and restore after a fresh boot', async () => {
+  const sharedStorage = new Map();
+  const routes0 = routeBase();
+  routes0.profile = profileWithParams();
+  const t = boot(routes0, { sharedStorage });
+  t.routes.profile = profileWithParams();
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  t.el('exec-param-0').value = '{"amount":42}';
+  t.el('exec-param-0').oninput();
+  // fresh boot: same origin storage, same analysis
+  const t2 = boot(routeBase(), { sharedStorage });
+  t2.routes.profile = profileWithParams();
+  t2.el('token').value = 'TOKEN-1';
+  await t2.run('connect()');
+  await t2.run(`select(${JSON.stringify(FN_A)})`);
+  assert.equal(t2.el('exec-param-0').value, '{"amount":42}', 'the refilled input survives a reload');
+});
+
 let failed = 0;
 for (const [name, fn] of checks) {
   try {

@@ -553,7 +553,13 @@ class FileBuilder {
     if (node.kind === ts.SyntaxKind.FalseKeyword) return { start, end, expr: 'const', value: { const: 'bool', value: false } };
     if (node.kind === ts.SyntaxKind.NullKeyword) return { start, end, expr: 'const', value: { const: 'null' } };
     if (ts.isIdentifier(node)) {
-      const symbol = this.checker.getSymbolAtLocation(node);
+      // A shorthand property `{ written }` names a *property* symbol at the
+      // assignment site; the value being read is the variable's symbol.
+      // Resolving the property symbol made local reads look like reads of
+      // external globals, so the profile demanded globals no caller owes.
+      const symbol = ts.isShorthandPropertyAssignment(node.parent) && node.parent.name === node
+        ? (this.checker.getShorthandAssignmentValueSymbol(node.parent) || this.checker.getSymbolAtLocation(node))
+        : this.checker.getSymbolAtLocation(node);
       const bindingId = symbol && this.symbolBindings.get(symbol);
       if (bindingId) {
         if (this.declaringFunction.get(bindingId) !== (this.currentFunction && this.currentFunction.symbol)) this.captured.add(bindingId);
@@ -657,7 +663,13 @@ class FileBuilder {
 
   assignTarget(node, fn) {
     if (ts.isIdentifier(node)) {
-      const symbol = this.checker.getSymbolAtLocation(node);
+      // A shorthand property `{ written }` names a *property* symbol at the
+      // assignment site; the value being read is the variable's symbol.
+      // Resolving the property symbol made local reads look like reads of
+      // external globals, so the profile demanded globals no caller owes.
+      const symbol = ts.isShorthandPropertyAssignment(node.parent) && node.parent.name === node
+        ? (this.checker.getShorthandAssignmentValueSymbol(node.parent) || this.checker.getSymbolAtLocation(node))
+        : this.checker.getSymbolAtLocation(node);
       const bindingId = symbol && this.symbolBindings.get(symbol);
       if (bindingId) {
         if (this.declaringFunction.get(bindingId) !== (this.currentFunction && this.currentFunction.symbol)) this.captured.add(bindingId);

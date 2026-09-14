@@ -645,6 +645,11 @@ fn external_names(
             names.insert(format!("\u{0}import:{name}"));
         }
     }
+    // `read_external` is decided by the language worker at the read site with
+    // full scope information (a block-scoped `let CONFIG` must not hide the
+    // outer global `CONFIG`, and a shorthand `{ written }` read is a local).
+    // Filtering here by binding names would need lexical scoping this layer
+    // does not have, so the ops are trusted as classified.
     if let Some(ops) = fact.get("ops").and_then(|v| v.as_array()) {
         for op in ops {
             if op.get("kind").and_then(|v| v.as_str()) == Some("read_external")

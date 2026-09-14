@@ -396,3 +396,35 @@ fn byte_windows_never_split_utf8_and_unparseable_bytes_are_reported() {
     assert_eq!(source["truncated"], true);
     assert!(s.source(&a.id, "file:binary.js", 10).is_err());
 }
+
+#[test]
+fn search_matches_name_and_path_with_stable_pages_and_bounded_cursors() {
+    use atlas_engine::query::search_nodes;
+    let p = tempfile::tempdir().unwrap();
+    let db = tempfile::tempdir().unwrap();
+    let s = Store::open(db.path()).unwrap();
+    let (snap, f) = chain(&s, p.path(), 3, false);
+    let a = analyze(&s, &snap, f, None).unwrap();
+    let all = search_nodes(&s, &a.id, "", "function", 10, None).unwrap();
+    assert_eq!(all.total, 3, "empty query lists every function");
+    assert_eq!(all.query, "", "the query is echoed back");
+    // Name match: f1 only.
+    let named = search_nodes(&s, &a.id, "f1", "function", 10, None).unwrap();
+    assert_eq!(named.total, 1);
+    assert_eq!(named.items[0].name, "f1");
+    // Path match: every symbol sits in a.js.
+    let bypath = search_nodes(&s, &a.id, "a.js", "function", 2, None).unwrap();
+    assert_eq!(bypath.total, 3);
+    assert_eq!(bypath.items.len(), 2, "page limit is honoured");
+    let cursor = bypath.next_cursor.clone().unwrap();
+    let rest = search_nodes(&s, &a.id, "a.js", "function", 2, Some(&cursor)).unwrap();
+    assert_eq!(rest.items.len(), 1, "the next page holds the remainder");
+    // A cursor is bound to its query: reusing it under another query fails.
+    let swapped = search_nodes(&s, &a.id, "f1", "function", 2, Some(&cursor));
+    assert!(swapped.is_err(), "cursor/query mismatch must be refused");
+    // % is a literal, not a wildcard.
+    let wild = search_nodes(&s, &a.id, "%", "function", 10, None).unwrap();
+    assert_eq!(wild.total, 0);
+    // Unknown kinds are refused, not silently everything.
+    assert!(search_nodes(&s, &a.id, "", "widget", 10, None).is_err());
+}

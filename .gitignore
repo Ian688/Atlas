@@ -7,3 +7,7 @@ node_modules/
 __pycache__/
 /local-state/
 /.atlas-verify.lock
+/dist/
+.env
+.env.*
+!.env.example

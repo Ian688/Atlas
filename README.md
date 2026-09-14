@@ -2,7 +2,9 @@
 
 独立的本地代码分析服务与可视化工作台。Modus 是未来的一个宿主，Atlas 的解析引擎、事实、查询和工作台不依赖 Modus、Python 服务或 LLM。
 
-这是 **Foundation 0.2：一条真实可运行的架构切片**，不是成熟 Atlas 的能力验收。已打通文件清点 → 内容快照 → JavaScript/TypeScript 语言材料 → Rust 关系图 → **版本化 Flow IR → CFG → 局部抽象解释（def-use、值来源、常量折叠、循环不动点）** → 跨过程摘要 → 查询 → 持久作业与增量失效 → 2D/3D 工作台 → **执行画像与隔离受控运行** → 固定选区上下文。完整目标仍包含上下文合成、正式 Source/Scenario Trace、Agent 操作与 AI Coding。
+这是 **Foundation 0.2：一条真实可运行的架构切片**，不是成熟 Atlas 的能力验收。已打通文件清点 → 内容快照 → JavaScript/TypeScript 语言材料 → Rust 关系图 → **版本化 Flow IR → CFG → 局部抽象解释（def-use、值来源、常量折叠、循环不动点）** → 跨过程摘要 → 查询 → 持久作业与增量失效 → 2D/3D 工作台 → **执行画像与隔离受控运行** → 固定选区上下文。完整目标仍包含上下文合成、正式 Source/Scenario Trace，以及贯通用户操作的 Agent/AI Coding 工作流。
+
+开发接手：先按 [当前执行任务书](docs/DAILY_DEVELOPMENT_WORK_ORDER.md) 完成用户任务；[产品目标](docs/USE-CASES.md) 描述最终形态，[交接](docs/HANDOFF.md) 提供当前断点。下列实现说明与数字是历史开发记录，实际支持范围以当前代码和对应验证为准，不能作为后续设计上限。
 
 ## 启动
 
@@ -35,7 +37,7 @@ target/debug/atlas --store local-state serve <上一步返回的id>
 - 保存不可变内容快照。项目文件修改以后，旧分析和旧选区依然读取旧字节。
 - 提取 JS/TS 函数、嵌套层级、导入与调用点；通过编译器绑定取得有限的词法调用候选。重绑定、歧义、动态调用等保留未知。
 - 在声明 profile（`js-structured-control.v1`）内把函数体降级为带锚点的 Flow IR，并在 Rust 构建基本块 CFG（含 finally 的 completion 语义、短路/条件分支、循环回边、switch 链），再做有界局部抽象解释：def-use、值来源（`Parameter(i)`、`CallResult`、`Allocation`、`Capture` 等）、有限常量折叠与显式 unknown/预算报告。跨过程符号摘要（参数来源按调用点代回、SCC 固定点、递归有限轮）及有界标量参数上下文已接通：每个 callee 最多保留 8 个调用点上下文，其余回退到符号摘要。未知 callee、跨函数堆分配与捕获 origin 等边界保留显式 unknown。
-- 索引支持 SIGINT/SIGTERM 协作取消；扫描、worker、Rust 求解及发布锁等待共用控制，提交前接受取消会阻止新分析发布。计算预算耗尽可发布带 unknown、frontier 与实际预算计数的部分事实，deadline 耗尽则拒绝发布。持久作业队列与恢复租约仍待实现。
+- 索引支持 SIGINT/SIGTERM 协作取消；扫描、worker、Rust 求解及发布锁等待共用控制，提交前接受取消会阻止新分析发布。计算预算耗尽可发布带 unknown、frontier 与实际预算计数的部分事实，deadline 耗尽则拒绝发布。持久作业链见下文 job 功能。
 - 用 Rust 构建包含关系、调用候选图、递归分量；按版本分页、多跳遍历、读取 UTF-8 源码窗口。
 - **2D 调用视图是分层布局**：选中函数后由本地钉版布局引擎（elkjs 0.12.0，`web/vendor/`，未修改）排布，上游/目标/下游分层，每条边从自己的**端口**出发；预算折叠的成员画成**摘要边**（`经 N 个函数`，虚线），不会被读成直接调用；状态行报出引擎、交叉、标签碰撞与折叠数。引擎不可用或**返回没有坐标**时走本地回退并明说（`fallback_local`），迟到的布局结果按 generation 丢弃。
 - 在真实 2D 页面中浏览文件与函数，选中对象高亮相关候选，其他对象变淡，导出带分析版本的本地 JSON 上下文。函数详情面板显示所选函数的块级控制流与绑定值来源摘要（`atlas-local-absint`，仅声明 profile 内）。
@@ -44,7 +46,7 @@ target/debug/atlas --store local-state serve <上一步返回的id>
 - **正式层级与 LOD**：城市背后是一个不可裁剪的形式层级 `项目 → 目录 → 文件`，同一份事实在里面只被计数一次（目录与项目是子节点的和）。切换层级只改变画什么：项目层级一根聚合柱体、目录层级每目录一根、文件层级是原来的样子。工作单的「LOD 不改变事实数量」是可检查的：页面上一行 `层级聚合守恒 ✓`（不守恒就列出字段），并且**层级省略与预算截断分开说**——"这一层不画函数层"是层级定义，"按预算截断"是渲染预算。聚合柱体不会被当成文件：它没有单一源码可读，共享选区落到粗层级时会指名真实文件并明确说这是聚合。
 - **观测层与静态层分开**：已运行过的入口用**另一种描边色**标出，并在覆盖栏单独一行给出结论分布（returned/threw/…）。这只是**读**静态布局：观测不会加文件、不会改高度、不会把未解析调用变成已解析。落不进当前布局的运行记录会被报出数量而不是丢掉；查询失败时显示"观测层不可用"，而不是显示成"什么都没运行过"。
 - 索引可以作为**持久作业**提交：身份由 (owner, project, request_key) 三元组定义，同一请求幂等——已完成的请求重放原分析而不重跑，失败的可以重试并计入下一次 attempt。作业持有带心跳的租约；租约停止续期就是进程死亡的证据，`job reap` 收割它并判失败，`job work` 则换个人接着跑——崩溃不该让队列停摆，重跑在这里是安全的（发布幂等且不可变）。陈旧持有者无法伪造终态。
-- - **有界并行**：`job work --parallel N`（1–4，默认 1）让一个进程同时跑 N 个作业；每个槽位用自己的 holder 领取租约（两个槽位不会共用一条），输出里给出 `holders` 作为「真的并行」的证据；超额取值与 `--once` 组合都被具名拒绝。
+- **有界并行**：`job work --parallel N`（1–4，默认 1）让一个进程同时跑 N 个作业；每个槽位用自己的 holder 领取租约（两个槽位不会共用一条），输出里给出 `holders` 作为「真的并行」的证据；超额取值与 `--once` 组合都被具名拒绝。
 - 作业可以**排队**而不是只能即刻执行：`job enqueue` 只登记请求（runner 参数随行存储，所以排队请求描述自己怎么跑），工人按优先级降序、同级最旧优先认领。排队中的作业可以取消；运行中的不行——它属于租约持有者。
 - **作业队列按种类分派**：`patch verify --enqueue --owner X` 把验证排成 `patch_verify` 作业，`job work` 认领后用**同一段代码**执行（不是另一条路径），终态 artifact 是补丁树派生的新 analysis。作业身份、租约、心跳、崩溃收割与 index 作业完全一致——队列不是 index 专用的。
 - `index --incremental` 在字节与版本都没变时直接返回已发布的分析，并报告一次局部改动会失效什么：每个文件按自身内容与依赖闭包（在导入图 SCC 凝聚上折叠）得到一个键，因此失效**不需要**额外的一遍扫描，且改叶子不会反向失效共享模块。`withdrawn` 列出上次分析过、这次已不存在的文件。**承重断言**：增量与全量必须发布同一个 analysis id，冷/热/编辑/删除四条路径都有测试。已知边界：局部改动仍需重新派生全部函数（Rust 侧是全程序 SCC 不动点）。
@@ -57,7 +59,7 @@ target/debug/atlas --store local-state serve <上一步返回的id>
 - **提案审阅面**（`/api/patches`、`/api/patch`、`POST /api/patch/propose` + 函数面板的补丁提案面板）：页面可以**登记**一份统一 diff（那是 Intent，什么都不改）并读到验证结果——校验是否通过、图差异计数、测试命令的真实退出码；验证仍只在本机 CLI。**写路径需要显式开关**：`atlas serve <analysis> --allow-writes <DIR>` 之后，页面才能 apply/revert，而且只写这一个目录——按钮上显示该目录、请求必须逐字回显它（否则 400 `confirmation_mismatch` 且不写任何文件），请求体里没有 target 字段（注入的同名字段不会被读）。不带开关时一律 403 `http_writes_disabled`，请求无法把它打开。写入与 CLI 共用同一段代码，记录里写明是谁、通过哪条路径做的（`applied_by:<actor>`）。没验证过的提案会明说「还没有验证」，没跑测试会明说「没有跑任何测试，这不是通过」。
 - **有界 Agent Bridge**：`atlas agent request/work/claim/complete/reap` 与 `/api/agent/*`。请求身份 = (owner, request_key)，幂等；认领即 ACK 并带租约，过期租约被收割回队列；只有当前租约持有者能写终态。动作集合是**封闭**的（`inspect` / `annotate` / `propose_patch`），请求其它动作在入队时就被持久地拒绝并记录原因。页面不能自己指定 Node 二进制、环境或分析版本。
 - **什么算"外部"分三类**：函数自己的 **import** 是模块状态（模块整体在副本里，不需要声明）；**运行时内建/宿主全局**（`Error`、`Math`、`JSON`、`console`、`process`…）由运行时提供，Atlas **不要求**调用者声明——`--global Error=null` 不是"提供"一个 Error 构造器，而是**拿掉**一个，会让运行因为与被测函数无关的原因失败；只有**真正的自由标识符**（如 `CONFIG`）才会被要求声明，并且在拒绝里**具名**（`global:CONFIG`）。worker 与 engine 通过单一常量 `WORKER_PRODUCER` 对齐：表达不了当前语义的 worker 版本被**具名拒绝**，而不是被错误解释。
-- **执行画像**（`atlas profile` / `/api/profile`）把每个函数按已发布事实分成 `pure_callable` / `needs_context` / `needs_entry_driver` / `unsupported`，每条降级理由都指回它读的那个字段。partial 分析一律降级：frontier 就是事实缺失的块，「没有副作用」没有被证明。画像区分两类要求：**可以声明的输入**（`this`、具名全局，用 `--this` / `--global NAME=<json>` 给出，记录里写明声明了什么）与**必须承认的未知**（未建模构造、未完成事实、堆近似、未知调用，用 `--allow-effects unknown_calls` 明确承认）。读取模块级状态不需要声明——模块整体都在副本里。嵌套闭包捕获的外层绑定**不是可以声明的值**：它只在包含它的函数运行期间存在。因此 Atlas 不构造作用域、也不接受任何函数值输入，而是只提供一条入口 `--via <enclosing-symbol>`：先调用**恰好等于**目标包含符号的那个函数（给别的符号直接拒绝 `via_not_the_enclosing_symbol`），再只调用它返回的、源码与目标钉住字节**同一**的那个函数实例。嵌得更深时用 `--via-chain` 给出**它之上**的祖先（由外到内）：**每一环**都按同样的源码同一性核对，任何一环返回别的函数就报 `closure_identity_mismatch` 并指出 `failed_stage`；链必须真的是包含路径（`via_chain_not_connected`）且最外层是顶层（`via_chain_not_rooted`），深度上限 8。页面会用分析自身的 `enclosing_symbol` 逐级向上查出祖先并预填这条链。返回的不是函数是 `closure_not_returned`，返回的是别的函数是 `closure_identity_mismatch`（两者都保留观测到的返回值/源码，都算观测而不是失败的调用）；只支持一层，更深的链静态拒绝 `closure_depth_not_supported`。拒绝会一次性列出缺什么。
+- **执行画像**（`atlas profile` / `/api/profile`）把每个函数按已发布事实分成 `pure_callable` / `needs_context` / `needs_entry_driver` / `unsupported`，每条降级理由都指回它读的那个字段。partial 分析一律降级：frontier 就是事实缺失的块，「没有副作用」没有被证明。画像区分两类要求：**可以声明的输入**（`this`、具名全局，用 `--this` / `--global NAME=<json>` 给出，记录里写明声明了什么）与**必须承认的未知**（未建模构造、未完成事实、堆近似、未知调用，用 `--allow-effects unknown_calls` 明确承认）。读取模块级状态不需要声明——模块整体都在副本里。嵌套闭包捕获的外层绑定**不是可以声明的值**：它只在包含它的函数运行期间存在。因此 Atlas 不构造作用域、也不接受任何函数值输入，而是只提供一条入口 `--via <enclosing-symbol>`：先调用**恰好等于**目标包含符号的那个函数（给别的符号直接拒绝 `via_not_the_enclosing_symbol`），再只调用它返回的、源码与目标钉住字节**同一**的那个函数实例。嵌得更深时用 `--via-chain` 给出**它之上**的祖先（由外到内）：**每一环**都按同样的源码同一性核对，任何一环返回别的函数就报 `closure_identity_mismatch` 并指出 `failed_stage`；链必须真的是包含路径（`via_chain_not_connected`）且最外层是顶层（`via_chain_not_rooted`），深度上限 8。页面会用分析自身的 `enclosing_symbol` 逐级向上查出祖先并预填这条链。返回的不是函数是 `closure_not_returned`，返回的是别的函数是 `closure_identity_mismatch`（两者都保留观测到的返回值/源码，都算观测而不是失败的调用）。拒绝会一次性列出缺什么。
 - **副本范围是一个被记录的选择**：`atlas exec --materialise snapshot|dependencies`。默认仍是整个快照；`dependencies` 只物化目标文件的**静态 import 闭包**加上所有 `package.json`（Node 靠它决定模块类型），是一个**更紧的读边界**——目标运行时按相对路径读取、但从未 import 的文件会以 `ENOENT` 失败，记录里 `known_risk` 事先列出这类情形、`fallback` 说明用 `--materialise snapshot` 复核，未解析的相对 import 逐个具名，遍历触顶则报 `bounded`。真实项目实测（rxjs@7.8.1，`dist/cjs/internal/util/isFunction.js:isFunction`，两种模式都真的运行了该模块）：快照 2277 文件 / 4,501,327 字节，切片 7 文件 / 9,514 字节。
 - **受控运行**（`atlas exec` / `/api/exec`）只对通过画像的函数生效：它把快照字节物化成隔离副本，用调用者指定的**目标 Node** 在 `--permission` 下启动，只授予副本只读与显式声明的项。权限是强制的而不是声明式的——每个进程首次运行前先跑一次能力探针，要求一次真实写入被 `ERR_ACCESS_DENIED` 拒绝，否则拒绝执行。目标函数按**源码同一性**选定（命名空间里某个值的 `toString()` 必须等于快照中该符号的字节），因此同名的另一个函数不会被静默执行，导不出的函数直接报 `target_not_exported`。`--via` 运行时命名空间查找针对包含函数（找不到就是 `enclosing_not_exported`），闭包本身从不按名字查找；两阶段的绑定（目标与包含函数）各自都有 `source_binding`，都从内容寻址 blob 读取并重新哈希校验。超时/取消按进程组 `SIGKILL` 回收。
 - **Effect journal**：记录运行时明确报告的**被拒绝尝试**（权限种类 + 目标，例如 `FileSystemWrite → /tmp/x`）。Node 只为拒绝附上这些字段，所以 journal 不声称列出被允许的操作——授予集合就是边界，记录里写明这一点。空 journal 等于"没有拒绝被报告"，不等于"没有副作用"。
@@ -67,7 +69,9 @@ target/debug/atlas --store local-state serve <上一步返回的id>
 
 **当前连线是静态候选，不是数据流执行顺序或运行血流。** 计算器同时出现加、减、除候选，不能据此声称一次加法执行过所有分支。Flow 事实是声明 profile 内的静态推导：未知构造、外部调用效果与跨过程值流都保留为显式 unknown。`examples/flow-lab` 是局部语义事实的集成测试样例（finally、短路、循环、分支候选、显式 unknown）。
 
-受控运行**不是**在项目目录里执行用户代码：它跑的是从不可变快照物化出来的副本，被测项目的文件不会被写；页面按钮只能选择符号与字面量实参，不能自己放宽沙箱。已经实现：`this`/全局声明、Effect journal、嵌套闭包经包含函数取实例（`--via`）、AI Coding 链（提案→隔离验证→应用/撤销）。仍未实现：依赖切片（每次运行仍物化整个快照）、多于一层的 `--via` 组合、行级覆盖与运行期调用图、堆/别名精度。
+受控运行**不是**在项目目录里执行用户代码：它跑的是从不可变快照物化出来的副本，被测项目的文件不会被写；页面按钮只能选择符号与字面量实参，不能自己放宽沙箱。已经实现：`this`/全局声明、Effect journal、嵌套闭包经包含函数取实例（`--via`）、AI Coding 链（提案→隔离验证→应用/撤销）。完整行级覆盖、运行期调用图与更强堆/别名精度仍属后续方向；依赖切片和多层闭包路径见上文。
+
+前端设计与接线：[主设计](docs/FRONTEND_DESIGN.md) · [交互版面](docs/design/workbench-preview.html) · [实现交接](docs/START_FRONTEND_AGENT.md)。版面是设计样例，未接生产数据。
 
 ## 工程入口
 

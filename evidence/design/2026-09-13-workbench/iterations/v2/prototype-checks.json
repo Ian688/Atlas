@@ -1,0 +1,83 @@
+{
+  "scope": "Design prototype only; sample data, no product API or process execution",
+  "checks": [
+    {
+      "name": "initial graph and no synthetic run",
+      "result": "PASS"
+    },
+    {
+      "name": "graph navigation and back",
+      "result": "PASS"
+    },
+    {
+      "name": "value source anchor",
+      "result": "PASS"
+    },
+    {
+      "name": "unknown drilldown and source warning",
+      "result": "PASS"
+    },
+    {
+      "name": "search empty and selection",
+      "result": "PASS"
+    },
+    {
+      "name": "run invalid JSON and preview result",
+      "result": "PASS"
+    },
+    {
+      "name": "run draft survives task switch",
+      "result": "PASS"
+    },
+    {
+      "name": "result variant threw",
+      "result": "PASS"
+    },
+    {
+      "name": "result variant refused",
+      "result": "PASS"
+    },
+    {
+      "name": "result variant timeout",
+      "result": "PASS"
+    },
+    {
+      "name": "result variant cancelled",
+      "result": "PASS"
+    },
+    {
+      "name": "review verify apply revert preview",
+      "result": "PASS"
+    },
+    {
+      "name": "source toggle",
+      "result": "PASS"
+    },
+    {
+      "name": "no horizontal overflow at 1440",
+      "result": "PASS"
+    },
+    {
+      "name": "no horizontal overflow at 1024",
+      "result": "PASS"
+    },
+    {
+      "name": "no horizontal overflow at 768",
+      "result": "PASS"
+    },
+    {
+      "name": "no horizontal overflow at 390",
+      "result": "PASS"
+    },
+    {
+      "name": "no horizontal overflow at 320",
+      "result": "PASS"
+    },
+    {
+      "name": "structure selection shares target",
+      "result": "PASS"
+    }
+  ],
+  "page_errors": [],
+  "exit_code": 0
+}

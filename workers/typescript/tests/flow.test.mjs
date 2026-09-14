@@ -239,3 +239,25 @@ test('runtime imports are named on every function, and type-only imports are not
     'a type-only import has no runtime binding and must not be listed');
 });
 
+test('shorthand property reads resolve the local binding, not a property symbol (R2)', () => {
+  const f = facts({'coupon.js': 'function r() { let written = 0; return { ok: true, written }; }'});
+  const fn = flowOf(f, 'r');
+  const external = JSON.stringify(fn.body).match(/"expr":"external"/);
+  assert.ok(!external, `a local shorthand read must not be external: ${JSON.stringify(fn.body).slice(0, 300)}`);
+});
+
+test('a block-scoped let does not hide the outer global read (R2)', () => {
+  const f = facts({'math.js': 'function shadow() { { let CONFIG = 1; } CONFIG; return 0; }'});
+  const fn = flowOf(f, 'shadow');
+  const binding = fn.bindings.find(b => b.name === 'CONFIG');
+  assert.ok(binding, 'the block-local CONFIG is a binding');
+  const externals = [];
+  const walk = (node) => {
+    if (!node || typeof node !== 'object') return;
+    if (node.expr === 'external' && node.name === 'CONFIG') externals.push(node);
+    for (const v of Object.values(node)) if (v && typeof v === 'object') walk(v);
+  };
+  for (const stmt of fn.body) walk(stmt);
+  assert.equal(externals.length, 1, 'the outer CONFIG read is genuinely external');
+});
+

@@ -1,0 +1,184 @@
+
+running 5 tests
+test worker::tests::pre_cancelled_request_does_not_start_worker ... ok
+test worker::tests::closed_false_sender_allows_successful_response ... ok
+test worker::tests::running_cancellation_reaps_worker_after_output_closes ... ok
+test worker::tests::deadline_kills_worker_and_output_cap_is_effective ... ok
+test worker::tests::an_exhausted_worker_heap_is_named_with_the_ceiling_that_was_hit ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 68 tests
+test bridge::tests::a_selection_is_pinned_to_its_analysis_version ... ok
+test exec::tests::a_via_spec_cannot_point_at_its_own_target ... ok
+test exec::tests::a_via_that_is_not_the_enclosing_function_is_refused ... ok
+test exec::tests::a_nested_capture_names_the_enclosing_function_and_cannot_be_declared ... ok
+test exec::tests::a_receiver_or_a_global_must_be_declared_and_is_then_runnable ... ok
+test exec::tests::captured_binding_is_context ... ok
+test exec::tests::an_imported_binding_is_not_a_global_the_caller_must_declare ... ok
+test exec::tests::clean_function_is_pure_and_params_are_ordered ... ok
+test exec::tests::grants_parse_rejects_unknown_names ... ok
+test exec::tests::dynamic_code_is_unsupported_and_refused ... ok
+test exec::tests::materialise_modes_are_closed_and_the_default_is_the_whole_snapshot ... ok
+test exec::tests::only_relative_specifiers_can_break_a_sliced_copy ... ok
+test exec::tests::stack_frames_map_to_pinned_offsets ... ok
+test exec::tests::partial_analysis_is_never_pure_and_needs_an_acknowledgement ... ok
+test exec::tests::unknown_call_requires_explicit_grant ... ok
+test exec::tests::unsafe_paths_are_rejected ... ok
+test incremental::tests::a_new_file_is_new_and_a_removed_file_is_withdrawn ... ok
+test incremental::tests::an_empty_graph_is_not_a_special_case_that_panics ... ok
+test incremental::tests::a_file_is_invalidated_by_anything_it_depends_on ... ok
+test incremental::tests::files_that_import_each_other_form_one_unit ... ok
+test incremental::tests::the_file_graph_only_keeps_edges_between_parsed_files ... ok
+test incremental::tests::the_run_key_follows_both_the_bytes_and_the_versions ... ok
+test incremental::tests::invalidation_reports_whether_it_was_our_bytes_or_a_dependency ... ok
+test inter::budget_tests::mark_incomplete_backfill_is_controlled_by_the_caller ... ok
+test inter::budget_tests::total_budget_includes_context_passes ... ok
+test inter::budget_tests::job_budget_is_bounded_and_attribution_matches_state ... ok
+test inter::budget_tests::truncated_frontier_names_real_pending_blocks_not_the_entry ... ok
+test job::tests::a_completed_job_requires_a_result_to_point_at ... ok
+test incremental::tests::a_deep_chain_does_not_overflow_and_orders_dependencies_first ... ok
+test bridge::tests::a_request_for_an_unknown_analysis_is_rejected_not_queued ... ok
+test job::tests::a_cancelled_queued_job_is_never_claimed ... ok
+test bridge::tests::unbounded_actions_are_rejected_at_enqueue ... ok
+test job::tests::a_completed_request_is_never_silently_re_run ... ok
+test bridge::tests::identity_is_the_owner_and_request_key_pair ... ok
+test bridge::tests::an_annotation_is_idempotent_and_never_claims_to_exist ... ok
+test job::tests::a_failed_request_may_be_retried_with_the_same_key ... ok
+test bridge::tests::only_the_lease_holder_can_finish_a_request ... ok
+test job::tests::a_request_is_addressable_even_when_its_handle_was_not_derived_from_the_triple ... ok
+test job::tests::a_live_lease_survives_a_reap_pass ... ok
+test job::tests::a_run_whose_lease_expired_is_resumed_by_whoever_is_available ... ok
+test patch::tests::a_context_mismatch_is_refused_with_the_line_that_disagreed ... ok
+test patch::tests::a_create_names_a_new_path_and_installs_exactly_its_added_lines ... ok
+test patch::tests::a_crlf_target_is_refused_instead_of_being_normalised ... ok
+test patch::tests::a_delete_removes_the_path_and_is_not_an_edit_to_empty ... ok
+test patch::tests::a_hunk_beyond_the_end_of_the_file_is_refused ... ok
+test patch::tests::a_pure_insertion_and_a_pure_deletion_both_work ... ok
+test patch::tests::a_single_hunk_replaces_one_line ... ok
+test patch::tests::a_target_that_is_not_in_the_snapshot_is_refused ... ok
+test patch::tests::an_unknown_line_marker_is_refused_rather_than_guessed ... ok
+test patch::tests::hunks_apply_in_order_with_the_offset_carried_forward ... ok
+test patch::tests::structure_that_would_change_which_bytes_are_meant_is_refused ... ok
+test patch::tests::the_final_newline_state_is_preserved ... ok
+test patch::tests::two_files_in_one_diff_are_both_applied ... ok
+test job::tests::identity_separates_owners_projects_and_keys ... ok
+test job::tests::a_running_job_cannot_be_cancelled_by_a_bystander ... ok
+test job::tests::enqueueing_does_not_run_and_keeps_one_row_per_request ... ok
+test job::tests::an_expired_lease_is_the_evidence_of_a_crashed_owner ... ok
+test job::tests::the_same_request_is_the_same_job_for_anyone_who_asks ... ok
+test job::tests::a_stale_holder_cannot_stamp_a_terminal_state ... ok
+test scan::tests::scan_deadline_refuses_and_publishes_nothing ... ok
+test job::tests::the_queue_serves_priority_first_then_the_oldest ... ok
+test scan::tests::scan_within_deadline_publishes_snapshot ... ok
+test relocate::tests::an_unknown_entity_is_named_as_such ... ok
+test relocate::tests::the_same_version_needs_no_relocation ... ok
+test relocate::tests::a_changed_body_is_relocated_by_path_and_name_and_says_the_bytes_changed ... ok
+test relocate::tests::a_withdrawn_entity_is_refused_rather_than_re_pointed ... ok
+test relocate::tests::identical_bytes_at_another_path_are_reported_as_a_move ... ok
+test relocate::tests::same_path_neighbours_are_not_offered_as_matches ... ok
+
+test result: ok. 68 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.84s
+
+
+running 4 tests
+test pre_cancelled_scan_publishes_nothing ... ok
+test cancellation_is_shared_with_stages_but_isolated_between_jobs ... ok
+test late_cancellation_cannot_relabel_a_committed_analysis ... ok
+test scan_stage_deadline_interrupts_publication_lock_wait ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+
+running 24 tests
+test d01_tdz_read_is_reported ... ok
+test d04_finally_preserves_completion_but_not_old_env ... ok
+test d02_short_circuit_rhs_reachability ... ok
+test d03_finally_completion_preserve_and_override ... ok
+test d12_identity_preserves_parameter_origin ... ok
+test d09_alias_and_wildcard_heap_updates ... ok
+test d07_d08_candidate_sets_and_strong_update ... ok
+test d05_loop_fixpoint_and_carried_update ... ok
+test f1_typed_constants_are_machine_distinguishable ... ok
+test d18_branch_conditions_stay_possible_without_execution_claims ... ok
+test f5_big_number_to_string_is_exact ... ok
+test d17_forwarding_keeps_call_and_data_edges_distinct ... ok
+test r1_perturbation_throw_ordering_keeps_partial_state ... ok
+test f4_nested_reachable_objects_dissolve_on_unknown_call ... ok
+test r2_unknown_call_clobbers_escaped_objects ... ok
+test d13_caller_isolation_through_summary ... ok
+test r4_primitive_addition_matrix ... ok
+test r5_expired_deadline_aborts_derivation ... ok
+test d15_mutual_recursion_converges_without_negative_proof ... ok
+test r2_known_setter_write_rebases_to_caller_object ... ok
+test d10_cap_overflow_becomes_top_with_reason ... ok
+test f2_wrapper_layer_heap_write_is_visible ... ok
+test d14_five_layer_chain_propagates_origin ... ok
+test k1_context_sensitive_branch_folding ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 9 tests
+test concurrent_blob_publication_is_immutable_and_corruption_fails_closed ... ok
+test reject_incomplete_worker_results_and_invalid_anchors_without_publication ... ok
+test nested_ignore_rules_and_budgets_keep_explicit_boundaries ... ok
+test immutable_snapshots_survive_source_and_catalog_changes ... ok
+test symlinks_never_import_external_contents_and_targets_affect_identity ... ok
+test scc_handles_deep_graph_without_recursion_and_reports_cycles ... ok
+test byte_windows_never_split_utf8_and_unparseable_bytes_are_reported ... ok
+test search_matches_name_and_path_with_stable_pages_and_bounded_cursors ... ok
+test reachability_is_transitive_bounded_and_revision_bound ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.89s
+
+
+running 17 tests
+test cancelled_and_expired_controls_refuse_interprocedural_results ... ok
+test a_call_that_cannot_return_has_no_normal_successor ... ok
+test callee_allocations_cannot_alias_caller_local_operation_numbers ... ok
+test a_callee_without_a_return_statement_still_completes_normally ... ok
+test local_budget_marks_callsites_and_bindings_as_incomplete ... ok
+test a_callee_that_may_return_keeps_the_normal_successor ... ok
+test probed_absent_records_resolved_targets_that_had_no_summary ... ok
+test a_context_that_proves_no_return_removes_the_normal_successor ... ok
+test caller_parameter_origins_are_not_reinterpreted_in_the_callee ... ok
+test nan_arguments_do_not_prevent_context_convergence ... ok
+test unknown_callee_exception_value_stays_unknown ... ok
+test omitted_argument_context_is_undefined ... ok
+test thrown_callee_allocation_does_not_alias_the_caller_heap ... ok
+test read_set_records_the_callee_summaries_actually_consumed ... ok
+test thrown_callee_parameter_is_rebased_to_the_call_argument ... ok
+test contexts_are_bound_to_arguments_after_summary_refinement ... ok
+test context_cap_falls_back_to_sound_symbolic_summary ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Compiling atlas-engine v0.1.0 (/Users/yinsijie/CodeRepo/Atlas/crates/atlas-engine)
+   Compiling atlas-app v0.1.0 (/Users/yinsijie/CodeRepo/Atlas/crates/atlas-app)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 11.47s
+     Running unittests src/main.rs (target/debug/deps/atlas-42f01a3d3f958126)
+     Running unittests src/lib.rs (target/debug/deps/atlas_contract-08b7b5180930da26)
+     Running unittests src/lib.rs (target/debug/deps/atlas_engine-0c966c8ef067d010)
+     Running tests/cancellation.rs (target/debug/deps/cancellation-091a0cfd4ee86f38)
+     Running tests/flow_semantics.rs (target/debug/deps/flow_semantics-5e3579eeee4b1994)
+     Running tests/foundation.rs (target/debug/deps/foundation-1dae0f667b16e3e9)
+     Running tests/interproc_context.rs (target/debug/deps/interproc_context-6c019dc0ccbaa718)
+   Doc-tests atlas_contract
+   Doc-tests atlas_engine

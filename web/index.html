@@ -1,28 +1,124 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Atlas · Local code workbench</title><link rel="stylesheet" href="/style.css"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Atlas · 函数工作台</title><link rel="stylesheet" href="/style.css"></head>
 <body>
-<header><div class="brand"><span class="mark">A</span><div><strong>ATLAS</strong><small>LOCAL CODE WORKBENCH</small></div></div><div class="head-right"><span class="pill">本地解析 · 无 LLM</span><a class="version" href="/city3d" title="同一份分析的三维投影：目录为地块、文件为柱、函数为层">3D 城市 →</a><span class="version">FOUNDATION / 02</span></div></header>
-<section id="connect" class="connect"><label for="token">本地会话令牌</label><input id="token" type="password" autocomplete="off" placeholder="从启动命令返回的 session_file 读取"><button id="connect-button">连接工作台</button><span id="status" role="status">等待连接</span></section>
-<section class="intro"><div><p class="eyebrow">UNDERSTAND BEFORE YOU CHANGE</p><h1>把代码的结构，放在眼前。</h1><p class="subtitle">从文件进入函数，沿静态调用候选探索。每个对象，都可以回到被解析时的源码。</p></div><div id="metrics" class="metrics"><div><b>—</b><span>文件</span></div><div><b>—</b><span>函数</span></div><div><b>—</b><span>调用点</span></div></div></section>
-<section id="brief" class="brief" hidden>
-  <div class="brief-head"><h2>这个项目，最该先知道的五件事</h2><span class="subtle" id="brief-scope">全部来自这一份固定分析（全量事实，不是本页已加载的部分）</span></div>
-  <ol id="brief-list"></ol>
-  <p class="brief-foot" id="brief-foot"></p>
-  <div class="context-actions"><button id="unknown-open">查看这 167 处未知 →</button></div>
-  <div id="unknown-panel" class="unknown-panel" hidden><h4>显式未知清单</h4><div id="unknown-body"></div></div>
-</section>
-<section id="tour" class="tour" hidden>
-  <div class="brief-head"><h2>试这五步</h2><span class="subtle">每一步都是一次真实查询；点一下就能看见结果</span></div>
-  <ol id="tour-steps"></ol>
-  <p class="tour-limits" id="tour-limits"></p>
-</section>
-<main>
-<aside class="explorer"><div class="section-title">找函数 <span id="fn-count">未加载</span></div><input id="fn-search" type="search" aria-label="按函数名查找" placeholder="输入函数名，例如 isFunction"><div class="context-actions"><button id="fn-load">加载全部函数清单</button></div><div id="fn-list"></div><details id="tree-panel" class="tree-panel"><summary>项目清单 <span id="node-count">0 / 0</span></summary><input id="search" type="search" aria-label="过滤已加载对象" placeholder="过滤已加载的文件与函数…"><div id="tree"></div><button id="more" hidden>加载下一页对象</button></details></aside>
-<section class="workbench"><div class="toolbar"><div><strong>关系工作台</strong><span class="subtle">2D / 静态候选</span></div><div class="levels" role="group" aria-label="层级切换"><button id="level-project" class="level-button" aria-pressed="false">项目</button><button id="level-district" class="level-button" aria-pressed="false">目录</button><button id="level-file" class="level-button" aria-pressed="true">文件</button></div><div class="levels" role="group" aria-label="工作区视图"><button id="ws-graph" class="level-button" aria-pressed="true">关系</button><button id="ws-values" class="level-button" aria-pressed="false">值状态</button></div><button id="reset">清除焦点</button></div><div class="legend"><span class="dot blue"></span>词法调用候选 <span class="dot amber"></span>未解析目标 <span id="graph-status">尚未加载</span></div><div class="canvas"><div id="matrix" class="matrix" hidden></div><svg id="graph" viewBox="0 0 850 580" aria-label="文件与函数调用候选图" role="img"></svg><div id="empty">连接后展示本地解析结果</div></div><div class="canvas-footer"><span id="revision">固定分析版本</span><span>线条不代表实际执行或完整数据流</span></div><button id="more-edges" hidden>加载下一页关系</button></section>
-<aside class="inspector" id="inspector"><p class="eyebrow">INSPECT / EVIDENCE</p><h2 id="selection-name">选择一个函数</h2><p id="selection-path" class="subtle">文件、函数与关系来自同一份不可变分析。</p><div id="selection-facts" class="facts">点击图中的函数层或左侧对象，查看固定快照源码与关联候选。</div><details id="flow-panel" hidden><summary>局部控制流与值来源（声明 profile 内，静态推导）</summary><div id="flow-body" class="flow-body"></div></details><details id="exec-panel" hidden><summary>执行画像与受控运行（静态充分性分类 + 隔离执行）</summary><div id="exec-body" class="flow-body"></div><div class="context-actions"><input id="exec-args" type="text" aria-label="受控运行的 JSON 字面量实参" placeholder="实参 JSON 数组，例如 [1,2]"><button id="exec-run" disabled>受控运行</button></div><div class="context-actions" id="exec-via-row" hidden><label id="exec-via-label" for="exec-via-args"></label><input id="exec-via-args" type="text" aria-label="包含函数的 JSON 字面量实参" placeholder="包含函数的实参 JSON 数组，例如 [100]"><input id="exec-via-chain" type="text" aria-label="包含函数的祖先链，由外到内" placeholder="祖先链 JSON（由外到内，符号来自分析）：[{&quot;symbol&quot;:&quot;...&quot;,&quot;args&quot;:[]}]"><label><input id="exec-via-enable" type="checkbox"> 经由包含函数取得闭包实例</label></div></details><details id="patch-panel" hidden><summary>补丁提案（Intent → 静态验证 → 只能在 CLI 应用）</summary><div id="patch-body" class="flow-body"></div><textarea id="patch-input" aria-label="统一 diff 提案" placeholder="粘贴统一 diff：--- a/... +++ b/... @@ ..."></textarea><div class="context-actions"><button id="patch-propose">登记提案</button></div></details><details id="annotation-panel" hidden><summary>Intent / 提案（不是已存在的代码）</summary><div id="annotation-body" class="flow-body"></div><div class="context-actions"><input id="annotation-input" type="text" aria-label="新增约束文本" placeholder="给当前选区加一条约束或意图"><button id="annotation-add">登记 Intent</button></div></details><div class="inspector-actions"><button id="export" disabled>导出选区上下文</button><a id="open-3d" title="同一份分析的第二投影，携带同一个选区">在 3D 中打开同一选区 →</a></div><p class="source-label">快照源码 <span>UTF-8 字节定位</span></p><pre id="source"><code>尚未选择对象</code></pre><div id="source-status" class="subtle"></div><details id="context-panel" hidden><summary>固定选区上下文 JSON</summary><textarea id="context-json" aria-label="固定选区上下文 JSON" readonly></textarea><div class="context-actions"><button id="context-copy">复制 JSON</button><a id="context-download">下载 JSON</a></div></details></aside>
+<div id="workbench" class="wb">
+<header class="wb-top">
+  <div class="brand"><span class="mark">A</span><div><strong>ATLAS</strong><small>本地代码工作台</small></div></div>
+  <span class="wb-project">本地项目</span>
+  <span class="wb-version" id="revision">未连接</span>
+  <span id="status" role="status" class="wb-topstatus"></span>
+  <div class="wb-topright">
+    <details class="wb-connect"><summary>连接会话</summary><div class="wb-connect-body"><label for="token">本地会话令牌</label><input id="token" type="password" autocomplete="off" placeholder="启动命令输出的 session_file 中的 token"><button id="connect-button">连接工作台</button><p class="subtle">令牌只经本机 URL fragment 传递，不进入 HTTP 请求与日志。</p></div></details>
+    <a class="wb-3dlink" href="/city3d" title="同一份分析的三维投影：目录为地块、文件为柱、函数为层">3D 城市 →</a>
+  </div>
+</header>
+<div class="wb-body">
+<nav class="wb-side" aria-label="项目函数导航">
+  <label for="fn-search">查找函数</label>
+  <input id="fn-search" type="search" placeholder="名称或路径，例如 redeem" autocomplete="off">
+  <div id="fn-count" class="wb-sidecount">未加载</div>
+  <div id="fn-list"></div>
+  <button id="fn-more" hidden>加载更多结果</button>
+  <div class="wb-sidefoot">
+    <div class="wb-recent-head">最近查看</div>
+    <div id="recent-list" class="wb-recent"></div>
+    <button id="nav-back" disabled>← 返回上一个对象</button>
+  </div>
+</nav>
+<main class="wb-work">
+  <div class="wb-heading">
+    <div class="wb-heading-title">
+      <div id="selection-path" class="wb-breadcrumb">未选择对象</div>
+      <h1 id="selection-name">查找并选择一个函数</h1>
+    </div>
+    <div class="wb-heading-actions">
+      <button id="run-shortcut" class="wb-primary" disabled>运行这个函数</button>
+      <button id="source-toggle" aria-label="显示或收起源码区">收起源码</button>
+    </div>
+  </div>
+  <nav class="wb-tabs" role="tablist" aria-label="工作任务">
+    <button data-mode="structure" aria-pressed="false">结构定位</button>
+    <button data-mode="understand" aria-pressed="true">理解代码</button>
+    <button data-mode="run" aria-pressed="false">运行验证</button>
+    <button data-mode="review" aria-pressed="false">审阅修改</button>
+  </nav>
+  <div class="wb-content">
+    <section class="wb-main">
+      <div id="task-structure" class="wb-lenses" hidden>
+        <span class="wb-eyebrow">结构总览 · 聚合来自同一份分析</span>
+        <div class="levels" role="group" aria-label="层级切换">
+          <button id="level-project" class="level-button" aria-pressed="false">项目</button>
+          <button id="level-district" class="level-button" aria-pressed="false">目录</button>
+          <button id="level-file" class="level-button" aria-pressed="true">文件</button>
+        </div>
+        <button id="reset">清除焦点</button>
+      </div>
+      <div id="task-understand" hidden>
+        <div class="wb-lenses" role="group" aria-label="理解镜头">
+          <button data-lens="calls" aria-pressed="true">调用关系</button>
+          <button data-lens="values" aria-pressed="false">值从哪来</button>
+          <button data-lens="unknowns" aria-pressed="false">未知边界</button>
+          <span class="wb-lensnote">静态候选 · 非运行顺序</span>
+        </div>
+        <section id="flow-panel" class="wb-panel" hidden><div id="flow-body" class="flow-body"></div></section>
+        <section id="unknown-panel" class="wb-panel" hidden><h3 class="wb-panel-title">未知边界</h3><div id="unknown-body"></div></section>
+      </div>
+      <div class="canvas" id="canvas-host">
+        <svg id="graph" viewBox="0 0 850 580" aria-label="文件与函数调用候选图" role="img"></svg>
+        <div id="empty">连接后展示本地解析结果</div>
+      </div>
+      <div id="task-run" class="wb-panel" hidden>
+        <section id="exec-panel" hidden>
+          <h3 class="wb-panel-title">执行画像与受控运行</h3>
+          <div id="exec-body" class="flow-body"></div>
+          <div id="exec-form" hidden>
+            <div class="wb-runline"><h4 class="wb-panel-title">输入</h4><button id="exec-mode" aria-label="切换输入编辑模式">按参数编辑</button></div>
+            <div id="exec-fields"></div>
+            <textarea id="exec-args" aria-label="受控运行的 JSON 字面量实参（数组）" hidden></textarea>
+            <div id="exec-context"></div>
+            <div id="exec-input-error" class="wb-error" role="alert" hidden></div>
+            <div class="context-actions"><button id="exec-run" disabled>受控运行</button><span class="subtle" id="exec-run-note">在隔离副本中以目标 Node 的权限模型执行一次固定调用</span></div>
+          </div>
+          <div class="context-actions" id="exec-via-row" hidden><label id="exec-via-label" for="exec-via-args"></label><input id="exec-via-args" type="text" aria-label="包含函数的 JSON 字面量实参" placeholder="包含函数的实参 JSON 数组，例如 [100]"><input id="exec-via-chain" type="text" aria-label="包含函数的祖先链，由外到内" placeholder='祖先链 JSON（由外到内，符号来自分析）：[{"symbol":"...","args":[]}]'><label><input id="exec-via-enable" type="checkbox"> 经由包含函数取得闭包实例</label></div>
+          <div id="exec-result" class="flow-body" aria-live="polite"></div>
+          <details id="exec-history-panel" hidden><summary>这个对象的运行记录（本次服务）</summary><div id="exec-history" class="flow-body"></div></details>
+        </section>
+      </div>
+      <div id="task-review" class="wb-panel" hidden>
+        <section id="patch-panel" hidden>
+          <h3 class="wb-panel-title">补丁提案（Intent，不是已存在的代码）</h3>
+          <div id="patch-body" class="flow-body"></div>
+          <textarea id="patch-input" aria-label="统一 diff 提案" placeholder="粘贴统一 diff：--- a/... +++ b/... @@ ..."></textarea>
+          <div class="context-actions"><button id="patch-propose">登记提案</button></div>
+        </section>
+        <section id="annotation-panel" hidden>
+          <h3 class="wb-panel-title">Intent / 约束（不是已存在的代码）</h3>
+          <div id="annotation-body" class="flow-body"></div>
+          <div class="context-actions"><input id="annotation-input" type="text" aria-label="新增约束文本" placeholder="给当前选区加一条约束或意图"><button id="annotation-add">登记 Intent</button></div>
+        </section>
+      </div>
+      <div class="wb-scope"><span id="graph-status">尚未加载</span></div>
+    </section>
+    <aside class="wb-source" id="inspector" aria-label="所选对象的源码与依据">
+      <div class="wb-sourcehead"><span>源码与依据</span><button id="source-close" aria-label="收起源码区">收起</button></div>
+      <div id="sourcepath" class="wb-sourcepath"></div>
+      <pre id="source"><code>尚未选择对象</code></pre>
+      <div id="source-status" class="subtle"></div>
+      <div class="wb-evidence">
+        <p id="selection-facts" class="facts">选择对象后，这里显示关联候选与观测边界。</p>
+        <div class="wb-evidence-actions">
+          <button id="export" disabled>导出选区上下文</button>
+          <a id="open-3d" href="/city3d" title="同一份分析的第二投影，携带同一个选区">在 3D 中打开同一选区 →</a>
+        </div>
+        <details id="context-panel" hidden><summary>固定选区上下文 JSON</summary><textarea id="context-json" aria-label="固定选区上下文 JSON" readonly></textarea><div class="context-actions"><button id="context-copy">复制 JSON</button><a id="context-download">下载 JSON</a></div></details>
+      </div>
+    </aside>
+  </div>
 </main>
-<footer><span>这个工作台回答四个问题：它调用谁、谁调用它、值从哪来、哪里是未知。全部是声明 profile 内的静态事实，不是执行结果。</span><span>INDEX → SNAPSHOT → FACTS → GRAPH → CONTEXT</span></footer>
+</div>
+<footer class="wb-bottom"><span id="selection-status">当前选择：无</span><span>静态候选 · 观测结果 · Intent 分别呈现；线条不代表实际执行或完整数据流</span></footer>
+</div>
 <script src="/hierarchy.js" defer></script>
 <script src="/vendor/elk.bundled.js" defer></script>
 <script src="/layout.js" defer></script>

@@ -1,0 +1,35 @@
+{
+  "scope": "design and documentation only",
+  "head": "cca8fcf0c77dd32d9f57db3969b9f520c56eacb3",
+  "local_links_checked": 54,
+  "errors": [],
+  "checks": [
+    {
+      "command": [
+        "node",
+        "--check",
+        "docs/design/check-prototype.cjs"
+      ],
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "output": ""
+    }
+  ],
+  "historical_product_state": "unchanged",
+  "earlier_check": "A link check was started while regenerated screenshot files were still being written; missing artifact links were detected. Final check runs after browser completion.",
+  "artifact_sha256": {
+    "docs/design/workbench-prototype.html": "5ae32d2189f2c367c015c2e941770671c61c1bd8063d8b32237f1af7ba101f14",
+    "docs/design/workbench-preview.html": "c7f25489b9398afb16cace7104e226327c11352f17d169d13b8949e6616b8437",
+    "docs/FRONTEND_DESIGN.md": "a0fa06266fdfd2807bf8ddcadc47207c4a33c88c2e6b867e3f3ffaed09962925",
+    "docs/FRONTEND_API_CONTRACT.md": "8bd672a42b4d8c6b2df37ccc2509d59305a20c9f94fd3b55123ad040287b56ad"
+  },
+  "exit_code": 0
+}

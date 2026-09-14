@@ -1,0 +1,12 @@
+{
+  "head": "cca8fcf0c77dd32d9f57db3969b9f520c56eacb3",
+  "note": "dirty working tree; no product code changed in review",
+  "sha256": {
+    "dist/atlas-local-darwin-x64/atlas": "216b1367b1f6df165bfa3fd5abf930497ad3a7af1b57236456e74bc39c8ace67",
+    "dist/atlas-local-darwin-x64/start.sh": "b7c00c061dbe6ac2dbd62ffec89f9fbec6021747279ac878ccc757b14e9a41b7",
+    "dist/atlas-local-darwin-x64/workers/typescript/src/flow.mjs": "5a77fff3afb2ebd53bc79e21a7f373c2cac6b8945cc93bbf5c6fcf786041d4b8",
+    "crates/atlas-app/src/server.rs": "5fea116f0cf4c7f199962013b2d9667bff96d262d00841097ffb12f69de4b445",
+    "web/app.js": "67dd8649f7c78faa272c13b19cec090d6f27218ca398fc91353aac951b867da4",
+    "scripts/dist.sh": "f6279a27ef88accdd3b39624336a3d10e9927bdcfb3239c44b969d2bc6fb3b93"
+  }
+}

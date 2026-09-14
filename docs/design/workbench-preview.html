@@ -1,0 +1,1483 @@
+<!doctype html>
+<html lang="en" data-visualize-standalone>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Workbench Prototype</title>
+<style>:root{color-scheme:light dark;background:light-dark(rgb(255 255 255), rgb(24 24 24))}html,body{margin:0}body{box-sizing:border-box;padding:1rem;background:inherit}iframe{display:block;width:100%;height:calc(100vh - 2rem);margin:0 auto;border:0}</style>
+</head>
+<body>
+<iframe sandbox="allow-scripts" referrerpolicy="no-referrer" title="Workbench Prototype" srcdoc="&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot; data-visualize-standalone&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;meta name=&quot;referrer&quot; content=&quot;no-referrer&quot;&gt;
+&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &#x27;none&#x27;; script-src &#x27;unsafe-inline&#x27; &#x27;unsafe-eval&#x27; &#x27;wasm-unsafe-eval&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src &#x27;unsafe-inline&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src &#x27;none&#x27;; object-src &#x27;none&#x27;; base-uri &#x27;none&#x27;; form-action &#x27;none&#x27;&quot;&gt;
+&lt;title&gt;Workbench Prototype&lt;/title&gt;
+&lt;style&gt;:root {
+  color-scheme: light dark;
+  background-color: var(
+    --background,
+    var(--color-background-primary, light-dark(rgb(255 255 255), rgb(24 24 24)))
+  ) !important;
+
+  /* Agent-facing contract; keep in sync with SKILL.md. */
+  --background: var(
+    --color-background-primary,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --card: color-mix(in oklab, var(--foreground) 5%, var(--background));
+  --card-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --popover: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255), rgb(45 45 45))
+  );
+  --popover-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --primary: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --primary-foreground: var(
+    --color-text-inverse,
+    light-dark(rgb(255 255 255), rgb(13 13 13))
+  );
+  --secondary: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255 / 96%), rgb(54 54 54 / 96%))
+  );
+  --secondary-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --muted: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --muted-foreground: var(
+    --color-text-secondary,
+    light-dark(rgb(26 28 31 / 49.4%), rgb(255 255 255 / 49.8%))
+  );
+  --accent: var(
+    --color-background-info,
+    light-dark(rgb(229 242 255), rgb(13 39 63))
+  );
+  --accent-foreground: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --destructive: var(
+    --color-text-warning,
+    light-dark(rgb(226 85 7), rgb(255 133 73))
+  );
+  --border: var(
+    --color-border-secondary,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+  --input: var(
+    --color-border-primary,
+    light-dark(
+      rgb(26 28 31 / 11.8%),
+      color-mix(in oklab, rgb(0 0 0) 10%, transparent)
+    )
+  );
+  --ring: var(
+    --color-ring-primary,
+    light-dark(rgb(51 156 255), rgb(131 195 255 / 76%))
+  );
+  --font-size-base: var(--font-text-md-size, 14px);
+  --blue: light-dark(rgb(51 156 255), rgb(51 156 255));
+  --orange: light-dark(rgb(226 85 7), rgb(251 106 34));
+  --green: light-dark(rgb(0 162 64), rgb(64 201 119));
+  --red: light-dark(rgb(224 46 42), rgb(255 103 100));
+  --purple: light-dark(rgb(146 79 247), rgb(173 123 249));
+  --yellow: light-dark(rgb(255 195 0), rgb(255 210 64));
+  --viz-series-1: var(--primary);
+  --viz-series-2: light-dark(rgb(243 136 59), rgb(245 154 86));
+  --viz-series-3: light-dark(rgb(93 201 119), rgb(116 213 139));
+  --viz-series-4: light-dark(rgb(235 119 177), rgb(240 143 192));
+  --viz-series-5: light-dark(rgb(155 121 236), rgb(170 145 239));
+  --viz-series-6: light-dark(rgb(58 185 177), rgb(90 203 194));
+
+  /* Internal implementation variables; not part of the agent contract. */
+  --font-sans: -apple-system, system-ui, &quot;Segoe UI&quot;, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;,
+    monospace;
+  --font-size-normal: max(11px, var(--font-size-base));
+  --font-size-tooltip: calc(var(--font-size-base) - 1px);
+  --font-size-small: max(11px, calc(var(--font-size-base) - 2px));
+  --font-size-h1: calc(var(--font-size-normal) * 1.7142857143);
+  --font-size-h2: calc(var(--font-size-normal) * 1.4285714286);
+  --font-size-h3: calc(var(--font-size-normal) * 1.2857142857);
+  --font-weight-normal: 430;
+  --font-weight-medium: 500;
+  --icon-size: 16px;
+  --line-height-normal: calc(var(--font-size-normal) * 1.5);
+  --line-height-tooltip: calc(var(--font-size-tooltip) * 1.4285714286);
+  --line-height-small: calc(var(--font-size-small) + 4px);
+  --corner-shape: round;
+  --radius: var(--border-radius-lg, 10px);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px -1px rgb(0 0 0 / 8%);
+  --checkmark-image: url(&quot;data:image/svg+xml,%3Csvg xmlns=&#x27;http://www.w3.org/2000/svg&#x27; viewBox=&#x27;0 0 17 17&#x27;%3E%3Cpath d=&#x27;M12.8961 3.64101C13.1297 3.41418 13.4984 3.37523 13.7779 3.56581C14.0571 3.75635 14.1554 4.11331 14.0299 4.41347L13.9615 4.53847L7.71151 13.7045C7.59411 13.8767 7.4063 13.9877 7.19881 14.0072C6.99136 14.0267 6.78564 13.9533 6.63826 13.806L2.88826 10.056L2.79842 9.9457C2.6192 9.67407 2.64927 9.30496 2.88826 9.06581C3.12738 8.82669 3.49647 8.79676 3.76815 8.97597L3.8785 9.06581L7.03084 12.2182L12.8053 3.74941L12.8961 3.64101Z&#x27;/%3E%3C/svg%3E&quot;);
+
+  /* Legacy aliases; not part of the current agent contract. */
+  --viz-bg: transparent;
+  --viz-panel: var(--card);
+  --viz-border: var(--border);
+  --viz-text: var(--foreground);
+  --viz-muted: var(--muted-foreground);
+  --viz-accent: var(--primary);
+  --viz-accent-text: var(--primary-foreground);
+  --viz-accent-bg: var(--accent);
+  --viz-font-size: var(--font-size-base);
+  --viz-warning: var(--destructive);
+}
+
+:root[data-theme=&quot;light&quot;] {
+  color-scheme: light;
+}
+
+:root[data-theme=&quot;dark&quot;] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html &gt; body {
+  /* Preserve MCP aliases for older inline renderers without creating :root cycles. */
+  --color-background-primary: var(
+    --background,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --color-text-primary: var(
+    --foreground,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --color-border-secondary: var(
+    --border,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+
+  margin: 0;
+  padding: var(--visualize-paint-gutter, 0px);
+  color: var(--foreground);
+  background: transparent !important;
+  font-family: var(--font-sans) !important;
+  font-size: var(--font-size-normal);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+}
+
+a {
+  color: color-mix(in srgb, var(--viz-accent) 80%, var(--viz-text) 20%);
+  cursor: pointer;
+  font-weight: var(--font-weight-medium, 500);
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+a:is(:hover, :focus-visible) {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 0.5px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-block: 0;
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h3,
+h4,
+h5,
+h6 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.3;
+}
+
+b,
+strong,
+th {
+  font-weight: var(--font-weight-medium);
+}
+
+code:not(pre code) {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  corner-shape: var(--corner-shape);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  word-break: break-word;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--foreground);
+  font: inherit;
+  text-align: start;
+}
+
+.table :is(th, td) {
+  padding-block: 10px;
+  padding-inline: 0 24px;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.table-responsive &gt; .table :is(th, td) {
+  overflow-wrap: break-word;
+}
+
+.table :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+.table :is(caption, thead th) {
+  font-weight: 600;
+}
+
+.table thead th {
+  padding-block: 8px;
+  border-bottom-color: color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+.table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+
+.table.table-sm :is(th, td) {
+  padding-block: 6px;
+}
+
+.table.table-sm :is(th, td):not(:last-child) {
+  padding-inline-end: 16px;
+}
+
+.table :is(.text-end, [align=&quot;right&quot;]) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.table :is(.text-center, [align=&quot;center&quot;]) {
+  text-align: center;
+}
+
+.table .text-nowrap {
+  white-space: nowrap;
+}
+
+#widget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: transparent !important;
+}
+
+.card {
+  min-width: 0;
+  padding: 12px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  border-radius: var(--radius-2xl);
+  corner-shape: var(--corner-shape);
+  color: var(--card-foreground);
+  background: var(--card);
+}
+
+#widget &gt; :not(.card, .progress) {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: min(
+    20rem,
+    var(--tooltip-available-width, calc(100vw - 10px)),
+    calc(100vw - 10px)
+  );
+  max-height: min(
+    var(--tooltip-available-height, calc(100vh - 10px)),
+    calc(100vh - 10px)
+  );
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  box-shadow: none;
+  font-size: var(--font-size-tooltip);
+  line-height: var(--line-height-tooltip);
+  overflow-wrap: break-word;
+  white-space: normal;
+  pointer-events: none;
+  user-select: none;
+}
+
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(180px, 24%), 1fr));
+  gap: 10px;
+}
+
+.viz-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viz-stat-value {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+.viz-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+hr {
+  width: 100%;
+  height: 1px;
+  margin-block: 6px;
+  border: 0;
+  background: var(--border);
+}
+
+.nav {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.progress {
+  display: flex;
+  height: 8px;
+  margin-block: calc((var(--line-height-normal, 1.5em) - 8px) / 2);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+}
+
+.progress-bar:only-child {
+  border-radius: var(--radius-full);
+}
+
+.progress-bar {
+  height: 100%;
+  flex-shrink: 0;
+  border: 0;
+  background: var(--viz-series-1);
+}
+
+.viz-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-weight: var(--font-weight-medium);
+}
+
+small,
+.text-small,
+.viz-badge {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.viz-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz-controls &gt; .form-label {
+  display: grid;
+  min-width: min(100%, 260px);
+  flex: 1 1 280px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-bottom: 0;
+}
+
+.viz-controls &gt; .form-label &gt; :is(.form-control, .form-range, .form-select) {
+  grid-column: 1 / -1;
+}
+
+.btn,
+.nav-link,
+.form-check-input,
+.form-control,
+.form-range,
+.form-select {
+  font: inherit;
+}
+
+.btn,
+.nav-link {
+  appearance: button;
+  display: inline-flex;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px;
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: var(--cursor-interaction, pointer);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn:is(.btn-block, .viz-tile) {
+  inline-size: 100%;
+}
+
+.btn.viz-tile {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+a.btn {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:not(:disabled):hover,
+.nav-link:not(:disabled):not([aria-disabled=&quot;true&quot;]):hover {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn-primary {
+  border-color: transparent;
+  color: var(--primary-foreground);
+  background: var(--foreground);
+  background-clip: padding-box;
+}
+
+.btn-primary .text-muted {
+  color: color-mix(in srgb, var(--primary-foreground) 50%, transparent);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 80%, transparent);
+  background-clip: padding-box;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.btn-ghost:not(:disabled):hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.nav-pills .nav-link {
+  min-width: 0;
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.nav-justified .nav-link {
+  flex: 1 1 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.nav-pills .nav-link.active {
+  color: var(--foreground);
+  background: var(--muted);
+}
+
+.btn:disabled,
+.nav-link:disabled,
+.nav-link[aria-disabled=&quot;true&quot;] {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+[data-lucide] {
+  stroke-width: 1.6;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--foreground);
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.form-control::placeholder {
+  color: var(--muted-foreground);
+}
+
+.form-control[type=&quot;file&quot;] {
+  padding: 0;
+  overflow: hidden;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control[type=&quot;file&quot;]::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--input);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: inherit;
+  font: inherit;
+}
+
+.form-control[type=&quot;file&quot;]:not(:disabled):hover::file-selector-button {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-control-color[type=&quot;color&quot;] {
+  width: 40px;
+  height: 28px;
+  padding: 3px;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-lg) - 4px);
+  corner-shape: var(--corner-shape);
+}
+
+textarea.form-control {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.form-control:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.form-select {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 32px 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--foreground);
+  background-color: var(--secondary);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+    linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-select:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-select:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-check {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-check-input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--input);
+  color: var(--primary-foreground);
+  background-color: transparent;
+  cursor: var(--cursor-interaction, default);
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;] {
+  border-color: var(--input);
+  border-radius: var(--radius-sm);
+  corner-shape: var(--corner-shape);
+  background-color: var(--secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input:not(:disabled):not(:checked):hover {
+  background-color: var(--card);
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;]:checked {
+  border-color: var(--primary);
+  background-color: var(--primary);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input[type=&quot;checkbox&quot;]:checked::before {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary-foreground);
+  content: &quot;&quot;;
+  mask: var(--checkmark-image) center / 12px 12px no-repeat;
+}
+
+.form-check-input[type=&quot;radio&quot;] {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+}
+
+.form-check-input[type=&quot;radio&quot;]:checked {
+  border: 2px solid var(--primary);
+  background:
+    radial-gradient(circle, var(--primary-foreground) 0 2.5px, transparent 3px),
+    var(--primary);
+}
+
+.form-check:not(.form-switch) .form-check-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+}
+
+.form-switch .form-check-input:disabled,
+.form-switch .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form-check-label {
+  color: var(--foreground);
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-switch .form-check-input {
+  position: relative;
+  width: 32px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  box-shadow: none;
+  transition: background-color 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid light-dark(var(--primary-foreground), var(--foreground));
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+  box-shadow: var(--shadow-sm);
+  content: &quot;&quot;;
+  transform: translate(2px, -50%);
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input:checked {
+  background: var(--primary);
+}
+
+.form-switch .form-check-input:checked::before {
+  transform: translate(14px, -50%);
+}
+
+.form-switch .form-check-input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.form-range {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 28px;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  outline: none;
+  border: 0;
+  accent-color: var(--primary);
+  background: linear-gradient(
+      color-mix(in srgb, var(--foreground) 7%, transparent),
+      color-mix(in srgb, var(--foreground) 7%, transparent)
+    )
+    center / 100% 2px no-repeat;
+}
+
+.form-range::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-webkit-slider-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-moz-range-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.btn:not(.btn-primary, .viz-tile):is(
+  [aria-pressed=&quot;true&quot;],
+  [aria-selected=&quot;true&quot;],
+  .is-selected
+) {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.btn.viz-tile:is([aria-pressed=&quot;true&quot;], [aria-selected=&quot;true&quot;], .is-selected) {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.btn:focus-visible,
+.nav-link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .btn,
+  .nav-link,
+  .form-control,
+  .form-select {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Keep small-screen WebKit from zooming when a text field receives focus. */
+  .form-control,
+  .form-select {
+    font-size: max(16px, var(--font-size-normal));
+  }
+
+  .form-control[type=&quot;file&quot;]::file-selector-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .form-control-color[type=&quot;color&quot;] {
+    width: 44px;
+    height: 44px;
+  }
+
+  .form-control:is(
+    [type=&quot;date&quot;],
+    [type=&quot;datetime-local&quot;],
+    [type=&quot;month&quot;],
+    [type=&quot;time&quot;],
+    [type=&quot;week&quot;]
+  ) {
+    min-width: 0;
+    max-width: 100%;
+    padding-block: 8px;
+  }
+
+  .form-check {
+    min-height: 44px;
+    padding-inline: 15px;
+  }
+
+  .form-check-input {
+    position: relative;
+  }
+
+  .form-check-input::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    content: &quot;&quot;;
+    transform: translate(-50%, -50%);
+  }
+
+  .form-check-label {
+    display: inline-flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+  }
+
+  .form-range {
+    height: 44px;
+    touch-action: pan-y;
+  }
+
+  .form-range::-webkit-slider-runnable-track {
+    height: 44px;
+  }
+
+  .form-range::-moz-range-track {
+    height: 44px;
+  }
+
+  .form-range::-webkit-slider-thumb {
+    margin-top: 12px;
+  }
+}
+
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+#widget &gt; svg {
+  width: 100%;
+}
+
+/* Model-authored chart rules can otherwise stretch icons after these styles load. */
+svg.lucide {
+  display: block;
+  width: var(--icon-size) !important;
+  height: var(--icon-size) !important;
+  flex: none;
+  margin: 0 !important;
+  stroke-width: 1.6;
+}
+
+.text-warning,
+.text-destructive {
+  color: var(--destructive);
+}
+
+html&gt;body{padding:0}&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;style&gt;
+#atlas-workbench{--at-bg:light-dark(#f4f5f4,#141a1d);--at-panel:light-dark(#fff,#1c2428);--at-soft:light-dark(#f7f9f8,#202a2f);--at-ink:light-dark(#233438,#e5edeb);--at-muted:light-dark(#607575,#a0b4b3);--at-line:light-dark(#dce5e2,#354449);--at-accent:light-dark(#14695c,#81ccba);--at-tint:light-dark(#e5f2ed,#233f39);--at-warn:light-dark(#936522,#e3bb78);--at-warnbg:light-dark(#fbf2e2,#3a3023);--at-red:light-dark(#a44342,#e4a29c);--at-redbg:light-dark(#fbefed,#402e2b);font:14px/1.5 -apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,&quot;PingFang SC&quot;,sans-serif;color:var(--at-ink);background:var(--at-bg);border:1px solid var(--at-line);border-radius:12px;overflow:clip;text-align:left;color-scheme:light dark;isolation:isolate}
+#atlas-workbench *{box-sizing:border-box}#atlas-workbench button,#atlas-workbench input,#atlas-workbench textarea,#atlas-workbench select{font:inherit;color:inherit}#atlas-workbench button{cursor:pointer;border:1px solid transparent;background:transparent;border-radius:6px;padding:7px 10px;text-align:left;line-height:1.35}#atlas-workbench button:hover{background:var(--at-soft);border-color:var(--at-line)}#atlas-workbench button:focus-visible,#atlas-workbench input:focus-visible,#atlas-workbench textarea:focus-visible,#atlas-workbench select:focus-visible{outline:2px solid var(--at-accent);outline-offset:2px}#atlas-workbench button[aria-pressed=true]{color:var(--at-accent);background:var(--at-tint)}#atlas-workbench [hidden]{display:none!important}#atlas-workbench h1,#atlas-workbench h2,#atlas-workbench h3,#atlas-workbench p{margin:0}#atlas-workbench h1{font-size:23px;font-weight:600;letter-spacing:-.6px}#atlas-workbench h2{font-size:16px;font-weight:600}#atlas-workbench h3{font-size:14px;font-weight:600}#atlas-workbench small,.at-small{font-size:12px}#atlas-workbench .at-muted{color:var(--at-muted)}#atlas-workbench .at-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}#atlas-workbench .at-eyebrow{color:var(--at-muted);font-size:11px;letter-spacing:1.2px;text-transform:uppercase}
+#atlas-workbench .at-preview{padding:7px 18px;background:var(--at-warnbg);color:var(--at-warn);font-size:12px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}#atlas-workbench .at-topbar{min-height:58px;padding:10px 18px;display:flex;align-items:center;gap:20px;background:var(--at-panel);border-bottom:1px solid var(--at-line)}#atlas-workbench .at-brand{font-size:17px;letter-spacing:2px;font-weight:600}#atlas-workbench .at-project{padding-left:18px;border-left:1px solid var(--at-line);font-weight:500}#atlas-workbench .at-topmeta{margin-left:auto;font-size:12px;color:var(--at-muted)}#atlas-workbench .at-body{display:grid;grid-template-columns:184px minmax(0,1fr)}#atlas-workbench .at-sidebar{padding:18px 12px;background:var(--at-soft);border-right:1px solid var(--at-line)}#atlas-workbench .at-sidebar label{display:block;margin:0 8px 8px;color:var(--at-muted);font-size:12px}#atlas-workbench input,#atlas-workbench textarea,#atlas-workbench select{width:100%;padding:9px 10px;border:1px solid var(--at-line);border-radius:6px;background:var(--at-panel)}#atlas-workbench .at-search{margin-bottom:20px}#atlas-workbench .at-file{margin:17px 8px 5px;color:var(--at-muted);font-size:11px}#atlas-workbench .at-fn{width:100%;display:flex;gap:8px;align-items:center;font-size:12px;padding:8px}#atlas-workbench .at-symbol{color:var(--at-accent);font-family:Georgia,serif;font-size:16px}#atlas-workbench .at-sidefoot{border-top:1px solid var(--at-line);margin-top:28px;padding:14px 8px;color:var(--at-muted);font-size:11px}#atlas-workbench .at-work{min-width:0;background:var(--at-panel)}#atlas-workbench .at-heading{padding:20px 24px 16px;display:flex;align-items:center;justify-content:space-between;gap:16px}#atlas-workbench .at-breadcrumb{font-size:12px;color:var(--at-muted);margin-bottom:6px}#atlas-workbench .at-heading-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}#atlas-workbench .at-outline{border-color:var(--at-line)}#atlas-workbench .at-primary{background:var(--at-accent);color:var(--at-panel)}#atlas-workbench .at-primary:hover{background:var(--at-accent);filter:brightness(.95)}#atlas-workbench .at-tabs{display:flex;gap:22px;border-bottom:1px solid var(--at-line);padding:0 24px;flex-wrap:wrap}#atlas-workbench .at-tabs button{border-radius:0;padding:12px 0;border-bottom:2px solid transparent;font-weight:500}#atlas-workbench .at-tabs button[aria-pressed=true]{background:transparent;border-bottom-color:var(--at-accent)}#atlas-workbench .at-content{display:grid;grid-template-columns:minmax(0,1fr) 330px;min-height:570px}#atlas-workbench .at-main{min-width:0;display:flex;flex-direction:column}#atlas-workbench .at-lenses{display:flex;align-items:center;gap:4px;padding:14px 18px;flex-wrap:wrap}#atlas-workbench .at-lenses button{font-size:12px}#atlas-workbench .at-lensnote{margin-left:auto;color:var(--at-muted);font-size:11px}#atlas-workbench .at-scope{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 18px;border-top:1px solid var(--at-line);background:var(--at-soft);font-size:11px;color:var(--at-muted);margin-top:auto}#atlas-workbench .at-scope button{font-size:11px;color:var(--at-warn)}#atlas-workbench .at-source{min-width:0;border-left:1px solid var(--at-line);background:var(--at-soft);display:flex;flex-direction:column}#atlas-workbench .at-sourcehead{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--at-line);font-size:12px;gap:8px}#atlas-workbench .at-sourcepath{padding:14px 16px 8px;font-size:11px;color:var(--at-muted)}#atlas-workbench .at-code{font:12px/1.95 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;padding:8px 0 16px;min-height:265px}#atlas-workbench .at-code-line{display:grid;grid-template-columns:32px minmax(0,1fr);gap:10px;padding:0 14px 0 4px;border-left:3px solid transparent}#atlas-workbench .at-code-line.at-highlight{background:var(--at-tint);border-left-color:var(--at-accent)}#atlas-workbench .at-code-line.at-warning-line{background:var(--at-warnbg);border-left-color:var(--at-warn)}#atlas-workbench .at-ln{color:var(--at-muted);text-align:right;user-select:none;font-size:11px}#atlas-workbench .at-kw{color:var(--at-accent)}#atlas-workbench .at-evidence{padding:16px;border-top:1px solid var(--at-line);margin-top:auto;font-size:12px}#atlas-workbench .at-evidence p{margin-top:8px;color:var(--at-muted)}#atlas-workbench .at-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 7px;background:var(--at-tint);border-radius:4px;color:var(--at-accent)}#atlas-workbench .at-chip.at-amber{background:var(--at-warnbg);color:var(--at-warn)}#atlas-workbench .at-bottom{border-top:1px solid var(--at-line);padding:8px 16px;display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--at-muted);flex-wrap:wrap}
+#atlas-workbench .at-graph{position:relative;height:490px;min-width:0;background:radial-gradient(var(--at-line) .65px,transparent .65px) 8px 8px/18px 18px}#atlas-workbench .at-wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;color:var(--at-muted)}#atlas-workbench .at-wires path{stroke:currentColor;stroke-width:1.3;fill:none;opacity:.65}#atlas-workbench .at-wires path.at-unresolved{stroke:var(--at-warn);stroke-dasharray:5 4;opacity:1}#atlas-workbench .at-node{position:absolute;width:25%;min-height:62px;border:1px solid var(--at-line);background:var(--at-panel);border-radius:8px;padding:10px 11px;box-shadow:0 2px 5px #00000004}#atlas-workbench .at-node:hover{background:var(--at-tint);border-color:var(--at-accent)}#atlas-workbench .at-node strong{font-size:12px;display:block;font-weight:600;overflow-wrap:anywhere}#atlas-workbench .at-node small{font-size:11px;display:block;color:var(--at-muted);margin-top:4px;overflow-wrap:anywhere}#atlas-workbench .at-node.at-focus{background:var(--at-tint);border:1.5px solid var(--at-accent)}#atlas-workbench .at-node.at-unknown{border:1px dashed var(--at-warn);background:var(--at-warnbg)}#atlas-workbench .at-node.at-unknown strong,#atlas-workbench .at-node.at-unknown small{color:var(--at-warn)}#atlas-workbench .at-graph-label{position:absolute;top:18px;color:var(--at-muted);font-size:11px}#atlas-workbench .at-graph-note{position:absolute;left:5%;bottom:20px;font-size:11px;color:var(--at-muted);max-width:85%}#atlas-workbench .at-graph-note span{display:inline-block;width:20px;border-top:1px solid var(--at-muted);vertical-align:middle;margin-right:6px}#atlas-workbench .at-section{padding:22px;min-width:0}#atlas-workbench .at-section h2{margin-bottom:7px}#atlas-workbench .at-section&gt;p{color:var(--at-muted);font-size:12px;margin-bottom:20px}#atlas-workbench .at-value-row{padding:15px 0;border-top:1px solid var(--at-line);display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px}#atlas-workbench .at-value-row:first-of-type{margin-top:24px}#atlas-workbench .at-value-row b{font-weight:500;font-size:13px}#atlas-workbench .at-value-row p{font-size:12px;color:var(--at-muted);margin-top:5px}#atlas-workbench .at-link{color:var(--at-accent);font-size:12px;padding:4px 0!important;text-decoration:underline;text-underline-offset:3px}#atlas-workbench .at-unknownitem{padding:16px;border:1px solid var(--at-line);border-left:3px solid var(--at-warn);border-radius:6px;margin-top:15px}#atlas-workbench .at-unknownitem p{margin:8px 0;color:var(--at-muted);font-size:12px}#atlas-workbench .at-inputlabel{display:block;margin:18px 0 7px;font-size:12px;font-weight:500}#atlas-workbench textarea{font:12px/1.65 ui-monospace,monospace;min-height:116px;resize:vertical}#atlas-workbench .at-runline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}#atlas-workbench .at-notice{padding:13px 15px;border-radius:6px;background:var(--at-tint);font-size:12px;margin-top:18px;line-height:1.75}#atlas-workbench .at-notice.at-warning{background:var(--at-warnbg);color:var(--at-warn)}#atlas-workbench .at-notice.at-error{background:var(--at-redbg);color:var(--at-red)}#atlas-workbench .at-result{margin-top:22px;border-top:1px solid var(--at-line);padding-top:18px}#atlas-workbench .at-resultcode{padding:16px;background:var(--at-soft);margin:12px 0;border:1px solid var(--at-line);border-radius:6px;font:14px/1.8 ui-monospace,monospace;white-space:pre-wrap}#atlas-workbench .at-diff{margin-top:20px;background:var(--at-soft);border:1px solid var(--at-line);border-radius:7px;overflow:clip;font:12px/1.8 ui-monospace,monospace}#atlas-workbench .at-diffhead{padding:10px 12px;border-bottom:1px solid var(--at-line);color:var(--at-muted);font-size:11px}#atlas-workbench .at-diffline{padding:4px 12px;overflow-wrap:anywhere;white-space:pre-wrap}#atlas-workbench .at-minus{background:var(--at-redbg);color:var(--at-red)}#atlas-workbench .at-plus{background:var(--at-tint);color:var(--at-accent)}#atlas-workbench .at-compare{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--at-line);border-radius:7px;margin-top:18px;overflow:clip}#atlas-workbench .at-compare&gt;div{padding:15px}#atlas-workbench .at-compare&gt;div+div{border-left:1px solid var(--at-line)}#atlas-workbench .at-compare p{font-size:12px;margin-top:6px;color:var(--at-muted)}#atlas-workbench .at-toast{background:var(--at-tint);color:var(--at-accent);padding:10px 18px;font-size:12px;border-top:1px solid var(--at-line)}#atlas-workbench .at-empty{padding:36px 22px;font-size:13px;color:var(--at-muted)}#atlas-workbench .at-sourcetoggle{display:none}#atlas-workbench.at-source-off .at-content{grid-template-columns:1fr}#atlas-workbench.at-source-off .at-source{display:none}#atlas-workbench.at-source-off .at-sourcetoggle{display:inline-block}
+@media(min-width:1400px){#atlas-workbench .at-body{grid-template-columns:208px minmax(0,1fr)}#atlas-workbench .at-content{grid-template-columns:minmax(0,1fr) 360px}#atlas-workbench .at-graph{height:490px}}
+@media(max-width:1100px){#atlas-workbench .at-body{grid-template-columns:164px minmax(0,1fr)}#atlas-workbench .at-content{grid-template-columns:minmax(0,1fr) 285px}#atlas-workbench .at-heading{padding:18px}#atlas-workbench .at-node{padding:9px 7px}#atlas-workbench .at-node strong{font-size:11px}}
+@media(max-width:1080px){#atlas-workbench .at-content{grid-template-columns:1fr}#atlas-workbench .at-source{border-left:0;border-top:1px solid var(--at-line)}#atlas-workbench .at-code{min-height:0}#atlas-workbench .at-graph{height:490px}#atlas-workbench .at-sourcepath{padding-top:10px}#atlas-workbench .at-heading{align-items:flex-start}#atlas-workbench .at-topmeta{display:none}}
+@media(max-width:600px){#atlas-workbench .at-body{grid-template-columns:1fr}#atlas-workbench .at-sidebar{border-right:0;border-bottom:1px solid var(--at-line);padding:12px}#atlas-workbench .at-sidebar .at-file,#atlas-workbench .at-sidefoot{display:none}#atlas-workbench .at-search{margin-bottom:8px}#atlas-workbench .at-fnlist{display:flex;flex-wrap:wrap;gap:3px}#atlas-workbench .at-fn{width:auto}#atlas-workbench .at-heading{padding:16px;flex-wrap:wrap}#atlas-workbench .at-topbar{gap:12px;padding:12px}#atlas-workbench .at-project{padding-left:12px;font-size:12px}#atlas-workbench .at-tabs{padding:0 16px;gap:20px}#atlas-workbench .at-lensnote{width:100%;margin:5px 0 0}#atlas-workbench .at-node strong{font-size:11px}#atlas-workbench .at-graph{height:500px}#atlas-workbench .at-scope{flex-wrap:wrap}#atlas-workbench .at-section{padding:18px}#atlas-workbench .at-preview{padding:8px 12px}#atlas-workbench h1{font-size:21px}}
+@media(prefers-reduced-motion:no-preference){#atlas-workbench button{transition:background .12s,border-color .12s}}
+#atlas-workbench .at-city{position:relative;min-height:470px;isolation:isolate;background:var(--at-soft)}#atlas-workbench .at-city-ground{position:absolute;inset:160px 3% 85px;background:var(--at-tint);border:1px solid var(--at-line);transform:skewY(-9deg);z-index:-1}#atlas-workbench .at-city-ground span{position:absolute;left:15px;bottom:10px;font-size:12px;color:var(--at-muted)}#atlas-workbench .at-building{position:absolute;width:19%;padding:0;text-align:center;border:0;background:transparent}#atlas-workbench .at-building:hover{background:transparent;border:0}#atlas-workbench .at-building svg{width:100%;height:150px;display:block;overflow:visible}#atlas-workbench .at-building strong{display:block;font-size:12px}#atlas-workbench .at-building small{display:block;font-size:11px;color:var(--at-muted)}#atlas-workbench .at-building span{display:block;font-size:11px;color:var(--at-accent);margin-top:6px;overflow-wrap:anywhere}#atlas-workbench .at-glass-top{fill:var(--at-panel);fill-opacity:.75;stroke:var(--at-muted);stroke-width:1}#atlas-workbench .at-glass-side{fill:var(--at-tint);fill-opacity:.65;stroke:var(--at-muted);stroke-width:1}#atlas-workbench .at-glass-front{fill:var(--at-panel);fill-opacity:.4;stroke:var(--at-muted);stroke-width:1}#atlas-workbench .at-floor{fill:var(--at-accent);fill-opacity:.12;stroke:var(--at-accent);stroke-opacity:.4;stroke-width:.8}#atlas-workbench .at-building-selected .at-floor{fill-opacity:.5;stroke-opacity:1}#atlas-workbench .at-building-selected strong{color:var(--at-accent)}#atlas-workbench .at-city-note{position:absolute;bottom:18px;left:20px;right:20px;font-size:11px;color:var(--at-muted)}
+#atlas-workbench .at-parameters{display:grid;grid-template-columns:1fr 1fr;gap:14px}#atlas-workbench .at-parameters textarea{min-height:132px}#atlas-workbench .at-runprofile{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--at-line);border-bottom:1px solid var(--at-line);padding:14px 0}#atlas-workbench .at-reportrow{display:grid;grid-template-columns:90px minmax(0,1fr);gap:12px;font-size:12px;padding:13px 0;border-bottom:1px solid var(--at-line)}#atlas-workbench .at-reportrow b{font-weight:500}#atlas-workbench button:disabled{opacity:.45;cursor:default}@media(max-width:600px){#atlas-workbench .at-parameters{grid-template-columns:1fr}}
+#atlas-workbench .at-city-title{position:absolute;left:20px;top:20px;font-size:12px;color:var(--at-muted)}
+&lt;/style&gt;
+&lt;div id=&quot;atlas-workbench&quot; aria-label=&quot;Atlas 函数工作台版面预览&quot;&gt;
+  &lt;div class=&quot;at-preview&quot;&gt;&lt;span&gt;设计预览 · 样例数据 · 不执行代码或写文件&lt;/span&gt;&lt;span&gt;函数工作台 / 01&lt;/span&gt;&lt;/div&gt;
+  &lt;header class=&quot;at-topbar&quot;&gt;&lt;span class=&quot;at-brand&quot;&gt;ATLAS&lt;/span&gt;&lt;span class=&quot;at-project&quot;&gt;tour &lt;span class=&quot;at-muted&quot;&gt;/ 本地项目&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;at-topmeta&quot;&gt;固定源码版本 &lt;span class=&quot;at-mono&quot;&gt;demo-v1&lt;/span&gt; · 设计样例&lt;/span&gt;&lt;/header&gt;
+  &lt;div class=&quot;at-body&quot;&gt;
+    &lt;nav class=&quot;at-sidebar&quot; aria-label=&quot;项目函数导航&quot;&gt;&lt;label for=&quot;at-search&quot;&gt;查找函数&lt;/label&gt;&lt;input class=&quot;at-search&quot; id=&quot;at-search&quot; type=&quot;search&quot; placeholder=&quot;名称或文件…&quot; autocomplete=&quot;off&quot;&gt;&lt;div id=&quot;at-fnlist&quot; class=&quot;at-fnlist&quot;&gt;&lt;/div&gt;&lt;p id=&quot;at-search-empty&quot; class=&quot;at-empty&quot; hidden&gt;没有匹配函数&lt;/p&gt;&lt;div class=&quot;at-sidefoot&quot;&gt;源码来自 examples/tour&lt;br&gt;只列出本原型的 5 个目标&lt;br&gt;全项目查找由正式接口提供&lt;/div&gt;&lt;/nav&gt;
+    &lt;main class=&quot;at-work&quot;&gt;
+      &lt;div class=&quot;at-heading&quot;&gt;&lt;div&gt;&lt;div id=&quot;at-breadcrumb&quot; class=&quot;at-breadcrumb&quot;&gt;src / coupon.js&lt;/div&gt;&lt;h1 id=&quot;at-title&quot;&gt;redeem&lt;/h1&gt;&lt;/div&gt;&lt;div class=&quot;at-heading-actions&quot;&gt;&lt;button id=&quot;at-back&quot; class=&quot;at-outline&quot; aria-label=&quot;返回上一个函数&quot;&gt;← 返回&lt;/button&gt;&lt;button id=&quot;at-show-source&quot; class=&quot;at-outline at-sourcetoggle&quot;&gt;显示源码&lt;/button&gt;&lt;button id=&quot;at-run-shortcut&quot; class=&quot;at-primary&quot;&gt;运行这个函数&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;
+      &lt;nav class=&quot;at-tabs&quot; aria-label=&quot;工作任务&quot;&gt;&lt;button data-mode=&quot;structure&quot; aria-pressed=&quot;false&quot;&gt;结构定位&lt;/button&gt;&lt;button data-mode=&quot;understand&quot; aria-pressed=&quot;true&quot;&gt;理解代码&lt;/button&gt;&lt;button data-mode=&quot;run&quot; aria-pressed=&quot;false&quot;&gt;运行验证&lt;/button&gt;&lt;button data-mode=&quot;review&quot; aria-pressed=&quot;false&quot;&gt;审阅修改&lt;/button&gt;&lt;/nav&gt;
+      &lt;div class=&quot;at-content&quot;&gt;
+        &lt;section class=&quot;at-main&quot; aria-label=&quot;当前任务&quot;&gt;
+          &lt;div id=&quot;at-structure&quot; hidden&gt;&lt;/div&gt;
+          &lt;div id=&quot;at-understand&quot;&gt;&lt;div class=&quot;at-lenses&quot;&gt;&lt;button data-lens=&quot;calls&quot; aria-pressed=&quot;true&quot;&gt;调用关系&lt;/button&gt;&lt;button data-lens=&quot;values&quot; aria-pressed=&quot;false&quot;&gt;值从哪来&lt;/button&gt;&lt;button data-lens=&quot;unknowns&quot; aria-pressed=&quot;false&quot;&gt;未知边界&lt;/button&gt;&lt;span class=&quot;at-lensnote&quot;&gt;静态可能关系 · 非运行顺序&lt;/span&gt;&lt;/div&gt;&lt;div id=&quot;at-lens-content&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+          &lt;div id=&quot;at-run&quot; class=&quot;at-section&quot; hidden&gt;&lt;/div&gt;
+          &lt;div id=&quot;at-review&quot; class=&quot;at-section&quot; hidden&gt;&lt;/div&gt;
+          &lt;div class=&quot;at-scope&quot;&gt;&lt;span id=&quot;at-scope-text&quot;&gt;焦点邻域 · 原型中展示 6 个节点&lt;/span&gt;&lt;button id=&quot;at-scope-unknown&quot;&gt;查看未知边界 →&lt;/button&gt;&lt;/div&gt;
+        &lt;/section&gt;
+        &lt;aside class=&quot;at-source&quot; aria-label=&quot;所选目标的源码与依据&quot;&gt;&lt;div class=&quot;at-sourcehead&quot;&gt;&lt;span&gt;源码与依据&lt;/span&gt;&lt;button id=&quot;at-close-source&quot; aria-label=&quot;收起源码&quot;&gt;收起&lt;/button&gt;&lt;/div&gt;&lt;div id=&quot;at-sourcepath&quot; class=&quot;at-sourcepath&quot;&gt;&lt;/div&gt;&lt;div id=&quot;at-code&quot; class=&quot;at-code&quot; aria-label=&quot;源码行&quot;&gt;&lt;/div&gt;&lt;div class=&quot;at-evidence&quot;&gt;&lt;span class=&quot;at-chip&quot; id=&quot;at-evidence-label&quot;&gt;源码定位&lt;/span&gt;&lt;h3 id=&quot;at-evidence-title&quot; style=&quot;margin-top:10px&quot;&gt;同一个对象，同一份源码&lt;/h3&gt;&lt;p id=&quot;at-evidence-text&quot;&gt;点击图中的函数查看对应源码。未知关系以独立边界呈现，不补成确定调用。&lt;/p&gt;&lt;button id=&quot;at-export&quot; class=&quot;at-link&quot; style=&quot;margin-top:9px&quot;&gt;导出当前上下文 →&lt;/button&gt;&lt;/div&gt;&lt;/aside&gt;
+      &lt;/div&gt;
+    &lt;/main&gt;
+  &lt;/div&gt;
+  &lt;div id=&quot;at-toast&quot; class=&quot;at-toast&quot; role=&quot;status&quot; aria-live=&quot;polite&quot; hidden&gt;&lt;/div&gt;
+  &lt;footer class=&quot;at-bottom&quot;&gt;&lt;span id=&quot;at-selection-status&quot;&gt;当前选择：src/coupon.js · redeem&lt;/span&gt;&lt;span&gt;Static · Observed · Intent 分别呈现&lt;/span&gt;&lt;/footer&gt;
+&lt;/div&gt;
+&lt;script&gt;
+(()=&gt;{
+const root=document.getElementById(&#x27;atlas-workbench&#x27;);
+const $=id=&gt;root.querySelector(&#x27;#&#x27;+id);
+const state={selected:&#x27;redeem&#x27;,mode:&#x27;understand&#x27;,lens:&#x27;calls&#x27;,history:[],highlight:[],warning:false,sourceOpen:true,runShown:false,reviewVerified:false,previewApplied:false,drafts:{},results:{},previewVerdict:&quot;returned&quot;};
+const prefs={sourceLayout:&#x27;并排&#x27;,density:&#x27;舒展&#x27;};
+const samples={
+redeem:{file:&#x27;coupon.js&#x27;,start:16,code:[&quot;export function redeem(coupon, order) {&quot;,&quot;  if (!validate(coupon, order)) {&quot;,&quot;    return { ok: false, reason: &#x27;invalid&#x27; };&quot;,&quot;  }&quot;,&quot;  let written = 0;&quot;,&quot;  for (const item of order.items) {&quot;,&quot;    written = write(coupon.account, item.amount);&quot;,&quot;  }&quot;,&quot;  const receipt = dispatch(&#x27;refund&#x27;, order);&quot;,&quot;  return { ok: true, written, receipt };&quot;,&quot;}&quot;],args:&#x27;[{&quot;amount&quot;:100,&quot;used&quot;:false,&quot;account&quot;:&quot;A&quot;},{&quot;items&quot;:[{&quot;amount&quot;:20}]}]&#x27;,desc:&#x27;需要确认外部状态与动态调用&#x27;,line:[17,22,24]},
+validate:{file:&#x27;coupon.js&#x27;,start:6,code:[&quot;export function validate(coupon, order) {&quot;,&quot;  if (!coupon || !order) {&quot;,&quot;    return false;&quot;,&quot;  }&quot;,&quot;  if (coupon.used) {&quot;,&quot;    return false;&quot;,&quot;  }&quot;,&quot;  return coupon.amount &lt;= MAX_DISCOUNT;&quot;,&quot;}&quot;],args:&#x27;[{&quot;amount&quot;:100,&quot;used&quot;:false},{&quot;items&quot;:[]}]&#x27;,desc:&#x27;先检查输入，再运行&#x27;,line:[7,10,13]},
+write:{file:&#x27;ledger.js&#x27;,start:4,code:[&quot;export function write(account, amount) {&quot;,&quot;  if (typeof amount !== &#x27;number&#x27; || amount &lt;= 0) {&quot;,&quot;    throw new Error(&#x27;ledger: amount must be positive&#x27;);&quot;,&quot;  }&quot;,&quot;  entries.push({ account, amount });&quot;,&quot;  return entries.length;&quot;,&quot;}&quot;],args:&#x27;[&quot;A&quot;,20]&#x27;,desc:&#x27;会写入模块状态&#x27;,line:[5,8,9]},
+dispatch:{file:&#x27;dispatch.js&#x27;,start:7,code:[&quot;export function dispatch(type, order) {&quot;,&quot;  const handler = handlers[type];&quot;,&quot;  if (!handler) {&quot;,&quot;    return null;&quot;,&quot;  }&quot;,&quot;  return handler(order);&quot;,&quot;}&quot;],args:&#x27;[&quot;refund&quot;,{&quot;items&quot;:[]}]&#x27;,desc:&#x27;调用目标需要进一步确认&#x27;,line:[8,12]},
+handleCheckout:{file:&#x27;entry.js&#x27;,start:3,code:[&quot;export function handleCheckout(cart, coupons) {&quot;,&quot;  const budget = sumDiscounts(coupons);&quot;,&quot;  const result = redeem(coupons[0], cart);&quot;,&quot;  return { budget, result };&quot;,&quot;}&quot;],args:&#x27;[{&quot;items&quot;:[]},[{&quot;amount&quot;:100}]]&#x27;,desc:&#x27;通过入口串起优惠与账本&#x27;,line:[4,5,6]}
+};
+const paramNames={redeem:[&#x27;coupon&#x27;,&#x27;order&#x27;],validate:[&#x27;coupon&#x27;,&#x27;order&#x27;],write:[&#x27;account&#x27;,&#x27;amount&#x27;],dispatch:[&#x27;type&#x27;,&#x27;order&#x27;],handleCheckout:[&#x27;cart&#x27;,&#x27;coupons&#x27;]};
+function draft(){if(!state.drafts[state.selected]){const raw=samples[state.selected].args;state.drafts[state.selected]={raw,fields:JSON.parse(raw).map(x=&gt;JSON.stringify(x,null,2)),advanced:false};}return state.drafts[state.selected];}
+function argumentsValue(){const d=draft();if(d.advanced){const args=JSON.parse(d.raw);if(!Array.isArray(args))throw new Error(&#x27;位置参数需要 JSON 数组&#x27;);return args;}return d.fields.map((x,i)=&gt;{try{return JSON.parse(x);}catch(e){throw new Error(paramNames[state.selected][i]+&#x27; 不是有效 JSON&#x27;);}});}
+const escape=s=&gt;String(s).replace(/[&amp;&lt;&gt;&quot;&#x27;]/g,c=&gt;({&#x27;&amp;&#x27;:&#x27;&amp;amp;&#x27;,&#x27;&lt;&#x27;:&#x27;&amp;lt;&#x27;,&#x27;&gt;&#x27;:&#x27;&amp;gt;&#x27;,&#x27;&quot;&#x27;:&#x27;&amp;quot;&#x27;,&quot;&#x27;&quot;:&#x27;&amp;#39;&#x27;}[c]));
+function toast(s){$(&#x27;at-toast&#x27;).textContent=s;$(&#x27;at-toast&#x27;).hidden=false;}
+function source(){const s=samples[state.selected];$(&#x27;at-sourcepath&#x27;).textContent=&#x27;src/&#x27;+s.file+&#x27; · L&#x27;+s.start+&#x27;–&#x27;+(s.start+s.code.length-1);$(&#x27;at-code&#x27;).innerHTML=s.code.map((line,i)=&gt;{const n=s.start+i;return &#x27;&lt;div class=&quot;at-code-line &#x27;+(state.highlight.includes(n)?(state.warning?&#x27;at-warning-line&#x27;:&#x27;at-highlight&#x27;):&#x27;&#x27;)+&#x27;&quot;&gt;&lt;span class=&quot;at-ln&quot;&gt;&#x27;+n+&#x27;&lt;/span&gt;&lt;span&gt;&#x27;+escape(line)+&#x27;&lt;/span&gt;&lt;/div&gt;&#x27;;}).join(&#x27;&#x27;);}
+function evidence(title,body,lines=[],warning=false){state.highlight=lines;state.warning=warning;$(&#x27;at-evidence-title&#x27;).textContent=title;$(&#x27;at-evidence-text&#x27;).textContent=body;$(&#x27;at-evidence-label&#x27;).textContent=warning?&#x27;待确认的边界&#x27;:&#x27;源码依据&#x27;;$(&#x27;at-evidence-label&#x27;).className=&#x27;at-chip&#x27;+(warning?&#x27; at-amber&#x27;:&#x27;&#x27;);state.sourceOpen=true;root.classList.remove(&#x27;at-source-off&#x27;);source();}
+function navigation(){const q=$(&#x27;at-search&#x27;).value.toLowerCase();let count=0,last=&#x27;&#x27;;$(&#x27;at-fnlist&#x27;).innerHTML=Object.entries(samples).filter(([name,s])=&gt;name.toLowerCase().includes(q)||s.file.includes(q)).map(([name,s])=&gt;{count++;const head=s.file!==last?&#x27;&lt;div class=&quot;at-file&quot;&gt;&#x27;+s.file+&#x27;&lt;/div&gt;&#x27;:&#x27;&#x27;;last=s.file;return head+&#x27;&lt;button class=&quot;at-fn&quot; data-select=&quot;&#x27;+name+&#x27;&quot; aria-pressed=&quot;&#x27;+(state.selected===name)+&#x27;&quot;&gt;&lt;span class=&quot;at-symbol&quot;&gt;ƒ&lt;/span&gt;&lt;span&gt;&#x27;+name+&#x27;&lt;/span&gt;&lt;/button&gt;&#x27;;}).join(&#x27;&#x27;);$(&#x27;at-search-empty&#x27;).hidden=count&gt;0;}
+function select(name,push=true){if(!samples[name])return;if(push&amp;&amp;state.selected!==name)state.history.push({selected:state.selected,lens:state.lens,mode:state.mode});state.selected=name;state.highlight=[];state.warning=false;state.runShown=false;state.reviewVerified=false;state.previewApplied=false;$(&#x27;at-toast&#x27;).hidden=true;render();evidence(&#x27;所选函数的原始源码&#x27;,&#x27;源码节选来自 examples/tour；关系与分析结论在本原型中为设计样例。正式实现读取固定分析版本的源码。&#x27;);}
+function setMode(mode){state.mode=mode;$(&#x27;at-toast&#x27;).hidden=true;render();}
+function node(name,sub,x,y,kind=&#x27;&#x27;){return &#x27;&lt;button class=&quot;at-node &#x27;+kind+&#x27;&quot; data-node=&quot;&#x27;+name+&#x27;&quot; &#x27;+(samples[name]?&#x27;data-select=&quot;&#x27;+name+&#x27;&quot;&#x27;:&#x27;data-unknown=&quot;true&quot;&#x27;)+&#x27; style=&quot;left:&#x27;+x+&#x27;%;top:&#x27;+y+&#x27;px&quot;&gt;&lt;strong&gt;&#x27;+escape(name)+&#x27;&lt;/strong&gt;&lt;small&gt;&#x27;+escape(sub)+&#x27;&lt;/small&gt;&lt;/button&gt;&#x27;;}
+let edges=[];
+function graph(){let html=&#x27;&lt;div class=&quot;at-graph&quot; aria-label=&quot;调用关系样例，可点击函数&quot;&gt;&lt;svg class=&quot;at-wires&quot; aria-hidden=&quot;true&quot;&gt;&lt;/svg&gt;&#x27;;
+if(state.selected===&#x27;redeem&#x27;){html+=&#x27;&lt;span class=&quot;at-graph-label&quot; style=&quot;left:5%&quot;&gt;谁调用它&lt;/span&gt;&lt;span class=&quot;at-graph-label&quot; style=&quot;left:36%&quot;&gt;当前函数&lt;/span&gt;&lt;span class=&quot;at-graph-label&quot; style=&quot;left:69%&quot;&gt;它调用谁&lt;/span&gt;&#x27;+node(&#x27;handleCheckout&#x27;,&#x27;entry.js&#x27;,4,165)+node(&#x27;redeem&#x27;,&#x27;coupon.js&#x27;,36,165,&#x27;at-focus&#x27;)+node(&#x27;validate&#x27;,&#x27;coupon.js · 检查输入&#x27;,69,62)+node(&#x27;write&#x27;,&#x27;ledger.js · 写入账本&#x27;,69,165)+node(&#x27;dispatch&#x27;,&#x27;dispatch.js · 选择处理器&#x27;,69,268)+node(&#x27;handler(order)&#x27;,&#x27;目标待确认&#x27;,36,339,&#x27;at-unknown&#x27;);edges=[[&#x27;handleCheckout&#x27;,&#x27;redeem&#x27;],[&#x27;redeem&#x27;,&#x27;validate&#x27;],[&#x27;redeem&#x27;,&#x27;write&#x27;],[&#x27;redeem&#x27;,&#x27;dispatch&#x27;],[&#x27;dispatch&#x27;,&#x27;handler(order)&#x27;,true]];}
+else {const incoming=state.selected===&#x27;handleCheckout&#x27;?null:&#x27;redeem&#x27;;html+=&#x27;&lt;span class=&quot;at-graph-label&quot; style=&quot;left:5%&quot;&gt;&#x27;+(incoming?&#x27;谁调用它&#x27;:&#x27;项目入口&#x27;)+&#x27;&lt;/span&gt;&lt;span class=&quot;at-graph-label&quot; style=&quot;left:36%&quot;&gt;当前函数&lt;/span&gt;&lt;span class=&quot;at-graph-label&quot; style=&quot;left:69%&quot;&gt;&#x27;+(state.selected===&#x27;dispatch&#x27;?&#x27;未知目标&#x27;:&#x27;源码依据&#x27;)+&#x27;&lt;/span&gt;&#x27;;if(incoming)html+=node(incoming,&#x27;coupon.js&#x27;,4,168);html+=node(state.selected,samples[state.selected].file,36,168,&#x27;at-focus&#x27;);edges=incoming?[[incoming,state.selected]]:[];if(state.selected===&#x27;dispatch&#x27;){html+=node(&#x27;handler(order)&#x27;,&#x27;目标待确认&#x27;,69,168,&#x27;at-unknown&#x27;);edges.push([&#x27;dispatch&#x27;,&#x27;handler(order)&#x27;,true]);}else if(state.selected===&#x27;handleCheckout&#x27;){html+=node(&#x27;redeem&#x27;,&#x27;coupon.js&#x27;,69,168);edges.push([&#x27;handleCheckout&#x27;,&#x27;redeem&#x27;]);}else html+=&#x27;&lt;div style=&quot;position:absolute;left:69%;top:172px;width:25%;font-size:12px;color:var(--at-muted)&quot;&gt;&#x27;+escape(samples[state.selected].desc)+&#x27;&lt;/div&gt;&#x27;;}
+html+=&#x27;&lt;div class=&quot;at-graph-note&quot;&gt;&lt;span&gt;&lt;/span&gt;静态候选　 ·　虚线为未知目标&lt;br&gt;点击函数继续阅读；展开与返回保留上下文。&lt;/div&gt;&lt;/div&gt;&#x27;;$(&#x27;at-lens-content&#x27;).innerHTML=html;requestAnimationFrame(drawWires);}
+function structureView(){
+$(&#x27;at-structure&#x27;).innerHTML=&#x27;&lt;div class=&quot;at-lenses&quot;&gt;&lt;span class=&quot;at-chip&quot;&gt;结构空间 · 2.5D 版面草图&lt;/span&gt;&lt;span class=&quot;at-lensnote&quot;&gt;同一选区 / 静态结构&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;at-city&quot;&gt;&lt;div class=&quot;at-city-ground&quot;&gt;&lt;/div&gt;&lt;div class=&quot;at-city-title&quot;&gt;tour / src&lt;/div&gt;&#x27;+[
+[&#x27;handleCheckout&#x27;,&#x27;entry.js&#x27;,&#x27;入口&#x27;,7,150,1],[&#x27;redeem&#x27;,&#x27;coupon.js&#x27;,&#x27;3 个顶层函数&#x27;,30,90,3],[&#x27;write&#x27;,&#x27;ledger.js&#x27;,&#x27;3 个顶层函数&#x27;,54,130,3],[&#x27;dispatch&#x27;,&#x27;dispatch.js&#x27;,&#x27;1 个顶层函数&#x27;,77,190,1]
+].map(([name,file,n,x,y,layers])=&gt;&#x27;&lt;button class=&quot;at-building &#x27;+(samples[state.selected].file===file?&#x27;at-building-selected&#x27;:&#x27;&#x27;)+&#x27;&quot; data-select=&quot;&#x27;+name+&#x27;&quot; style=&quot;left:&#x27;+x+&#x27;%;top:&#x27;+y+&#x27;px&quot; aria-label=&quot;在 &#x27;+file+&#x27; 中定位 &#x27;+name+&#x27;&quot;&gt;&lt;svg viewBox=&quot;0 0 130 180&quot; aria-hidden=&quot;true&quot;&gt;&lt;polygon points=&quot;14,40 74,10 117,34 57,64&quot; class=&quot;at-glass-top&quot;/&gt;&lt;polygon points=&quot;14,40 57,64 57,164 14,140&quot; class=&quot;at-glass-side&quot;/&gt;&lt;polygon points=&quot;57,64 117,34 117,134 57,164&quot; class=&quot;at-glass-front&quot;/&gt;&#x27;+Array.from({length:layers},(_,i)=&gt;&#x27;&lt;polygon points=&quot;15,&#x27;+(64+i*26)+&#x27; 74,&#x27;+(34+i*26)+&#x27; 116,&#x27;+(58+i*26)+&#x27; 57,&#x27;+(88+i*26)+&#x27;&quot; class=&quot;at-floor&quot;/&gt;&#x27;).join(&#x27;&#x27;)+&#x27;&lt;/svg&gt;&lt;strong&gt;&#x27;+file+&#x27;&lt;/strong&gt;&lt;small&gt;&#x27;+n+&#x27;&lt;/small&gt;&lt;span&gt;&#x27;+name+&#x27; →&lt;/span&gt;&lt;/button&gt;&#x27;).join(&#x27;&#x27;)+&#x27;&lt;div class=&quot;at-city-note&quot;&gt;目录是地块，文件是玻璃柱，函数是内部层。&lt;br&gt;此草图只验证空间与选区；调用管道与运行留痕在真实渲染实现中接线。&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;at-section&quot; style=&quot;padding-top:0&quot;&gt;&lt;button class=&quot;at-outline&quot; data-mode=&quot;understand&quot;&gt;在 2D 中阅读 &#x27;+state.selected+&#x27; →&lt;/button&gt;&lt;/div&gt;&#x27;;
+}
+function drawWires(){const stage=root.querySelector(&#x27;.at-graph&#x27;),svg=root.querySelector(&#x27;.at-wires&#x27;);if(!stage||!svg)return;const b=stage.getBoundingClientRect();svg.setAttribute(&#x27;viewBox&#x27;,&#x27;0 0 &#x27;+b.width+&#x27; &#x27;+b.height);const ports=new Map();const plans=edges.map(([a,c,u])=&gt;{const aa=[...stage.querySelectorAll(&#x27;[data-node]&#x27;)].find(n=&gt;n.dataset.node===a).getBoundingClientRect(),cc=[...stage.querySelectorAll(&#x27;[data-node]&#x27;)].find(n=&gt;n.dataset.node===c).getBoundingClientRect();const reverse=cc.left&lt;aa.left;const ak=a+(reverse?&#x27;:left&#x27;:&#x27;:right&#x27;),ck=c+(reverse?&#x27;:right&#x27;:&#x27;:left&#x27;);for(const key of [ak,ck])ports.set(key,(ports.get(key)||0)+1);return {aa,cc,reverse,ak,ck,u};});const used=new Map();function port(key,r){const index=(used.get(key)||0)+1;used.set(key,index);return r.top+r.height*index/(ports.get(key)+1)-b.top;}svg.innerHTML=&#x27;&lt;defs&gt;&lt;marker id=&quot;at-arrow&quot; markerWidth=&quot;7&quot; markerHeight=&quot;7&quot; refX=&quot;6&quot; refY=&quot;3.5&quot; orient=&quot;auto&quot;&gt;&lt;path d=&quot;M0 0 L7 3.5 L0 7&quot; style=&quot;fill:currentColor;stroke:none&quot;&gt;&lt;/path&gt;&lt;/marker&gt;&lt;/defs&gt;&#x27;+plans.map(({aa,cc,reverse,ak,ck,u})=&gt;{const x1=(reverse?aa.left:aa.right)-b.left,x2=(reverse?cc.right:cc.left)-b.left,y1=port(ak,aa),y2=port(ck,cc),m=(x1+x2)/2;return &#x27;&lt;path &#x27;+(u?&#x27;class=&quot;at-unresolved&quot;&#x27;:&#x27;&#x27;)+&#x27; d=&quot;M&#x27;+x1+&#x27; &#x27;+y1+&#x27; H&#x27;+m+&#x27; V&#x27;+y2+&#x27; H&#x27;+x2+&#x27;&quot; marker-end=&quot;url(#at-arrow)&quot;&gt;&lt;/path&gt;&#x27;;}).join(&#x27;&#x27;);}
+function values(){const s=samples[state.selected];const rows=state.selected===&#x27;redeem&#x27;?[[&#x27;ok&#x27;,&#x27;由校验分支决定&#x27;,&#x27;检查 validate 的结果，分别返回 false 或 true。&#x27;,[17,18,25]],[&#x27;written&#x27;,&#x27;初始值或 write 的结果&#x27;,&#x27;初始为 0；循环中的值来自 write 返回值。&#x27;,[20,22,25]],[&#x27;receipt&#x27;,&#x27;来自 dispatch 返回值&#x27;,&#x27;动态 handler 的具体结果仍需确认。&#x27;,[24,25]]]:[[&#x27;返回值&#x27;,&#x27;沿源码中的 return 查看&#x27;,&#x27;展开相关判断与来源；样例不代表引擎已证明结果唯一。&#x27;,s.line]];$(&#x27;at-lens-content&#x27;).innerHTML=&#x27;&lt;div class=&quot;at-section&quot;&gt;&lt;span class=&quot;at-eyebrow&quot;&gt;Value origins&lt;/span&gt;&lt;h2 style=&quot;margin-top:8px&quot;&gt;返回值不是一个黑盒&lt;/h2&gt;&lt;p style=&quot;margin-top:8px&quot;&gt;先看组成，再沿每项回到依据。以下为设计样例。&lt;/p&gt;&#x27;+rows.map(([a,b,c,l])=&gt;&#x27;&lt;div class=&quot;at-value-row&quot;&gt;&lt;b class=&quot;at-mono&quot;&gt;&#x27;+a+&#x27;&lt;/b&gt;&lt;div&gt;&lt;h3&gt;&#x27;+b+&#x27;&lt;/h3&gt;&lt;p&gt;&#x27;+c+&#x27;&lt;/p&gt;&lt;button class=&quot;at-link&quot; data-lines=&quot;&#x27;+l.join(&#x27;,&#x27;)+&#x27;&quot; data-caption=&quot;&#x27;+b+&#x27;&quot;&gt;定位源码 L&#x27;+l.join(&#x27; / L&#x27;)+&#x27; →&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;&#x27;).join(&#x27;&#x27;)+&#x27;&lt;/div&gt;&#x27;;}
+function unknowns(){$(&#x27;at-lens-content&#x27;).innerHTML=&#x27;&lt;div class=&quot;at-section&quot;&gt;&lt;span class=&quot;at-chip at-amber&quot;&gt;边界样例 · 不代表全项目计数&lt;/span&gt;&lt;h2 style=&quot;margin-top:16px&quot;&gt;哪些结论还不能下&lt;/h2&gt;&lt;p style=&quot;margin-top:8px&quot;&gt;已知关系继续可读；未确认的部分单独追问。&lt;/p&gt;&lt;div class=&quot;at-unknownitem&quot;&gt;&lt;h3&gt;dispatch 的调用目标待确认&lt;/h3&gt;&lt;p&gt;&lt;span class=&quot;at-mono&quot;&gt;handlers[type]&lt;/span&gt; 按输入选择处理器。此处不能把某一个处理器当作唯一调用目标。&lt;/p&gt;&lt;button class=&quot;at-link&quot; data-inspect-unknown&gt;查看 dispatch.js : 8–12 →&lt;/button&gt;&lt;/div&gt;&lt;div class=&quot;at-unknownitem&quot;&gt;&lt;h3&gt;本次执行走过哪里，尚无记录&lt;/h3&gt;&lt;p&gt;静态关系表示可能联系。运行入口的返回结果，也不等于已经采集了每一行或每一次调用。&lt;/p&gt;&lt;button class=&quot;at-link&quot; data-mode=&quot;run&quot;&gt;配置一次运行 →&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;&#x27;;}
+function runView(){const sample=samples[state.selected],d=draft();const names=paramNames[state.selected];$(&#x27;at-run&#x27;).innerHTML=&#x27;&lt;span class=&quot;at-eyebrow&quot;&gt;Run workspace&lt;/span&gt;&lt;h2 style=&quot;margin-top:8px&quot;&gt;给 &#x27;+state.selected+&#x27; 一组输入&lt;/h2&gt;&lt;p style=&quot;margin-top:8px&quot;&gt;固定版本 demo-v1 · src/&#x27;+sample.file+&#x27;&lt;br&gt;以下是表单与状态设计，不代表当前画像已允许运行。&lt;/p&gt;&lt;div class=&quot;at-runprofile&quot;&gt;&lt;div&gt;&lt;span class=&quot;at-chip &#x27;+(state.selected===&#x27;validate&#x27;?&#x27;&#x27;:&#x27;at-amber&#x27;)+&#x27;&quot;&gt;&#x27;+(state.selected===&#x27;validate&#x27;?&#x27;输入待检查&#x27;:&#x27;需要确认条件&#x27;)+&#x27;&lt;/span&gt;&lt;h3 style=&quot;margin-top:8px&quot;&gt;&#x27;+sample.desc+&#x27;&lt;/h3&gt;&lt;/div&gt;&lt;button class=&quot;at-link&quot; data-lines=&quot;&#x27;+sample.start+&#x27;&quot; data-caption=&quot;用户定位：函数声明&quot;&gt;查看声明 →&lt;/button&gt;&lt;/div&gt;&#x27;+(state.selected!==&#x27;validate&#x27;?&#x27;&lt;div class=&quot;at-notice at-warning&quot;&gt;&lt;b&gt;动态调用或外部状态&lt;/b&gt;&lt;br&gt;正式画像逐项列出所缺上下文。此处演示明确确认，不使用一个“强行运行”开关。&lt;label style=&quot;display:flex;gap:8px;margin-top:10px&quot;&gt;&lt;input id=&quot;at-ack&quot; type=&quot;checkbox&quot; style=&quot;width:auto&quot;&gt;我理解：动态目标尚未确定&lt;/label&gt;&lt;/div&gt;&#x27;:&#x27;&#x27;)+&#x27;&lt;div class=&quot;at-runline&quot; style=&quot;justify-content:space-between&quot;&gt;&lt;h3&gt;参数&lt;/h3&gt;&lt;button id=&quot;at-input-mode&quot; class=&quot;at-outline&quot;&gt;&#x27;+(d.advanced?&#x27;按参数编辑&#x27;:&#x27;JSON 数组编辑&#x27;)+&#x27;&lt;/button&gt;&lt;/div&gt;&#x27;+(d.advanced?&#x27;&lt;label class=&quot;at-inputlabel&quot; for=&quot;at-args&quot;&gt;按声明顺序排列参数&lt;/label&gt;&lt;textarea id=&quot;at-args&quot; spellcheck=&quot;false&quot;&gt;&#x27;+escape(d.raw)+&#x27;&lt;/textarea&gt;&#x27;:&#x27;&lt;div class=&quot;at-parameters&quot;&gt;&#x27;+names.map((name,i)=&gt;&#x27;&lt;div&gt;&lt;label class=&quot;at-inputlabel&quot; for=&quot;at-param-&#x27;+i+&#x27;&quot;&gt;&lt;span class=&quot;at-mono&quot;&gt;&#x27;+name+&#x27;&lt;/span&gt; &lt;span class=&quot;at-muted&quot;&gt;· 参数 &#x27;+(i+1)+&#x27;&lt;/span&gt;&lt;/label&gt;&lt;textarea id=&quot;at-param-&#x27;+i+&#x27;&quot; data-param=&quot;&#x27;+i+&#x27;&quot; spellcheck=&quot;false&quot;&gt;&#x27;+escape(d.fields[i])+&#x27;&lt;/textarea&gt;&lt;/div&gt;&#x27;).join(&#x27;&#x27;)+&#x27;&lt;/div&gt;&#x27;)+&#x27;&lt;div id=&quot;at-input-error&quot; class=&quot;at-notice at-error&quot; role=&quot;alert&quot; hidden&gt;&lt;/div&gt;&lt;div class=&quot;at-runline&quot;&gt;&lt;button id=&quot;at-run-preview&quot; class=&quot;at-primary&quot;&gt;预览结果版式&lt;/button&gt;&lt;label class=&quot;at-small at-muted&quot; for=&quot;at-preview-verdict&quot;&gt;样例状态&lt;/label&gt;&lt;select id=&quot;at-preview-verdict&quot; style=&quot;width:auto;font-size:12px&quot;&gt;&#x27;+[[&#x27;returned&#x27;,&#x27;返回&#x27;],[&#x27;threw&#x27;,&#x27;抛出异常&#x27;],[&#x27;refused&#x27;,&#x27;运行被拒绝&#x27;],[&#x27;timeout&#x27;,&#x27;超时&#x27;],[&#x27;cancelled&#x27;,&#x27;已取消&#x27;]].map(([v,t])=&gt;&#x27;&lt;option value=&quot;&#x27;+v+&#x27;&quot; &#x27;+(state.previewVerdict===v?&#x27;selected&#x27;:&#x27;&#x27;)+&#x27;&gt;&#x27;+t+&#x27;&lt;/option&gt;&#x27;).join(&#x27;&#x27;)+&#x27;&lt;/select&gt;&lt;/div&gt;&lt;div id=&quot;at-result&quot; class=&quot;at-result&quot; hidden aria-live=&quot;polite&quot;&gt;&lt;/div&gt;&#x27;;if(state.results[state.selected])paintResult(state.results[state.selected]);}
+function paintResult(record){$(&#x27;at-result&#x27;).hidden=false;const verdict=record.verdict;const variants={returned:[&#x27;样例返回&#x27;,&#x27;true&#x27;,&#x27;函数返回值与进程退出码分开呈现。&#x27;],threw:[&#x27;样例异常&#x27;,&#x27;Error: invalid input&#x27;,&#x27;正式页面仅在实际异常有位置时提供源码定位。&#x27;],refused:[&#x27;样例拒绝&#x27;,&#x27;未启动：缺少所需上下文&#x27;,&#x27;列出具体缺失字段，保留输入，修正后可重试。&#x27;],timeout:[&#x27;样例超时&#x27;,&#x27;超过本次时间预算&#x27;,&#x27;保留已收集输出；不把超时归为返回或通过。&#x27;],cancelled:[&#x27;样例取消&#x27;,&#x27;进程终止已确认&#x27;,&#x27;正式页面只有收到服务端终态才显示已取消。&#x27;]};const [title,value,detail]=variants[verdict];$(&#x27;at-result&#x27;).innerHTML=&#x27;&lt;span class=&quot;at-chip &#x27;+(verdict===&#x27;returned&#x27;?&#x27;&#x27;:&#x27;at-amber&#x27;)+&#x27;&quot;&gt;&#x27;+title+&#x27; · 非实际执行&lt;/span&gt;&lt;div class=&quot;at-resultcode&quot;&gt;&#x27;+escape(value)+&#x27;&lt;/div&gt;&lt;p class=&quot;at-small at-muted&quot;&gt;&#x27;+detail+&#x27;&lt;/p&gt;&lt;details style=&quot;margin-top:12px;font-size:12px&quot;&gt;&lt;summary&gt;这次样例关联的输入&lt;/summary&gt;&lt;pre class=&quot;at-resultcode&quot;&gt;&#x27;+escape(JSON.stringify(record.args,null,2))+&#x27;&lt;/pre&gt;&lt;/details&gt;&lt;div class=&quot;at-notice at-warning&quot;&gt;固定结果样例，不由输入计算。没有行级或调用级采样，不绘制运行路径。&lt;/div&gt;&#x27;;}
+function previewRun(){try{const args=argumentsValue();$(&#x27;at-input-error&#x27;).hidden=true;state.results[state.selected]={verdict:state.previewVerdict,args};paintResult(state.results[state.selected]);}catch(e){$(&#x27;at-input-error&#x27;).textContent=&#x27;输入格式不正确：&#x27;+e.message;$(&#x27;at-input-error&#x27;).hidden=false;return;}evidence(&#x27;当前函数的源码&#x27;,&#x27;这是源码阅读区，不表示这些行已执行。用户定位或实际异常位置才显示相应高亮。&#x27;,[]);}
+function reviewView(){const isValidate=state.selected===&#x27;validate&#x27;;$(&#x27;at-review&#x27;).innerHTML=&#x27;&lt;span class=&quot;at-chip at-amber&quot;&gt;Intent · 候选修改样例&lt;/span&gt;&lt;h2 style=&quot;margin-top:14px&quot;&gt;先看改了什么，再决定写入&lt;/h2&gt;&lt;p style=&quot;margin-top:8px&quot;&gt;&#x27;+(isValidate?&#x27;为 validate 增加负金额输入检查。补丁和结果均为设计样例。&#x27;:&#x27;这一页用 validate 演示修改审阅；切换时会明确更换所选对象。&#x27;)+&#x27;&lt;/p&gt;&#x27;+(isValidate?&#x27;&lt;div class=&quot;at-diff&quot;&gt;&lt;div class=&quot;at-diffhead&quot;&gt;src/coupon.js · 候选变更&lt;/div&gt;&lt;div class=&quot;at-diffline&quot;&gt;  if (coupon.used) { return false; }&lt;/div&gt;&lt;div class=&quot;at-diffline at-minus&quot;&gt;− return coupon.amount &amp;lt;= MAX_DISCOUNT;&lt;/div&gt;&lt;div class=&quot;at-diffline at-plus&quot;&gt;+ return coupon.amount &amp;gt;= 0&lt;/div&gt;&lt;div class=&quot;at-diffline at-plus&quot;&gt;+   &amp;amp;&amp;amp; coupon.amount &amp;lt;= MAX_DISCOUNT;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;at-runline&quot;&gt;&lt;button id=&quot;at-verify-preview&quot; class=&quot;at-primary&quot;&gt;预览验证报告&lt;/button&gt;&lt;span class=&quot;at-muted at-small&quot;&gt;原文件尚未改动&lt;/span&gt;&lt;/div&gt;&lt;div id=&quot;at-verification&quot; hidden&gt;&lt;/div&gt;&#x27;:&#x27;&lt;button id=&quot;at-review-validate&quot; class=&quot;at-primary&quot;&gt;查看 validate 修改样例 →&lt;/button&gt;&#x27;);}
+function verifyPreview(){state.reviewVerified=true;$(&#x27;at-verification&#x27;).hidden=false;$(&#x27;at-verification&#x27;).innerHTML=&#x27;&lt;div class=&quot;at-result&quot;&gt;&lt;h3&gt;验证报告 · 设计样例&lt;/h3&gt;&lt;p class=&quot;at-muted at-small&quot; style=&quot;margin-top:7px&quot;&gt;下面展示接线后的报告结构；本原型没有运行索引或测试。&lt;/p&gt;&lt;div class=&quot;at-reportrow&quot;&gt;&lt;b&gt;静态变化&lt;/b&gt;&lt;span&gt;新增金额下界判断&lt;br&gt;&lt;small class=&quot;at-muted&quot;&gt;来自源码差异的样例说明；图差异待验证&lt;/small&gt;&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;at-reportrow&quot;&gt;&lt;b&gt;共同输入&lt;/b&gt;&lt;span class=&quot;at-mono&quot;&gt;coupon.amount = -10&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;at-compare&quot;&gt;&lt;div&gt;&lt;span class=&quot;at-eyebrow&quot;&gt;基线版本 demo-v1&lt;/span&gt;&lt;p&gt;实际结果&lt;/p&gt;&lt;strong&gt;未运行&lt;/strong&gt;&lt;/div&gt;&lt;div&gt;&lt;span class=&quot;at-eyebrow&quot;&gt;候选版本&lt;/span&gt;&lt;p&gt;实际结果&lt;/p&gt;&lt;strong&gt;未运行&lt;/strong&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;at-reportrow&quot;&gt;&lt;b&gt;独立预期&lt;/b&gt;&lt;span class=&quot;at-mono&quot;&gt;false &lt;small class=&quot;at-muted&quot;&gt;（需绑定项目约束）&lt;/small&gt;&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;at-reportrow&quot;&gt;&lt;b&gt;测试命令&lt;/b&gt;&lt;span&gt;未配置&lt;br&gt;&lt;small class=&quot;at-muted&quot;&gt;命令 / 退出码 / 输出分别显示&lt;/small&gt;&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;at-reportrow&quot;&gt;&lt;b&gt;验证结论&lt;/b&gt;&lt;span class=&quot;at-chip at-amber&quot;&gt;尚未验证&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;at-notice at-warning&quot;&gt;正式应用区：显示已授权目标目录与提案版本。无验证结果时不会显示“测试通过”。&lt;/div&gt;&lt;div class=&quot;at-runline&quot;&gt;&lt;button id=&quot;at-apply-preview&quot; class=&quot;at-outline&quot;&gt;查看应用后状态样例&lt;/button&gt;&lt;span class=&quot;at-small at-muted&quot;&gt;仅查看版式，无写入&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&#x27;;}
+function render(){const s=samples[state.selected];navigation();$(&#x27;at-title&#x27;).textContent=state.selected;$(&#x27;at-breadcrumb&#x27;).textContent=&#x27;tour / src / &#x27;+s.file;$(&#x27;at-selection-status&#x27;).textContent=&#x27;当前选择：src/&#x27;+s.file+&#x27; · &#x27;+state.selected+&#x27; · demo-v1&#x27;;root.querySelectorAll(&#x27;[data-mode]&#x27;).forEach(b=&gt;b.setAttribute(&#x27;aria-pressed&#x27;,b.dataset.mode===state.mode));root.querySelectorAll(&#x27;[data-lens]&#x27;).forEach(b=&gt;b.setAttribute(&#x27;aria-pressed&#x27;,b.dataset.lens===state.lens));$(&#x27;at-structure&#x27;).hidden=state.mode!==&#x27;structure&#x27;;$(&#x27;at-understand&#x27;).hidden=state.mode!==&#x27;understand&#x27;;$(&#x27;at-run&#x27;).hidden=state.mode!==&#x27;run&#x27;;$(&#x27;at-review&#x27;).hidden=state.mode!==&#x27;review&#x27;;$(&#x27;at-back&#x27;).disabled=!state.history.length;$(&#x27;at-scope-text&#x27;).textContent=state.mode===&#x27;understand&#x27;?&#x27;焦点邻域 · 仅设计样例范围&#x27;:&#x27;目标固定 · src/&#x27;+s.file+&#x27; / &#x27;+state.selected;if(state.mode===&#x27;structure&#x27;)structureView();else if(state.mode===&#x27;understand&#x27;){if(state.lens===&#x27;calls&#x27;)graph();else if(state.lens===&#x27;values&#x27;)values();else unknowns();}else if(state.mode===&#x27;run&#x27;)runView();else reviewView();source();}
+root.addEventListener(&#x27;click&#x27;,e=&gt;{const b=e.target.closest(&#x27;button&#x27;);if(!b)return;if(b.dataset.select){select(b.dataset.select);return;}if(b.dataset.mode){setMode(b.dataset.mode);return;}if(b.dataset.lens){state.lens=b.dataset.lens;render();return;}if(b.dataset.lines){evidence(b.dataset.caption,&#x27;来源设计样例；正式接口有源码锚点时按 UTF-8 字节区间定位。&#x27;,b.dataset.lines.split(&#x27;,&#x27;).map(Number));return;}if(b.hasAttribute(&#x27;data-unknown&#x27;)){state.lens=&#x27;unknowns&#x27;;render();return;}if(b.hasAttribute(&#x27;data-inspect-unknown&#x27;)){select(&#x27;dispatch&#x27;);state.lens=&#x27;unknowns&#x27;;render();evidence(&#x27;按输入选择处理器&#x27;,&#x27;未确认目标仍保留，不将动态调用画成确定关系。&#x27;,[8,12],true);return;}
+switch(b.id){case&#x27;at-back&#x27;:if(state.history.length){const previous=state.history.pop();state.lens=previous.lens;state.mode=previous.mode;select(previous.selected,false);}break;case&#x27;at-run-shortcut&#x27;:setMode(&#x27;run&#x27;);break;case&#x27;at-scope-unknown&#x27;:state.mode=&#x27;understand&#x27;;state.lens=&#x27;unknowns&#x27;;render();break;case&#x27;at-close-source&#x27;:state.sourceOpen=false;root.classList.add(&#x27;at-source-off&#x27;);requestAnimationFrame(drawWires);break;case&#x27;at-show-source&#x27;:state.sourceOpen=true;root.classList.remove(&#x27;at-source-off&#x27;);requestAnimationFrame(drawWires);break;case&#x27;at-run-preview&#x27;:previewRun();break;case&#x27;at-input-mode&#x27;:{const d=draft();try{if(!d.advanced){d.raw=JSON.stringify(argumentsValue(),null,2);}else{const a=argumentsValue();if(a.length!==paramNames[state.selected].length)throw new Error(&#x27;按参数编辑需要 &#x27;+paramNames[state.selected].length+&#x27; 个参数&#x27;);d.fields=a.map(x=&gt;JSON.stringify(x,null,2));}d.advanced=!d.advanced;runView();}catch(e){$(&#x27;at-input-error&#x27;).textContent=e.message;$(&#x27;at-input-error&#x27;).hidden=false;}break;}case&#x27;at-review-validate&#x27;:select(&#x27;validate&#x27;);state.mode=&#x27;review&#x27;;render();break;case&#x27;at-verify-preview&#x27;:verifyPreview();break;case&#x27;at-apply-preview&#x27;:state.previewApplied=true;b.textContent=&#x27;撤销预览状态&#x27;;b.id=&#x27;at-revert-preview&#x27;;toast(&#x27;状态样例：已应用到 /workspace/tour · 新版本 demo-v2 · 可撤销。本原型未验证、未写入文件。&#x27;);break;case&#x27;at-revert-preview&#x27;:state.previewApplied=false;verifyPreview();toast(&#x27;已回到待应用的预览状态；没有发生文件操作。&#x27;);break;case&#x27;at-export&#x27;:toast(&#x27;上下文导出设计：当前对象、固定源码、关系与未知、材料范围。此原型不生成真实分析包。&#x27;);break;}});
+$(&#x27;at-search&#x27;).addEventListener(&#x27;input&#x27;,navigation);
+root.addEventListener(&#x27;input&#x27;,e=&gt;{if(e.target.id===&#x27;at-args&#x27;)draft().raw=e.target.value;if(e.target.hasAttribute(&#x27;data-param&#x27;))draft().fields[Number(e.target.dataset.param)]=e.target.value;});
+root.addEventListener(&#x27;change&#x27;,e=&gt;{if(e.target.id===&#x27;at-preview-verdict&#x27;)state.previewVerdict=e.target.value;});
+new ResizeObserver(()=&gt;requestAnimationFrame(drawWires)).observe(root);
+render();
+if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:()=&gt;{root.style.setProperty(&#x27;--at-design-source&#x27;,prefs.sourceLayout);const content=root.querySelector(&#x27;.at-content&#x27;);content.style.gridTemplateColumns=prefs.sourceLayout===&#x27;下方&#x27;?&#x27;minmax(0,1fr)&#x27;:&#x27;&#x27;;root.querySelector(&#x27;.at-heading&#x27;).style.padding=prefs.density===&#x27;紧凑&#x27;?&#x27;12px 18px&#x27;:&#x27;&#x27;;requestAnimationFrame(drawWires);}});tweak.addSelect(prefs,&#x27;sourceLayout&#x27;,{label:&#x27;源码位置&#x27;,options:[&#x27;并排&#x27;,&#x27;下方&#x27;]});tweak.addSelect(prefs,&#x27;density&#x27;,{label:&#x27;界面密度&#x27;,options:[&#x27;舒展&#x27;,&#x27;紧凑&#x27;]});}
+})();
+&lt;/script&gt;
+
+&lt;script src=&quot;https://unpkg.com/@floating-ui/core@1.7.3/dist/floating-ui.core.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script src=&quot;https://unpkg.com/@floating-ui/dom@1.7.4/dist/floating-ui.dom.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  if (window.FloatingUIDOM == null) {
+    return;
+  }
+  const { autoUpdate, computePosition, flip, offset, shift, size } =
+    window.FloatingUIDOM;
+  const tooltipPlacements = new Set([&quot;top&quot;, &quot;right&quot;, &quot;bottom&quot;, &quot;left&quot;]);
+  const tooltipId = `codex-visualization-tooltip-${
+    window.crypto?.randomUUID?.() ?? Date.now().toString(36)
+  }`;
+  const tooltipGap = 5;
+  const hoverDelay = 700;
+  const skipDelay = 300;
+  let activeTrigger = null;
+  let pendingTrigger = null;
+  let tooltip = null;
+  let openTimeout = null;
+  let autoUpdateCleanup = null;
+  let positionRequest = 0;
+  let skipDelayUntil = 0;
+  let lastPointerWasTouch = false;
+  let pinnedByTouch = false;
+
+  const getTrigger = (target) =&gt;
+    target?.nodeType === Node.ELEMENT_NODE
+      ? target.closest(&quot;[data-tooltip]&quot;)
+      : null;
+  const containsTarget = (trigger, target) =&gt;
+    target?.nodeType != null &amp;&amp; trigger.contains(target);
+  const getContent = (trigger) =&gt;
+    trigger.getAttribute(&quot;data-tooltip&quot;)?.trim() ?? &quot;&quot;;
+  const getPlacement = (trigger) =&gt; {
+    const placement = trigger.getAttribute(&quot;data-tooltip-placement&quot;);
+    return tooltipPlacements.has(placement) ? placement : &quot;top&quot;;
+  };
+  const getTooltip = () =&gt; {
+    if (tooltip == null) {
+      tooltip = document.createElement(&quot;div&quot;);
+      tooltip.id = tooltipId;
+      tooltip.className = &quot;tooltip&quot;;
+      tooltip.setAttribute(&quot;role&quot;, &quot;tooltip&quot;);
+    }
+    return tooltip;
+  };
+  const setDescribedBy = (trigger, described) =&gt; {
+    const ids = new Set(
+      (trigger.getAttribute(&quot;aria-describedby&quot;) ?? &quot;&quot;)
+        .split(/\s+/)
+        .filter(Boolean),
+    );
+    if (described) {
+      ids.add(tooltipId);
+    } else {
+      ids.delete(tooltipId);
+    }
+    if (ids.size === 0) {
+      trigger.removeAttribute(&quot;aria-describedby&quot;);
+    } else {
+      trigger.setAttribute(&quot;aria-describedby&quot;, [...ids].join(&quot; &quot;));
+    }
+  };
+  const clearOpenTimeout = () =&gt; {
+    if (openTimeout != null) {
+      window.clearTimeout(openTimeout);
+      openTimeout = null;
+    }
+    pendingTrigger = null;
+  };
+  const closeTooltip = (activateSkipDelay = true) =&gt; {
+    clearOpenTimeout();
+    pinnedByTouch = false;
+    positionRequest += 1;
+    autoUpdateCleanup?.();
+    autoUpdateCleanup = null;
+    if (activeTrigger == null) {
+      return;
+    }
+    setDescribedBy(activeTrigger, false);
+    activeTrigger = null;
+    tooltip?.remove();
+    if (activateSkipDelay) {
+      skipDelayUntil = Date.now() + skipDelay;
+    }
+  };
+  const updatePosition = (trigger, floating) =&gt; {
+    const request = ++positionRequest;
+    void computePosition(trigger, floating, {
+      middleware: [
+        offset(tooltipGap),
+        flip({ padding: tooltipGap }),
+        shift({ padding: tooltipGap }),
+        size({
+          padding: tooltipGap,
+          apply({ availableHeight, availableWidth, elements }) {
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-width&quot;,
+              `${Math.max(0, availableWidth)}px`,
+            );
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-height&quot;,
+              `${Math.max(0, availableHeight)}px`,
+            );
+          },
+        }),
+      ],
+      placement: getPlacement(trigger),
+      strategy: &quot;fixed&quot;,
+    })
+      .then(({ x, y }) =&gt; {
+        if (activeTrigger !== trigger || request !== positionRequest) {
+          return;
+        }
+        const scale = window.devicePixelRatio || 1;
+        floating.style.transform = `translate(${Math.round(x * scale) / scale}px, ${Math.round(y * scale) / scale}px)`;
+        floating.style.visibility = &quot;visible&quot;;
+      })
+      .catch(() =&gt; {
+        if (activeTrigger === trigger &amp;&amp; request === positionRequest) {
+          closeTooltip(false);
+        }
+      });
+  };
+  const openTooltip = (trigger) =&gt; {
+    const content = getContent(trigger);
+    if (!trigger.isConnected || content.length === 0) {
+      return;
+    }
+    clearOpenTimeout();
+    if (activeTrigger === trigger) {
+      return;
+    }
+    closeTooltip();
+    const floating = getTooltip();
+    floating.textContent = content;
+    floating.style.visibility = &quot;hidden&quot;;
+    floating.style.transform = &quot;translate(0, 0)&quot;;
+    document.body.appendChild(floating);
+    activeTrigger = trigger;
+    setDescribedBy(trigger, true);
+    autoUpdateCleanup = autoUpdate(trigger, floating, () =&gt; {
+      updatePosition(trigger, floating);
+    });
+  };
+  const requestOpen = (trigger, immediate = false) =&gt; {
+    if (
+      getContent(trigger).length === 0 ||
+      activeTrigger === trigger ||
+      pendingTrigger === trigger
+    ) {
+      return;
+    }
+    clearOpenTimeout();
+    pendingTrigger = trigger;
+    const delay =
+      immediate || activeTrigger != null || Date.now() &lt; skipDelayUntil
+        ? 0
+        : hoverDelay;
+    if (delay === 0) {
+      openTooltip(trigger);
+      return;
+    }
+    openTimeout = window.setTimeout(() =&gt; {
+      openTimeout = null;
+      pendingTrigger = null;
+      openTooltip(trigger);
+    }, delay);
+  };
+  const handlePointerOpen = (event) =&gt; {
+    if (event.pointerType === &quot;touch&quot;) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    requestOpen(trigger);
+  };
+  const handlePointer = (event) =&gt; {
+    lastPointerWasTouch =
+      event.type === &quot;pointerdown&quot; &amp;&amp; event.pointerType === &quot;touch&quot;;
+  };
+  const handleTouchClick = (event) =&gt; {
+    const isTouch = event.pointerType === &quot;touch&quot; || lastPointerWasTouch;
+    lastPointerWasTouch = false;
+    if (!isTouch || event.detail === 0) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (
+      trigger == null ||
+      !trigger.isConnected ||
+      getContent(trigger).length === 0 ||
+      (pinnedByTouch &amp;&amp; activeTrigger === trigger)
+    ) {
+      if (pinnedByTouch) {
+        closeTooltip();
+      }
+      return;
+    }
+    openTooltip(trigger);
+    pinnedByTouch = activeTrigger === trigger;
+    window.setTimeout(() =&gt; {
+      if (activeTrigger === trigger &amp;&amp; !trigger.isConnected) {
+        closeTooltip(false);
+      }
+    }, 0);
+  };
+  const handleLeave = (event) =&gt; {
+    if (pinnedByTouch) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const handleFocusIn = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger?.matches(&quot;:focus-visible&quot;)) {
+      requestOpen(trigger, true);
+    }
+  };
+  const handleKeyDown = (event) =&gt; {
+    if (event.key === &quot;Escape&quot;) {
+      closeTooltip();
+    }
+  };
+  const handleContextMenu = (event) =&gt; {
+    lastPointerWasTouch = false;
+    const trigger = getTrigger(event.target);
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const destroy = () =&gt; {
+    closeTooltip(false);
+    lastPointerWasTouch = false;
+    document.removeEventListener(&quot;pointerover&quot;, handlePointerOpen);
+    document.removeEventListener(&quot;pointerdown&quot;, handlePointer);
+    document.removeEventListener(&quot;pointercancel&quot;, handlePointer);
+    document.removeEventListener(&quot;click&quot;, handleTouchClick);
+    document.removeEventListener(&quot;pointerout&quot;, handleLeave);
+    document.removeEventListener(&quot;focusin&quot;, handleFocusIn);
+    document.removeEventListener(&quot;focusout&quot;, handleLeave);
+    document.removeEventListener(&quot;keydown&quot;, handleKeyDown);
+    document.removeEventListener(&quot;contextmenu&quot;, handleContextMenu);
+    tooltip = null;
+  };
+
+  document.addEventListener(&quot;pointerover&quot;, handlePointerOpen);
+  document.addEventListener(&quot;pointerdown&quot;, handlePointer);
+  document.addEventListener(&quot;pointercancel&quot;, handlePointer);
+  document.addEventListener(&quot;click&quot;, handleTouchClick);
+  document.addEventListener(&quot;pointerout&quot;, handleLeave);
+  document.addEventListener(&quot;focusin&quot;, handleFocusIn);
+  document.addEventListener(&quot;focusout&quot;, handleLeave);
+  document.addEventListener(&quot;keydown&quot;, handleKeyDown);
+  document.addEventListener(&quot;contextmenu&quot;, handleContextMenu);
+  window.addEventListener(&quot;pagehide&quot;, destroy, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-tabs&quot;&gt;
+(() =&gt; {
+  const selector = &#x27;.nav[role=&quot;tablist&quot;] [role=&quot;tab&quot;]&#x27;;
+  const disabled = &#x27;:disabled,[aria-disabled=&quot;true&quot;]&#x27;;
+  const selectTab = (selected) =&gt; {
+    const panelId = selected.getAttribute(&quot;aria-controls&quot;);
+    for (const tab of selected.closest(&#x27;[role=&quot;tablist&quot;]&#x27;).querySelectorAll(&#x27;[role=&quot;tab&quot;]&#x27;)) {
+      const active = tab === selected;
+      tab.classList.toggle(&quot;active&quot;, active);
+      tab.setAttribute(&quot;aria-selected&quot;, String(active));
+      const id = tab.getAttribute(&quot;aria-controls&quot;);
+      const panel = id &amp;&amp; document.getElementById(id);
+      if (panel != null) {
+        panel.hidden = id !== panelId;
+        if (!panel.hidden &amp;&amp; selected.id) {
+          panel.setAttribute(&quot;aria-labelledby&quot;, selected.id);
+        }
+      }
+    }
+  };
+  const interact = (event) =&gt; {
+    const tab = event.target?.closest?.(selector);
+    if (event.defaultPrevented || tab == null || tab.matches(disabled)) {
+      return;
+    }
+    if (event.type === &quot;click&quot;) {
+      selectTab(tab);
+      return;
+    }
+    const tabs = Array.from(
+      tab.closest(&#x27;[role=&quot;tablist&quot;]&#x27;).querySelectorAll(&#x27;[role=&quot;tab&quot;]&#x27;),
+    ).filter((candidate) =&gt; !candidate.matches(disabled));
+    const current = tabs.indexOf(tab);
+    let next;
+    if (event.key === &quot;ArrowRight&quot; || event.key === &quot;ArrowDown&quot;) {
+      next = (current + 1) % tabs.length;
+    } else if (event.key === &quot;ArrowLeft&quot; || event.key === &quot;ArrowUp&quot;) {
+      next = (current + tabs.length - 1) % tabs.length;
+    } else if (event.key === &quot;Home&quot;) {
+      next = 0;
+    } else if (event.key === &quot;End&quot;) {
+      next = tabs.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    tabs[next].focus();
+    selectTab(tabs[next]);
+  };
+
+  for (const list of document.querySelectorAll(&#x27;.nav[role=&quot;tablist&quot;]&#x27;)) {
+    const selected =
+      list.querySelector(&#x27;[role=&quot;tab&quot;][aria-selected=&quot;true&quot;]&#x27;) ??
+      list.querySelector(&#x27;[role=&quot;tab&quot;].active&#x27;) ??
+      list.querySelector(&#x27;[role=&quot;tab&quot;]&#x27;);
+    if (selected != null) {
+      selectTab(selected);
+    }
+  }
+  document.addEventListener(&quot;click&quot;, interact);
+  document.addEventListener(&quot;keydown&quot;, interact);
+  window.addEventListener(&quot;pagehide&quot;, () =&gt; {
+    document.removeEventListener(&quot;click&quot;, interact);
+    document.removeEventListener(&quot;keydown&quot;, interact);
+  }, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-lucide&quot; async src=&quot;https://unpkg.com/lucide@1.17.0/dist/umd/lucide.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  const initialize = () =&gt; {
+    globalThis.lucide?.createIcons({ attrs: { width: 16, height: 16 } });
+  };
+  if (globalThis.lucide != null) {
+    initialize();
+    return;
+  }
+  document
+    .getElementById(&quot;codex-visualization-lucide&quot;)
+    ?.addEventListener(&quot;load&quot;, initialize, { once: true });
+})();
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+</body>
+</html>

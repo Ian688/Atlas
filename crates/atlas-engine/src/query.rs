@@ -49,6 +49,87 @@ pub fn flow_symbols(
     })
 }
 
+/// Page of nodes whose name or path contains a query substring.
+///
+/// This is the server side of "find a function from the page": `/api/nodes`
+/// walks objects in id order (directories and files first), so a page cannot
+/// promise a whole-project search by filtering pages locally. The match rule is
+/// one documented rule, not a search platform: the query is trimmed, matched as
+/// a case-insensitive substring of name or path (case folding is ASCII-only,
+/// which is what SQL `LIKE` gives us; other characters compare exactly), and
+/// `%`/`_` in the query are literal. Results are ordered by path, then name,
+/// then id, so a query re-run against the same analysis pages stably.
+#[derive(Debug, Serialize)]
+pub struct SearchPage {
+    pub analysis_id: String,
+    pub query: String,
+    pub total: usize,
+    pub items: Vec<Node>,
+    pub next_cursor: Option<String>,
+}
+
+pub fn search_nodes(
+    store: &Store,
+    analysis: &str,
+    query: &str,
+    kind: &str,
+    limit: usize,
+    cursor: Option<&str>,
+) -> Result<SearchPage> {
+    page_limit(limit)?;
+    store.metadata(analysis)?;
+    if !["all", "directory", "file", "function"].contains(&kind) {
+        return Err(invalid("invalid_entity_kind"));
+    }
+    let trimmed = query.trim();
+    // One rule, stated here: escape the two LIKE wildcards so a query like
+    // "50%" finds "50%" rather than every name.
+    let pattern = format!(
+        "%{}%",
+        trimmed
+            .replace('\\', "\\\\")
+            .replace('%', "\\%")
+            .replace('_', "\\_")
+    );
+    let key = digest(&serde_json::to_vec(&(
+        analysis, "search", trimmed, kind, limit,
+    ))?);
+    let offset = offset(&key, cursor)?;
+    let conn = store.connection()?;
+    // The display name lives inside the node body (the table only indexes
+    // kind/path), so the match reads it with json_extract. One analysis per
+    // query and a bounded page make the scan cost fine for a local store.
+    let total: usize = conn.query_row(
+        "SELECT count(*) FROM nodes WHERE analysis=?1 AND (?2='all' OR kind=?2) \
+         AND (json_extract(body,'$.name') LIKE ?3 ESCAPE '\\' OR path LIKE ?3 ESCAPE '\\')",
+        params![analysis, kind, pattern],
+        |r| r.get(0),
+    )?;
+    if offset > total {
+        return Err(invalid("cursor_outside_result"));
+    }
+    let mut statement = conn.prepare(
+        "SELECT body FROM nodes WHERE analysis=?1 AND (?2='all' OR kind=?2) \
+         AND (json_extract(body,'$.name') LIKE ?3 ESCAPE '\\' OR path LIKE ?3 ESCAPE '\\') \
+         ORDER BY path, json_extract(body,'$.name'), id LIMIT ?4 OFFSET ?5",
+    )?;
+    let rows = statement.query_map(params![analysis, kind, pattern, limit, offset], |r| {
+        r.get::<_, String>(0)
+    })?;
+    let mut items = Vec::new();
+    for row in rows {
+        items.push(serde_json::from_str(&row?)?);
+    }
+    let next = offset + items.len();
+    Ok(SearchPage {
+        analysis_id: analysis.into(),
+        query: trimmed.into(),
+        total,
+        items,
+        next_cursor: (next < total).then(|| format!("{key}:{next}")),
+    })
+}
+
 fn offset(key: &str, cursor: Option<&str>) -> Result<usize> {
     if let Some(cursor) = cursor {
         let (owner, value) = cursor

@@ -43,6 +43,11 @@ struct Request {
     cursor: Option<String>,
     entity: Option<String>,
     direction: Option<String>,
+    /// Name/path substring for `/api/search`; trimmed server-side.
+    q: Option<String>,
+    /// Byte window for `/api/source`, bounded by the entity's own span.
+    start: Option<usize>,
+    end: Option<usize>,
     /// A direct object reference where `entity` would be ambiguous, as in
     /// `/api/patch?id=<proposal id>`.
     id: Option<String>,
@@ -82,6 +87,17 @@ async fn query(
             "nodes" => serde_json::to_value(app.store.nodes(
                 id,
                 q.kind.as_deref().unwrap_or("all"),
+                q.limit.unwrap_or(100),
+                q.cursor.as_deref(),
+            )?)
+            .map_err(Into::into),
+            // Whole-analysis name/path search. The page filters nothing
+            // locally: paging to the end of 500-node pages is not a promise
+            // that the answer covers the project, and this query is.
+            "search" => serde_json::to_value(app.store.search_nodes(
+                id,
+                q.q.as_deref().unwrap_or(""),
+                q.kind.as_deref().unwrap_or("function"),
                 q.limit.unwrap_or(100),
                 q.cursor.as_deref(),
             )?)
@@ -131,7 +147,13 @@ async fn query(
             "source" => {
                 let entity = crate::runner::resolve_entity(&app.store, id, q.entity.as_deref().unwrap_or(""))
                     .map_err(|error| atlas_engine::invalid(&error))?;
-                app.store.source(id, &entity, 16000)
+                app.store.source_window(
+                    id,
+                    &entity,
+                    q.start,
+                    q.end,
+                    16000,
+                )
             }
             "context" => {
                 let entity = crate::runner::resolve_entity(&app.store, id, q.entity.as_deref().unwrap_or(""))
@@ -351,6 +373,7 @@ macro_rules! endpoint {
 }
 endpoint!(report, "report");
 endpoint!(nodes, "nodes");
+endpoint!(search_nodes, "search");
 endpoint!(node, "node");
 endpoint!(edges, "edges");
 endpoint!(reach, "reach");
@@ -853,6 +876,382 @@ struct ExecRequest {
     /// one level deep. Each is resolved inside this analysis too.
     #[serde(default)]
     via_chain: Option<Vec<ViaRequest>>,
+    /// The receiver for functions that read `this`. A declared *input*: it
+    /// never widens the fs/child/network boundary, which stays server-side.
+    #[serde(default)]
+    this_arg: Option<serde_json::Value>,
+    /// Named globals the analysis says this function reads, declared openly
+    /// and recorded in the published spec. Same boundary rule as `this_arg`.
+    #[serde(default)]
+    globals: Option<std::collections::BTreeMap<String, serde_json::Value>>,
+}
+
+/// Page-triggered proposal verification. The page names a proposal; the
+/// server owns every execution parameter (worker, Node, deadlines) and runs
+/// the same `patch_verify` code path the CLI queue uses. First slice runs no
+/// test unless an operator declared one: `test.ran:false` is the honest answer,
+/// never "passed".
+// A client may still send `request_key`; serde ignores unknown fields here.
+// That is deliberate: a client-supplied key would fork the verification
+// identity, and a status query built from a different key could never find the
+// job it started. The persistent identity of a verification is
+// (owner, analysis, proposal id), so submits, retries and status queries all
+// converge on one row.
+#[derive(serde::Deserialize)]
+struct PatchVerifyRequest {
+    id: String,
+}
+
+fn server_verify_options(proposal_id: &str) -> crate::StoredVerify {
+    crate::StoredVerify {
+        proposal_id: proposal_id.to_string(),
+        node: "node".into(),
+        worker: "workers/typescript/worker.mjs".into(),
+        timeout_seconds: 60,
+        scan_deadline_seconds: 300,
+        index_deadline_seconds: 600,
+        // No page-declared shell strings: a declared test stays an operator
+        // decision made at startup, not something a page can attach.
+        test_argv: None,
+        test_timeout_ms: 120_000,
+        worker_heap_mb: 1024,
+    }
+}
+
+async fn patch_verify(
+    State(app): State<App>,
+    headers: HeaderMap,
+    axum::Json(request): axum::Json<PatchVerifyRequest>,
+) -> Response {
+    if !allowed(&app, &headers) {
+        return (StatusCode::UNAUTHORIZED, "local session required").into_response();
+    }
+    let proposal = match app.store.patch_proposal(&request.id) {
+        Ok(proposal) => proposal,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({"error": error.to_string()})),
+            )
+                .into_response();
+        }
+    };
+    if proposal.state != atlas_engine::patch::STATE_PROPOSED {
+        return (
+            StatusCode::CONFLICT,
+            axum::Json(serde_json::json!({
+                "error": "proposal_not_verifiable",
+                "detail": format!("proposal_state:{}", proposal.state),
+            })),
+        )
+            .into_response();
+    }
+    let stored = server_verify_options(&request.id);
+    let options = serde_json::to_string(&stored)
+        .map_err(|e| e.to_string())
+        .unwrap_or_else(|e| format!("stored_verify_serialize_failed:{e}"));
+    // Same derivation as the status endpoint reads back: one proposal, one
+    // verification row per owner, whatever key a client sent along.
+    let request_key = request.id.clone();
+    let job_request = atlas_engine::job::JobRequest {
+        kind: atlas_engine::job::KIND_PATCH_VERIFY,
+        owner: &app.owner,
+        project: &proposal.analysis_id,
+        request_key: &request_key,
+        root: "",
+        options: &options,
+    };
+    let (row, created) = match app.store.enqueue_job(&job_request, 0) {
+        Ok(pair) => pair,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({"error": error.to_string()})),
+            )
+                .into_response();
+        }
+    };
+    // The server is also the worker for its own queue: without this, a page
+    // could only ever enqueue and wait for an external `job work` process.
+    // Claiming by id means this runner cannot pick up anyone else's row.
+    if created {
+        let store = app.store.clone();
+        let job_id = row.id.clone();
+        tokio::spawn(async move {
+            run_verify_job(store, job_id).await;
+        });
+    }
+    (
+        StatusCode::OK,
+        axum::Json(serde_json::json!({
+            "outcome": if created { "queued" } else { "already_enqueued" },
+            "job": row,
+        })),
+    )
+        .into_response()
+}
+
+async fn run_verify_job(store: Store, job_id: String) {
+    let holder = format!("server-{}", uuid::Uuid::new_v4());
+    // A lease longer than the strictest deadline inside the request: the
+    // in-process runner does not heartbeat, so the lease must outlive the work.
+    let Some(job) = store.claim_job(&job_id, &holder, 900_000).unwrap_or(None) else {
+        return; // already claimed elsewhere; that runner owns the outcome
+    };
+    let outcome = async {
+        let stored: crate::StoredVerify = serde_json::from_str(
+            job.options
+                .as_deref()
+                .ok_or_else(|| "job_has_no_stored_options".to_string())?,
+        )
+        .map_err(|e| format!("stored_verify_unreadable:{e}"))?;
+        let options = stored
+            .options()
+            .map_err(|e| format!("stored_verify_invalid:{e}"))?;
+        crate::patchwork::verify_proposal(&store, &stored.proposal_id, &options).await
+    }
+    .await;
+    match outcome {
+        Ok(proposal) => {
+            let artifact = proposal["verification"]["patched_analysis_id"]
+                .as_str()
+                .map(str::to_string);
+            let _ = store.finish_job(
+                &job_id,
+                &holder,
+                atlas_engine::job::STATE_COMPLETED,
+                None,
+                artifact.as_deref(),
+            );
+        }
+        Err(error) => {
+            let _ = store.finish_job(
+                &job_id,
+                &holder,
+                atlas_engine::job::STATE_FAILED,
+                Some(&error),
+                None,
+            );
+        }
+    }
+}
+
+/// Owner-bound status: the page asks "what happened to my verification" by
+/// proposal id. The job row carries the state machine, the proposal carries
+/// the verification result once it exists.
+async fn patch_verify_status(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Query(q): Query<Request>,
+) -> Response {
+    if !allowed(&app, &headers) {
+        return (StatusCode::UNAUTHORIZED, "local session required").into_response();
+    }
+    let Some(id) = q.id.as_deref().filter(|id| !id.is_empty()) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({"error": "id_required"})),
+        )
+            .into_response();
+    };
+    let proposal = match app.store.patch_proposal(id) {
+        Ok(proposal) => proposal,
+        Err(error) => {
+            return (
+                StatusCode::NOT_FOUND,
+                axum::Json(serde_json::json!({"error": error.to_string()})),
+            )
+                .into_response();
+        }
+    };
+    let request_key = id.to_string();
+    let job_id = atlas_engine::job::job_id(&app.owner, &proposal.analysis_id, &request_key);
+    let job = app.store.job(&job_id).ok();
+    (
+        StatusCode::OK,
+        axum::Json(serde_json::json!({
+            "proposal": proposal,
+            "job": job,
+        })),
+    )
+        .into_response()
+}
+
+/// Side-by-side execution: the same declared inputs run against the base
+/// analysis and against a verified proposal's patched analysis. Both sides are
+/// real isolated runs; the records keep their own analysis identities, so a
+/// comparison can never overwrite either side.
+#[derive(serde::Deserialize)]
+struct ExecCompareRequest {
+    entity: String,
+    #[serde(default)]
+    args: Vec<serde_json::Value>,
+    proposal_id: String,
+    timeout_ms: Option<u64>,
+    allow_effects: Option<Vec<String>>,
+}
+
+async fn exec_compare(
+    State(app): State<App>,
+    headers: HeaderMap,
+    axum::Json(request): axum::Json<ExecCompareRequest>,
+) -> Response {
+    if !allowed(&app, &headers) {
+        return (StatusCode::UNAUTHORIZED, "local session required").into_response();
+    }
+    let Ok(permit) = app.slots.clone().try_acquire_owned() else {
+        return (StatusCode::TOO_MANY_REQUESTS, "busy").into_response();
+    };
+    let proposal = match app.store.patch_proposal(&request.proposal_id) {
+        Ok(proposal) => proposal,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({"error": error.to_string()})),
+            )
+                .into_response();
+        }
+    };
+    if proposal.analysis_id != app.analysis {
+        return (
+            StatusCode::CONFLICT,
+            axum::Json(serde_json::json!({
+                "error": "proposal_from_other_analysis",
+                "detail": format!("proposal pins {}, server serves {}", proposal.analysis_id, app.analysis),
+            })),
+        )
+            .into_response();
+    }
+    let Some(verification) = proposal.verification.as_ref() else {
+        return (
+            StatusCode::CONFLICT,
+            axum::Json(serde_json::json!({
+                "error": "proposal_not_verified",
+                "detail": "对照运行需要先完成隔离验证；没有补丁分析就无法运行补丁侧。",
+            })),
+        )
+            .into_response();
+    };
+    let Some(patched_analysis) = verification["patched_analysis_id"]
+        .as_str()
+        .map(str::to_string)
+    else {
+        return (
+            StatusCode::CONFLICT,
+            axum::Json(serde_json::json!({"error": "verification_has_no_patched_analysis"})),
+        )
+            .into_response();
+    };
+    let grants = Grants {
+        fs_write: false,
+        child_process: false,
+        network: false,
+        unknown_calls: request
+            .allow_effects
+            .as_ref()
+            .is_some_and(|names| names.iter().any(|name| name == "unknown_calls")),
+    };
+    let grants_for_spec = grants.clone();
+    let args_for_spec = request.args.clone();
+    let mk_spec = move |analysis_id: String, symbol: String| {
+        let args = args_for_spec.clone();
+        RunSpec {
+            schema: atlas_engine::exec::RUN_SPEC_SCHEMA.into(),
+            analysis_id,
+            symbol,
+            args,
+            timeout_ms: request.timeout_ms.unwrap_or(5_000).min(30_000),
+            output_limit: 64 * 1024,
+            grants: grants_for_spec.clone(),
+            node: "node".into(),
+            env: std::collections::BTreeMap::new(),
+            this_arg: None,
+            globals: std::collections::BTreeMap::new(),
+            fixtures: false,
+            fixture_note: None,
+            label: Some("http-compare".into()),
+            via: None,
+            materialise: None,
+            via_chain: Vec::new(),
+        }
+    };
+    // The base side keeps the caller's entity reference; the patched side
+    // resolves the same path:name in the patched tree, where byte positions
+    // may have moved. A side that cannot resolve is a reported refusal, not a
+    // fabricated result.
+    let base_symbol =
+        match crate::runner::resolve_symbol(&app.store, &app.analysis, &request.entity) {
+            Ok(symbol) => symbol,
+            Err(error) => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    axum::Json(serde_json::json!({"error": error})),
+                )
+                    .into_response();
+            }
+        };
+    let base_node = match app.store.node(&app.analysis, &base_symbol) {
+        Ok(node) => node,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({"error": error.to_string()})),
+            )
+                .into_response();
+        }
+    };
+    let patched_reference = format!("{}:{}", base_node.path, base_node.name);
+    let patched_symbol =
+        match crate::runner::resolve_symbol(&app.store, &patched_analysis, &patched_reference) {
+            Ok(symbol) => Ok(symbol),
+            Err(error) => Err(format!("patched_side_unresolved:{error}")),
+        };
+    let store = app.store.clone();
+    let base_spec = mk_spec(app.analysis.clone(), base_symbol);
+    let outcome = tokio::spawn(async move {
+        let _permit = permit;
+        let base_run = {
+            let (_cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+            crate::runner::execute(&store, &base_spec, cancel_rx)
+                .await
+                .map_err(|e| format!("base_side:{e}"))
+        };
+        let patched_run = match &patched_symbol {
+            Ok(symbol) => {
+                let spec = mk_spec(patched_analysis.clone(), symbol.clone());
+                let (_cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+                crate::runner::execute(&store, &spec, cancel_rx)
+                    .await
+                    .map_err(|e| format!("patched_side:{e}"))
+            }
+            Err(reason) => Err(reason.clone()),
+        };
+        (base_run, patched_run, patched_analysis)
+    })
+    .await;
+    let (base_run, patched_run, patched_analysis) = match outcome {
+        Ok(parts) => parts,
+        Err(_) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, "compare failed").into_response();
+        }
+    };
+    let side = |run: &Result<serde_json::Value, String>| match run {
+        Ok(record) => serde_json::json!({"verdict": record["verdict"], "record": record}),
+        Err(reason) => serde_json::json!({"refused": reason}),
+    };
+    (
+        StatusCode::OK,
+        axum::Json(serde_json::json!({
+            "schema": "atlas.exec-compare.v1",
+            "entity": request.entity,
+            "args": request.args,
+            "base": side(&base_run),
+            "patched": side(&patched_run),
+            "base_analysis_id": app.analysis,
+            "patched_analysis_id": patched_analysis,
+        })),
+    )
+        .into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -949,11 +1348,11 @@ async fn exec(
         grants,
         node: "node".into(),
         env: std::collections::BTreeMap::new(),
-        // Deliberately absent from the page's request type: a receiver or a
-        // global is an input the caller states, and the local page is not where
-        // an operator states inputs for someone else's function.
-        this_arg: None,
-        globals: std::collections::BTreeMap::new(),
+        // A receiver or a global is an input the caller states. It is recorded
+        // in the published spec and grants nothing: fs/child/network stay
+        // governed by the server-built `grants` above.
+        this_arg: request.this_arg,
+        globals: request.globals.unwrap_or_default(),
         fixtures: request.fixtures,
         fixture_note: request.fixture_note,
         label: Some("http".into()),
@@ -1465,6 +1864,7 @@ pub async fn serve(
         )
         .route("/api/report", get(report))
         .route("/api/nodes", get(nodes))
+        .route("/api/search", get(search_nodes))
         .route("/api/node", get(node))
         .route("/api/edges", get(edges))
         .route("/api/reach", get(reach))
@@ -1493,6 +1893,11 @@ pub async fn serve(
         .route("/api/patch/propose", post(propose_patch))
         // Writes exist only when the operator allowed them at startup, and even
         // then the page must echo the exact directory it was shown.
+        .route(
+            "/api/patch/verify",
+            get(patch_verify_status).post(patch_verify),
+        )
+        .route("/api/exec-compare", post(exec_compare))
         .route("/api/patch/apply", post(apply_patch))
         .route("/api/patch/revert", post(revert_patch))
         // The seam, published as data so a host integration can be checked

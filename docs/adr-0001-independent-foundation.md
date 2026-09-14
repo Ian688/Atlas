@@ -1,6 +1,8 @@
 # ADR 0001：独立仓库与渐进替换
 
-日期：2026-09-08；状态：已采用并开始实施。
+日期：2026-09-08；状态：独立仓库决策已采用。
+
+2026-09-13 注：本文保留当时的决策背景；旧分支名、当时“不提交”的安排和迁移次序不约束当前日常开发。当前任务及 Git 处理见 [执行任务书](DAILY_DEVELOPMENT_WORK_ORDER.md)，独立服务与宿主接口边界继续有效。
 
 用户明确授权重建 Atlas 架构与示例实现，并接受必要的破坏式改写。工程选择为 `/Users/yinsijie/CodeRepo/Atlas`，与 `/Users/yinsijie/CodeRepo/Modus` 同级，自己的 Git 分支 `codex/standalone-foundation`，不设远程、不提交、不发布。
 

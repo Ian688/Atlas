@@ -566,6 +566,17 @@ impl Store {
     ) -> Result<crate::query::SymbolPage> {
         crate::query::flow_symbols(self, analysis, limit, cursor)
     }
+    /// Name/path substring search over one analysis, server-side and paginated.
+    pub fn search_nodes(
+        &self,
+        analysis: &str,
+        query: &str,
+        kind: &str,
+        limit: usize,
+        cursor: Option<&str>,
+    ) -> Result<crate::query::SearchPage> {
+        crate::query::search_nodes(self, analysis, query, kind, limit, cursor)
+    }
     pub fn metadata(&self, analysis: &str) -> Result<serde_json::Value> {
         let value: Option<String> = self
             .connection()?
@@ -597,6 +608,25 @@ impl Store {
         entity: &str,
         max_bytes: usize,
     ) -> Result<serde_json::Value> {
+        self.source_window(analysis, entity, None, None, max_bytes)
+    }
+
+    /// Source of one entity, optionally restricted to a byte window.
+    ///
+    /// A window request (`start`,`end`) is always bounded by the entity's own
+    /// span -- it can widen the reader's view within one object, never reach
+    /// another file or the disk. Responses carry `file_total_bytes` and the
+    /// 1-based `start_line` so a client can draw line numbers and say how much
+    /// of the file exists beyond the window; `truncated` names a window the
+    /// byte budget cut, not an absence.
+    pub fn source_window(
+        &self,
+        analysis: &str,
+        entity: &str,
+        window_start: Option<usize>,
+        window_end: Option<usize>,
+        max_bytes: usize,
+    ) -> Result<serde_json::Value> {
         if max_bytes == 0 || max_bytes > 65536 {
             return Err(invalid("invalid_source_budget"));
         }
@@ -614,25 +644,38 @@ impl Store {
             .ok_or_else(|| invalid("source_not_captured"))?;
         // Capture limits bound each blob; validate bytes before serving historical source.
         let bytes = self.read_blob(hash)?;
-        let start = node.start;
+        let entity_start = node.start;
         let expected_end = if node.kind == "function" {
             node.end
         } else {
             bytes.len()
         };
-        if expected_end > bytes.len() || start > expected_end {
+        if expected_end > bytes.len() || entity_start > expected_end {
             return Err(invalid("invalid_source_span"));
         }
+        let (req_start, req_end) = match (window_start, window_end) {
+            (None, None) => (entity_start, expected_end),
+            (Some(s), Some(e)) => {
+                if e <= s || s < entity_start || e > expected_end {
+                    return Err(invalid("source_window_outside_entity"));
+                }
+                (s, e)
+            }
+            _ => return Err(invalid("invalid_source_window")),
+        };
         let source = std::str::from_utf8(&bytes).map_err(|_| invalid("source_not_utf8"))?;
-        let mut end = expected_end.min(start.saturating_add(max_bytes));
-        while end > start && !source.is_char_boundary(end) {
+        let mut end = req_end.min(req_start.saturating_add(max_bytes));
+        while end > req_start && !source.is_char_boundary(end) {
             end -= 1;
         }
         let content = source
-            .get(start..end)
+            .get(req_start..end)
             .ok_or_else(|| invalid("invalid_utf8_span"))?;
+        // Line numbers are counted over the whole file so a window into the
+        // tail of a long function still reports the line a reader scrolls to.
+        let start_line = source[..req_start].matches('\n').count() + 1;
         Ok(
-            serde_json::json!({"analysis_id":analysis,"snapshot_id":snapshot.id,"entity_id":entity,"path":node.path,"blob":hash,"start":start,"end":end,"content":content,"truncated":end<expected_end}),
+            serde_json::json!({"analysis_id":analysis,"snapshot_id":snapshot.id,"entity_id":entity,"path":node.path,"blob":hash,"start":req_start,"end":end,"content":content,"truncated":end<req_end,"file_total_bytes":bytes.len(),"start_line":start_line}),
         )
     }
 

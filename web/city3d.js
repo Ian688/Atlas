@@ -1510,6 +1510,19 @@ async function city3dStart(canvas) {
       state.pendingSelection = { entity_id: fragment.selection || '', analysis: fragment.analysis || '' };
     }
     if (fragment.token) {
+      // 回 2D 的链接带上当前 fragment 中的选区:往返不丢当前对象。
+      // (令牌本身从链接上剥掉——它已经进过一次页面,不再继续传递。)
+      const back = document.querySelector('a.version[href="/"]');
+      if (back && fragment.selection) {
+        const roundTrip = new URLSearchParams();
+        roundTrip.set('selection', fragment.selection);
+        if (fragment.analysis) roundTrip.set('analysis', fragment.analysis);
+        if (fragment.token) roundTrip.set('token', fragment.token);
+        // 任务状态(页签/镜头)跟选区一起往返,读者回来还在同一项工作里。
+        if (fragment.mode) roundTrip.set('mode', fragment.mode);
+        if (fragment.lens) roundTrip.set('lens', fragment.lens);
+        back.setAttribute('href', `/#${roundTrip.toString()}`);
+      }
       history.replaceState(null, '', location.pathname);
       if (tokenField) tokenField.value = fragment.token;
       connect();

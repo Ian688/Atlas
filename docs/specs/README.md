@@ -1,16 +1,22 @@
-# 完整产品规格快照
+# 完整产品规格参考
 
-此目录的六份原文来自 Modus 已更新的 Atlas 规格，来源和 SHA-256 在 [import-manifest.json](import-manifest.json)。导入时不改原文，不改变旧证据 hash。
+六份原文来自导入时的 Modus Atlas 设计，来源和 SHA-256 在 [import-manifest.json](import-manifest.json)。原文保留为 v2026-09-08 需求快照，方便查阅完整目标和算法语义；本次不改原文或旧证据 hash。
 
-| 原文 | 范围 |
+**当前执行以 [任务书 2.0](../DAILY_DEVELOPMENT_WORK_ORDER.md) 为准，产品形态见 [USE-CASES](../USE-CASES.md)。** 按正在实现的任务读相关章节，无需开工通读六份全文，也无需先完成所有成熟资格才能交付一条用户任务。
+
+| 参考 | 需要时查什么 |
 |---|---|
-| [主设计](code-atlas-development-design-2026-09-07.md) | 完整产品与职责、分层、长期范围 |
-| [长期任务书](code-atlas-coding-agent-work-order-2026-09-07.md) | 33 包及原有持续实施规则 |
-| [本地算法](code-atlas-local-engine-algorithm-spec-2026-09-07.md) | AL/ET/GE、本地解析、流分析、执行画像 |
-| [成熟场景](code-atlas-maturity-and-scenario-spec-2026-09-07.md) | 函数/场景测试、AI Coding 与成熟资格 |
+| [主设计](code-atlas-development-design-2026-09-07.md) | 完整产品与职责、长期范围 |
+| [历史任务书](code-atlas-coding-agent-work-order-2026-09-07.md) | 历史工作包与验收来源；不是当前执行顺序 |
+| [本地算法](code-atlas-local-engine-algorithm-spec-2026-09-07.md) | AL/ET/GE、绑定、控制/数据流、执行画像 |
+| [成熟场景](code-atlas-maturity-and-scenario-spec-2026-09-07.md) | 场景、AI Coding 与成熟资格 |
 | [独立集成](code-atlas-standalone-integration-spec-2026-09-08.md) | 服务、Agent、选区与回执 |
-| [双视图](code-atlas-dual-view-design-2026-09-08.md) | 正式 2D/3D 与共享语义 |
+| [双视图](code-atlas-dual-view-design-2026-09-08.md) | 正式 2D/3D、共享语义与 DV |
 
-这些文件是**需求快照**，保留部分原仓库相对路径与旧实施引用，不能机械当作本仓库路径。原文中的旧 Rust/Node 链保留、旧 Modus 文件改造顺序等实施假设，受用户本轮独立重建授权及 [当前架构](../ARCHITECTURE.md)、[任务书](../HANDOFF.md) 更新。完整产品目标与正确性验收没有因此取消。
+## 本独立仓库采用方式（2026-09-13）
 
-后续修订应在本独立仓库维护新版本与迁移说明，Modus 文档只维护宿主接缝。不能在两个仓库独立修改同一份“当前权威”规格而不声明主从关系。当前六份原文保留为 v2026-09-08 输入基线；本仓库当前实现权威为 README + ARCHITECTURE + HANDOFF，完整目标改动需同步明确到本目录版本化规格。
+- 保留完整能力方向、正确性语义及既定 2D/3D 产品形态；当前阶段只验收声明的用户任务，不宣称整份规格完成。
+- 原文的旧仓库路径、旧实现保留要求、开发先后顺序、工具限制、重复汇报规则已被当前任务书替代。不要去 Modus 按旧路径实现 Atlas。
+- 架构、库、目录、默认预算、布局细节和测试组织可依据任务调整，记录实质理由即可。可替换实现不等于降低正确性、权限或数据边界。
+- 语义反例用于验证相关改动；规模/生态/发布门槛只约束对应资格声明。未取得的资格如实保留，不变成所有日常开发的前置条件。
+- 用户最新决定优先。无需为普通实现变化编辑六份原文、重写历史 hash 或询问是否继续；新的产品范围决定记到产品目标和任务书，只有协议/正式资格合同改变时再写对应版本说明。

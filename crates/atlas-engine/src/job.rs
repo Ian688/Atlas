@@ -348,6 +348,27 @@ impl Store {
         Ok(updated == 1)
     }
 
+    /// Claim one specific queued row by id, for a runner that already knows
+    /// exactly which request it owns (the HTTP server runs the verifications
+    /// its own page enqueues). Same lease semantics as `claim_next`: the
+    /// holder check is what stops two runners from sharing one job.
+    pub fn claim_job(&self, id: &str, holder: &str, lease_ms: i64) -> Result<Option<Job>> {
+        let now = now_ms();
+        let conn = self.connection()?;
+        let tx = write_tx(&conn)?;
+        let updated = tx.execute(
+            "UPDATE jobs SET state='running', lease_holder=?2, lease_expires_at=?3,
+                    heartbeat_at=?3, attempt=attempt+1, updated_at=?3
+             WHERE id=?1 AND state='queued'",
+            params![id, holder, now + lease_ms.max(1000)],
+        )?;
+        tx.commit()?;
+        if updated == 0 {
+            return Ok(None);
+        }
+        self.job(id).map(Some)
+    }
+
     pub fn job(&self, id: &str) -> Result<Job> {
         let job = self
             .connection()?
