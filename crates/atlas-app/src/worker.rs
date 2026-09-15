@@ -6,7 +6,19 @@ use tokio::{
     sync::watch,
 };
 
-async fn bounded(mut reader: impl AsyncRead + Unpin, limit: usize) -> io::Result<Vec<u8>> {
+/// The runtime's own complaints are a different budget from the response, and
+/// far smaller: a Node warning must not be read as "the answer was too large".
+const STDERR_LIMIT: usize = 64 * 1024;
+
+/// Read at most `limit` bytes, and fail with `overrun` when the bound is hit.
+///
+/// Both readers share this helper but not the label: which ceiling was reached
+/// is the part a reader has to act on.
+async fn bounded(
+    mut reader: impl AsyncRead + Unpin,
+    limit: usize,
+    overrun: &str,
+) -> io::Result<Vec<u8>> {
     let mut result = Vec::new();
     let mut buffer = [0u8; 8192];
     loop {
@@ -15,7 +27,7 @@ async fn bounded(mut reader: impl AsyncRead + Unpin, limit: usize) -> io::Result
             return Ok(result);
         }
         if result.len() + n > limit {
-            return Err(io::Error::other("worker_output_limit"));
+            return Err(io::Error::other(overrun.to_string()));
         }
         result.extend_from_slice(&buffer[..n]);
     }
@@ -40,6 +52,12 @@ async fn cancelled(cancel: &mut watch::Receiver<bool>) {
 /// a large project into an opaque `worker_exit_failed`; the limit is now a
 /// parameter, and hitting it is reported as its own failure with the ceiling
 /// that was reached.
+///
+/// `output_limit` bounds that same response in bytes for the same reason: the
+/// facts for one project are a single JSON document holding every symbol, call
+/// and flow, so what one project needs is a property of the project, not a
+/// constant Atlas can pick. The failure names the ceiling reached and the flag
+/// that raises it.
 pub async fn parse(
     node: &Path,
     worker: &Path,
@@ -75,6 +93,15 @@ pub async fn parse(
     let mut stdin = child.stdin.take().unwrap();
     let stdout = child.stdout.take().unwrap();
     let stderr = child.stderr.take().unwrap();
+    // The response ceiling is a bound Atlas chose and the operator can raise, so
+    // the failure names both the ceiling and the flag that raises it. A bare
+    // `worker_output_limit` left the reader with a real project, no number, and
+    // nothing to change -- the same dead end a fixed heap cap used to be.
+    let output_overrun = format!(
+        "worker_output_limit:limit_mb={}:raise --worker-output-mb",
+        output_limit / (1024 * 1024)
+    );
+    let stderr_overrun = format!("worker_stderr_limit:limit_bytes={STDERR_LIMIT}");
     let result = {
         let write = async {
             stdin.write_all(&bytes).await?;
@@ -85,8 +112,8 @@ pub async fn parse(
         let worker_io = async {
             let (_, stdout, stderr) = tokio::try_join!(
                 write,
-                bounded(stdout, output_limit),
-                bounded(stderr, 64 * 1024)
+                bounded(stdout, output_limit, &output_overrun),
+                bounded(stderr, STDERR_LIMIT, &stderr_overrun)
             )?;
             let status = child.wait().await?;
             if !status.success() {
@@ -396,5 +423,48 @@ mod tests {
         .await
         .unwrap_err();
         assert!(error.contains("output_limit"), "{error}");
+    }
+
+    #[tokio::test]
+    async fn the_response_ceiling_is_named_with_its_value_and_the_flag_that_raises_it() {
+        let tmp = tempfile::tempdir().unwrap();
+        let p = tmp.path().join("chatty.mjs");
+        std::fs::write(&p, "process.stdout.write('x'.repeat(3*1024*1024));").unwrap();
+        let error = parse(
+            Path::new("node"),
+            &p,
+            &request(),
+            Duration::from_secs(3),
+            2 * 1024 * 1024,
+            512,
+            tokio::sync::watch::channel(false).1,
+        )
+        .await
+        .unwrap_err();
+        assert!(error.starts_with("worker_output_limit"), "{error}");
+        assert!(error.contains("limit_mb=2"), "{error}");
+        assert!(error.contains("--worker-output-mb"), "{error}");
+    }
+
+    #[tokio::test]
+    async fn stderr_exhaustion_is_not_reported_as_the_response_ceiling() {
+        let tmp = tempfile::tempdir().unwrap();
+        let p = tmp.path().join("noisy.mjs");
+        std::fs::write(&p, "process.stderr.write('e'.repeat(200000));").unwrap();
+        let error = parse(
+            Path::new("node"),
+            &p,
+            &request(),
+            Duration::from_secs(3),
+            2 * 1024 * 1024,
+            512,
+            tokio::sync::watch::channel(false).1,
+        )
+        .await
+        .unwrap_err();
+        // A runtime that chats on stderr must not read as "the answer was too
+        // large", which would send the reader to the wrong flag.
+        assert!(error.starts_with("worker_stderr_limit"), "{error}");
+        assert!(!error.contains("--worker-output-mb"), "{error}");
     }
 }

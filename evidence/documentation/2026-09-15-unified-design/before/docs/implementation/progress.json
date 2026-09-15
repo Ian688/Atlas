@@ -1,0 +1,1710 @@
+{
+ "schema": "atlas.daily-development-progress.v1",
+ "work_order_version": "6.0",
+ "prepared_on": "2026-09-09",
+ "timezone": "Asia/Shanghai",
+ "repository": "/Users/yinsijie/CodeRepo/Atlas",
+ "mode": "external_agent_continuous",
+ "active_window": {
+  "window": "2026-09-15/ui-v2-fix-r1-r4",
+  "status": "INDEPENDENT_REVIEW_PASSED_FOR_R1_R4",
+  "note": "复审 R1-R4 整改(自测)。R1:写授权改为能力(capable)+跟随当前项目(页内以可写方式打开=明确本机操作者动作,最近项目记录授权);write_gate/apply/revert/reindex/target=here 全部用当前项目目录——双项目(同名同字节 math.js)字节日志证明 beta 全程应用/新版本/撤销而 alpha 恒等于基线。R2:草稿按 analysis|entity 键,connect 整表替换服务端按项目存档,跨版本只经重定位迁移。R3:结果卡按 record.analysis_id 标注并明示跨版本记录;切换/重连清结果卡;外项目任务在面板标注并拒绝冒充当前结果。R4:设置按项目键持久化与切换(入队作业保留自身快照),重启后各项目声明与写授权恢复(restart-check 4/4)。证据:双项目 probe 16/16(真实 Chrome,仓库外最终包,bytesLog 六快照),行为测试 78/78,verify 全 PASS+指纹 2029ab35…三方一致。边界:3D 往返/完整外部 Agent 任务/平台范围维持上轮自测声明。断点:独立复审。 独立复验：复制最终包从仓库外启动，同名双项目及真正停止服务再启动，16/16通过。R1–R4关闭；完整外部Agent任务与3D往返保持待独立验收，不扩大资格。",
+  "evidence_dir": "evidence/development/2026-09-15-ui-v2-fix-r1-r4",
+  "verification": "evidence/development/2026-09-15-ui-v2-fix-r1-r4/verify/verification.json",
+  "probe": "evidence/development/2026-09-15-ui-v2-fix-r1-r4/results.json",
+  "independent_review": "evidence/reviews/2026-09-15-ui-v2-r1-r4-rereview/REPORT.md"
+ },
+ "windows": [
+  {
+   "id": "2026-09-15/s1-s6-first-version",
+   "started_local": "2026-09-14T16:00:00+08:00",
+   "status": "SELF_TEST_PASSED_NEEDS_INDEPENDENT_REVIEW",
+   "work_items": [
+    "S1-distribution-resource-location",
+    "S2-restart-restoration",
+    "S3-declared-test-and-full-input-compare",
+    "S4-final-package-human-journey",
+    "S5-real-agent-task-and-human-review",
+    "S6-local-trial-delivery"
+   ],
+   "report": "evidence/development/2026-09-15-s1-s6-first-version/REPORT.md",
+   "verification": "evidence/development/2026-09-15-s1-s6-first-version/verify/verification.json",
+   "note": "S1-S6 自测通过。S5 在最终包上复跑:执行 Agent 产出提案 A/B/C(均 verified,未 apply),独立核对 Agent 自建副本复核通过,人在工作台应用/撤销 4/4。本轮修的产品缺陷:资源定位、重启恢复、失败作业无法重试、提案面板在画像到达前渲染导致对照默认输入为空;契约缺 search/exec-compare 由 Agent 找不到入口暴露。"
+  },
+  {
+   "id": "2026-09-15/d0-d4-first-local-delivery",
+   "started_local": "2026-09-14T05:31:51+08:00",
+   "started_utc": "2026-09-13T21:31:51+00:00",
+   "status": "DELIVERED",
+   "work_items": [
+    "D0",
+    "D1",
+    "D2",
+    "D3",
+    "D4"
+   ],
+   "report": "evidence/development/2026-09-15-d0-delivery/REPORT.md",
+   "verification": "evidence/development/2026-09-15-d0-delivery/verify/verification.json",
+   "ended_local": "2026-09-14T05:31:51+08:00"
+  },
+  {
+   "id": "2026-09-14/t1-t3-workbench",
+   "started_local": "2026-09-14T03:51:26+08:00",
+   "started_utc": "2026-09-13T19:51:26+00:00",
+   "status": "DELIVERED",
+   "work_items": [
+    "T1",
+    "T2",
+    "T3",
+    "F1",
+    "F2",
+    "F3",
+    "F4",
+    "F5"
+   ],
+   "report": "evidence/development/2026-09-14-t1-t3-workbench/REPORT.md",
+   "verification": "evidence/development/2026-09-14-t1-t3-workbench/verification.json",
+   "ended_local": "2026-09-14T03:51:26+08:00"
+  },
+  {
+   "id": "2026-09-14/t1-f1f2f3",
+   "started_local": "2026-09-14T03:12:46+08:00",
+   "started_utc": "2026-09-13T19:12:46+00:00",
+   "status": "DELIVERED",
+   "work_items": [
+    "T1",
+    "F1",
+    "F2",
+    "F3"
+   ],
+   "report": "evidence/development/2026-09-14-t1-f1f2f3/REPORT.md",
+   "verification": "evidence/development/2026-09-14-t1-f1f2f3/verification.json",
+   "ended_local": "2026-09-14T03:12:46+08:00"
+  },
+  {
+   "id": "2026-09-14/f1-workbench",
+   "started_local": "2026-09-14T02:37:19+08:00",
+   "started_utc": "2026-09-13T18:37:19+00:00",
+   "status": "DELIVERED",
+   "work_items": [
+    "F1(前端主设计切片)",
+    "T1 第一段"
+   ],
+   "report": "evidence/development/2026-09-14-f1-workbench/REPORT.md",
+   "verification": "evidence/development/2026-09-14-f1-workbench/verification.json",
+   "ended_local": "2026-09-14T02:37:19+08:00"
+  },
+  {
+   "id": "2026-09-09/w01",
+   "started_local": "2026-09-09T00:29:44+08:00",
+   "started_utc": "2026-09-08T16:29:44Z",
+   "status": "DELIVERED",
+   "work_items": [
+    "W00",
+    "W01",
+    "W02",
+    "W03",
+    "W04",
+    "W05",
+    "W06(部分)"
+   ],
+   "report": "evidence/daily/2026-09-09/w01/final/daily-report.md",
+   "verification": "evidence/daily/2026-09-09/w01/final/verification/verification.json",
+   "ended_local": "2026-09-09T03:28:00+08:00"
+  },
+  {
+   "id": "2026-09-09/w02",
+   "started_local": "2026-09-09T05:15:51+08:00",
+   "started_utc": "2026-09-08T21:15:51Z",
+   "status": "DELIVERED",
+   "work_items": [
+    "R1",
+    "R2",
+    "R3",
+    "R4",
+    "R5",
+    "R6",
+    "R7",
+    "M1",
+    "M2",
+    "M3"
+   ],
+   "report": "evidence/daily/2026-09-09/w02/final/daily-report.md",
+   "ended_local": "2026-09-09T08:20:00+08:00",
+   "note": "独立复审 CHANGES_REQUIRED（F1-F5）；对应修复已由 w03 交付并有具名测试 (f1_typed_constants_are_machine_distinguishable / f2_wrapper_layer_heap_write_is_visible / r1_perturbation_throw_ordering_keeps_partial_state / f4_nested_reachable_objects_dissolve_on_unknown_call / f5_big_number_to_string_is_exact)。独立再复审未进行，资格继续扣留。"
+  },
+  {
+   "id": "2026-09-09/w03",
+   "started_local": "2026-09-09T08:27:00+08:00",
+   "status": "DELIVERED",
+   "work_items": [
+    "F1",
+    "F2",
+    "F3",
+    "F4",
+    "F5"
+   ],
+   "report": "evidence/daily/2026-09-09/w03/final/daily-report.md"
+  },
+  {
+   "id": "2026-09-10/continuation",
+   "status": "DELIVERED",
+   "work_items": [
+    "W04-scalar-contexts",
+    "D19-shared-budget-and-frontier",
+    "W06-cooperative-cancellation"
+   ],
+   "report": "evidence/development/2026-09-10-continuation/REPORT.md",
+   "verification": "evidence/development/2026-09-10-continuation/verified/verification.json"
+  },
+  {
+   "id": "2026-09-12/consumer-layer",
+   "status": "DELIVERED",
+   "work_items": [
+    "consumer-flow-heat-matrix",
+    "consumer-city3d"
+   ],
+   "note": "非 W 项。两项都是已发布事实的投影：矩阵读 /api/flow，3D 城市读 /api/nodes、/api/edges、/api/source。新增 /city3d 与 /city3d.js 路由复用 asset() 边界；build.rs 与 verify.py 指纹清单已同步。三项不变量有测试：未解析调用必须画出、未分析文件必须区分、警告不得被值掩盖。",
+   "report": "evidence/daily/2026-09-12/city3d/REPORT.md",
+   "verification": "evidence/daily/2026-09-12/city3d/verification.json"
+  },
+  {
+   "id": "2026-09-12/w06-jobs",
+   "status": "DELIVERED",
+   "work_items": [
+    "W06-job-identity",
+    "W06-idempotent-submit",
+    "W06-lease-and-heartbeat",
+    "W06-crash-reap"
+   ],
+   "note": "W06 推进：持久 (owner,project,request_key) 身份、幂等重放、带心跳的租约、崩溃收割接通并纳入验证门。未推进任何分析算法。该窗口时仍缺持久队列与调度器，同日 w06-queue 随后补上；三个真实缺陷（身份双来源、并发 database is locked、心跳 join 阻塞 20s）由真实运行暴露并修复。",
+   "report": "evidence/daily/2026-09-12/w06-jobs/REPORT.md",
+   "verification": "evidence/daily/2026-09-12/w06-jobs/verification.json"
+  },
+  {
+   "id": "2026-09-12/w06-queue",
+   "status": "DELIVERED",
+   "work_items": [
+    "W06-durable-queue",
+    "W06-priority-scheduling",
+    "W06-worker-claim-and-resume",
+    "W06-queued-cancel",
+    "W06-additive-migration"
+   ],
+   "note": "W06 补完队列：enqueue 只入队不执行、优先级+最旧优先调度、job work 认领与续跑、排队取消、priority/options 纯增量加列迁移。迁移测试暴露“依赖新列的索引先于加列执行”缺陷并修复。W06 仍 PARTIAL（owner 未认证、无守护进程、断电耐久未验证）。",
+   "report": "evidence/daily/2026-09-12/w06-queue/REPORT.md",
+   "verification": "evidence/daily/2026-09-12/w06-queue/verification.json"
+  },
+  {
+   "id": "2026-09-12/w07-incremental",
+   "status": "DELIVERED",
+   "work_items": [
+    "W07-run-key",
+    "W07-file-keys-and-scc-closure",
+    "W07-invalidation-attribution",
+    "W07-withdrawal",
+    "W07-cost-accounting",
+    "store-put-blob-idempotent-publication"
+   ],
+   "note": "W07 推进到 PARTIAL。承重断言：增量与全量必须发布同一 analysis id，冷/热/编辑/删除四条路径全部相等。实测暴露 store.put_blob 对已存在 blob 仍写盘并 fsync（每次扫描每个未改动文件一次），修复后 scan 3.1–4.9s → 0.049s。局部改动仍需全程序重新派生：Rust 侧是全程序 SCC 不动点，按文件缓存派生结果在算法上不成立，已登记为 blocker。",
+   "report": "evidence/daily/2026-09-12/w07-incremental/REPORT.md",
+   "verification": "evidence/daily/2026-09-12/w07-incremental/verification.json"
+  },
+  {
+   "id": "2026-09-12/w08-execution",
+   "started_local": "2026-09-12T20:00:00+08:00",
+   "status": "DELIVERED",
+   "work_items": [
+    "W08-execution-profile",
+    "W08-run-spec-and-isolated-copy",
+    "W08-node-permission-enforcement",
+    "W08-source-identity-target-resolution",
+    "W08-observed-record-and-trace-honesty",
+    "W08-scenario-tests",
+    "W08-http-boundary",
+    "GE-2-worker-defect-flow-reference-unknown-binding-x2"
+   ],
+   "note": "受控执行只对静态画像允许且 spec 显式授权的函数生效；权限由 Node 权限模型强制（能力探针要求一次真实写入被 ERR_ACCESS_DENIED 拒绝），不是 Atlas 的声明。记录身份 = digest(固定问题+观测答案)，刻意排除耗时与临时路径。观测边界写进每条记录：coverage=not_sampled、unknown_paths=not_observed。",
+   "report": "evidence/development/2026-09-12-w08/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w09-selection-and-bridge",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-shared-selection-object",
+    "W09-version-check-and-refusal",
+    "W09-projection-interop-2d-3d",
+    "W09-semantic-dom-and-bridge-surface",
+    "W09-annotations-as-proposals",
+    "W09-bounded-agent-bridge-with-lease-ack"
+   ],
+   "note": "选区 = 实体 + 分析版本，经 fragment 在 2D 与 3D 之间传递，跨版本一律拒绝而不是重指。注解是 Intent（exists=false）。Agent Bridge 请求身份 (owner,request_key) 幂等、认领即 ACK 带租约、只有租约持有者能写终态、动作集合封闭且越界动作在入队时被持久拒绝。AI Coding 补丁链未实现。",
+   "report": "evidence/development/2026-09-12-w09/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w09-ai-coding-chain",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-diff-against-pinned-bytes",
+    "W09-isolated-verify-reindex",
+    "W09-graph-diff",
+    "W09-declared-argv-test-observed",
+    "W09-apply-revert-with-drift-check",
+    "W09-intent-static-observed-separation"
+   ],
+   "note": "AI Coding 第一条完整链接通：diff 对固定快照字节校验（不匹配即带行拒绝，无模糊匹配）、隔离副本重新索引派生新 analysis、图差异按 path+name 配对、声明的 argv 测试作为 Observed 证据、apply/revert 带字节漂移校验与单向状态机。Intent/Static/Observed 分开存放。",
+   "report": "evidence/development/2026-09-12-w09-ai-coding/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w10-host-seam",
+   "status": "DELIVERED",
+   "work_items": [
+    "W10-host-contract-as-data",
+    "W10-reference-host-client",
+    "W10-no-storage-access-check",
+    "W10-host-e2e",
+    "W10-migration-and-rollback-boundary"
+   ],
+   "note": "宿主接缝接通：合同作为数据发布（GET /api/contract），参考宿主客户端只拿 {url,token}，测试断言适配器源码无任何存储访问、contract 不含 store 路径、非回环 host 被拒。Modus 旧入口未切换：宿主检出不在本工作区，无法做宿主侧 E2E，回退边界与切换前置条件已写进 docs/HOST_API.md。",
+   "report": "evidence/development/2026-09-12-w10/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w08-context-model",
+   "status": "DELIVERED",
+   "work_items": [
+    "W08-declared-inputs-vs-acknowledged-unknowns",
+    "W08-this-arg-and-named-globals",
+    "W08-module-state-is-present",
+    "W08-actionable-refusals"
+   ],
+   "note": "执行画像把要求分成两类：可声明的输入（this、具名全局）与必须承认的未知（未建模构造/未完成事实/堆近似/未知调用）。读取模块级状态不需要声明（模块整体在副本里）；嵌套函数的外层绑定不可运行。拒绝一次性列出缺什么。",
+   "report": "evidence/development/2026-09-12-w08/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w09-patch-review",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-patch-review-http-surface",
+    "W09-patch-review-panel",
+    "W09-shared-propose-path"
+   ],
+   "note": "提案审阅面接通：页面可登记提案并读验证结果，验证与应用仍只在 CLI；HTTP 与 CLI 共用同一校验路径。",
+   "report": "evidence/development/2026-09-12-w09-ai-coding/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w08-effect-journal",
+   "status": "DELIVERED",
+   "work_items": [
+    "W08-effect-journal"
+   ],
+   "note": "Effect journal：记录运行时报告的拒绝尝试（权限种类+目标）与授予集合，并写明空 journal 不等于没有副作用。",
+   "report": "evidence/development/2026-09-12-w08/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w09-queued-verify",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-patch-verify-as-durable-job",
+    "W06-queue-kind-dispatch"
+   ],
+   "note": "补丁验证可排队为 patch_verify 作业；队列按 kind 分派，index 与 patch_verify 共用身份/租约/心跳/收割；无法自述的作业行判失败而不是猜参数。",
+   "report": "evidence/development/2026-09-12-w09-queued-verify/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w08-cancellation",
+   "status": "DELIVERED",
+   "work_items": [
+    "W08-sigint-cancels-controlled-run",
+    "W08-scenario-stops-on-cancel"
+   ],
+   "note": "受控运行的 SIGINT 取消接通并有测试（按进程组 kill、发布 cancelled 记录）；scenario 取消后停止并区分 attempted/declared。",
+   "report": "evidence/development/2026-09-12-w08/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w09-session-identity",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-http-owner-is-the-session",
+    "W09-http-authorship-is-the-session"
+   ],
+   "note": "HTTP 上的 owner 与作者改由服务端按会话写入；请求体里的 owner/proposed_by 不被采信。CLI 保留显式声明（本机自我声明，非认证）。",
+   "report": "evidence/development/2026-09-12-w09-session-identity/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w09-observed-layer",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-run-markers-projection",
+    "W09-observed-vs-static-legend"
+   ],
+   "note": "3D 城市加入观测层：已运行入口单独描边色 + 独立图例与结论分布；映射是纯函数且不改变静态布局；不可放置与查询失败都如实呈现。",
+   "report": "evidence/development/2026-09-12-w09-observed-layer/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w07-worker-heap",
+   "status": "DELIVERED",
+   "work_items": [
+    "W07-worker-heap-ceiling-configurable",
+    "W07-heap-exhaustion-named"
+   ],
+   "note": "语言 worker 堆上限成为参数（默认 1024，128–8192）并在耗尽时给出具名错误；实测单文件 14k 函数在 128MiB 下 1.5s 耗尽。",
+   "report": "evidence/development/2026-09-12-w07-worker-heap/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w08-imports-vs-globals",
+   "status": "DELIVERED",
+   "work_items": [
+    "W08-flow-function-imports",
+    "W08-import-is-not-a-global",
+    "W08-runtime-globals-not-inputs",
+    "W08-single-worker-producer-constant"
+   ],
+   "note": "把 import、运行时全局、真正自由标识符分开：导入不再被要求声明，内建不再被要求声明，真全局具名要求；worker/engine 用单一 producer 常量对齐并具名拒绝不兼容版本。",
+   "report": "evidence/development/2026-09-12-w08-imports/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/ge2-rerun-0.2.2",
+   "status": "DELIVERED",
+   "work_items": [
+    "GE-2-regression-rerun-flow-0.2.2"
+   ],
+   "note": "在 flow 0.2.2 上复跑 rxjs@7.8.1：覆盖分母逐项相同（6573 flow 函数 / 0 partial / 167 unknown regions / 6568 SCC），四条承重断言全部成立，store +0.32%。耗时差异不作因果结论（单次测量、共享机器、首轮有并发负载）。",
+   "report": "evidence/development/2026-09-12-real-project-r2/REPORT.md",
+   "verification": "evidence/development/2026-09-12-real-project-r2/rxjs/bench.json"
+  },
+  {
+   "id": "2026-09-12/w09-relocation",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-cross-version-relocation",
+    "W09-relocation-evidence",
+    "W09-web-relocation"
+   ],
+   "note": "跨版本选区重定位：path_and_name / identical_bytes / name_only 三条依据，撤回与无对应物分开，歧义拒绝；只给建议不改记录；网页显示依据与字节是否变化。",
+   "report": "evidence/development/2026-09-12-w09-relocation/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w08-scenario-records",
+   "status": "DELIVERED",
+   "work_items": [
+    "W08-scenario-results-published"
+   ],
+   "note": "场景结果成为不可变记录（--scenario-history / GET /api/scenarios、/api/scenario），不再只存在于 stdout；同场景同分析幂等。",
+   "report": "evidence/development/2026-09-12-w08/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w08-closure-via",
+   "status": "DELIVERED",
+   "work_items": [
+    "W08-nested-closure-via"
+   ],
+   "note": "needs_context 的最后一块：捕获绑定不可声明，只能由包含函数真实产生。--via 必须等于目标的包含符号；harness 分两阶段并只调用返回值中源码与目标钉住字节一致的那个函数；closure_not_returned / closure_identity_mismatch 作为观测保留；closure_depth_not_supported 静态拒绝更深链。",
+   "report": "evidence/development/2026-09-12-w08-closure-via/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/ge3-concurrency",
+   "status": "DELIVERED",
+   "work_items": [
+    "GE-3-concurrency-qualification"
+   ],
+   "note": "并发第一次真实运行就以 database is locked 失败（两个进程用 5 秒固定预算撞发布者的写锁）。修复：等待改为可取消的可配预算 + 具名超时拒绝，schema 创建放进一个 IMMEDIATE 事务并在事务内重查，已初始化 store 只读打开（读取不再取写锁）。资格：rxjs@7.8.1 上串行 133.0s/534MB，3 并发共享 store 220.2–220.6s（各自 519–525MB），3 并发分 store 237.3–238.2s，全部 exit 0 且发布同一 analysis id dc2f21c4…；事后读回 6573 函数 / 8938 节点 / 25969 边与基线一致。",
+   "report": "evidence/development/2026-09-12-ge3-concurrency/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w09-city-lod",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-city-hierarchy-lod"
+   ],
+   "note": "城市从一张固定图变成 一个模型 + 每层一张视图：buildCityHierarchy（不可裁剪、目录/项目为子节点之和）、cityLevelView（项目/目录/文件三种画法，共享打包路径避免层级间不一致）、cityLevelInvariants（逐层重加，project==Σdistrict==Σfile 才算守恒，页面上显示）。LOD 不改变事实数量因此是结构性保证；层级省略与预算截断分开报；聚合柱体 aggregate=true、无单一源码、共享选区落到粗层级指名真实文件并标注聚合；运行标记按 filePaths 落在聚合柱体上并写明是聚合。顺带修掉 maxFiles=0 被 || 缺省吞掉的预算 bug。city3d 行为用例 17→23。",
+   "report": "evidence/development/2026-09-12-w09-city-lod/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w08-materialise-slice",
+   "status": "DELIVERED",
+   "work_items": [
+    "W08-dependency-slice"
+   ],
+   "note": "--materialise snapshot|dependencies：dependencies 走已发布 import 边的传递闭包（type_import 不跟随）+ 全部 package.json（Node 模块类型判定，rxjs dist/cjs 靠它按 CJS 载入），闭包遍历有界。记录把 range 变成证据：files_written/files_in_snapshot/bytes_written/written[]/closure（未解析 import 分 relative（具名）与 bare（计数））/known_risk/fallback。真实项目（rxjs@7.8.1，dist/cjs/internal/util/isFunction.js:isFunction，两种模式都真的 returned）快照 2277 文件 4,501,327B vs 切片 7 文件 9,514B。execution 用例 50→55。",
+   "report": "evidence/development/2026-09-12-w08-materialise-slice/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w08-via-chain",
+   "status": "DELIVERED",
+   "work_items": [
+    "W08-via-chain"
+   ],
+   "note": "嵌套闭包从一层扩到多层：--via-chain（由外到内的祖先，上限 8）。engine 校验请求形状（via_chain_without_via / too_long / symbol==target），runner 在图上校验链（每环 enclosing == 上一环、最外层顶层）并要求每一环自己的画像允许运行；harness 变成阶段循环，每阶段只接受源码与下一环钉住字节一致的返回值，closure_not_returned / closure_identity_mismatch 记录该阶段并置 failed_stage。记录兼容：一层深时 ancestors=[]、stage_report 形状不变。页面经 /api/profile 逐级向上查 enclosing_symbol 预填链。execution 55→59，host-adapter 10→11，web 29→30。",
+   "report": "evidence/development/2026-09-12-w08-via-chain/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w09-patch-forms",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-patch-forms"
+   ],
+   "note": "AI Coding 链补上新建与删除：PatchForm 由 /dev/null 表头声明并由 hunks 复核，删除不再等于编辑成空文件（outcome 分开 files/deleted，记录带 form 与 removed_digest）；apply/revert 按形式各自校验（create 要求路径为空、revert create 删文件、revert delete 按钉住字节恢复且要求路径仍空）；同路径两次出现与 git rename 都具名拒绝；新建提案可以命名一个尚不存在的路径（只有 diff 真的新建它时才接受），提案写 target_exists=false；HTTP 与 CLI 共用同一解析与校验，页面显示形式与撤销语义。patch 用例 25→31，engine 单测 66→68，web 30→31。",
+   "report": "evidence/development/2026-09-12-w09-patch-forms/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w09-http-writes",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-one-click-revert"
+   ],
+   "note": "页面可以一键 apply/revert，但仍然只有一个由操作者显式打开的目录：serve --allow-writes <DIR>（默认关闭，403 http_writes_disabled）；目录启动时 canonicalize，请求体没有 target/root 字段、注入了也不读；confirm_path 必须逐字相同（400 confirmation_mismatch，且不写任何文件）；revert 只撤销记录里那个目录；写入与 CLI 共用同一实现并把 actor（HTTP 为会话身份）写进 terminal_reason；契约新增 writes 段供页面判断是否显示按钮。patch 用例 31→37（新增 HttpWrites 5 条 + Http 1 条），web 31→32。",
+   "report": "evidence/development/2026-09-12-w09-http-writes/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w06-bounded-parallel-jobs",
+   "status": "DELIVERED",
+   "work_items": [
+    "W06-bounded-parallelism"
+   ],
+   "note": "job work --parallel N：每槽位自己的 holder（租约不共用），上限 1..=4 是策略；越界与 --once 组合具名拒绝；输出 parallelism/holders 作为证据；用例用 1.2 秒的声明测试让重叠可见（观察到 >=2 个 running 与 3 个不同 holder），顺序模式从不重叠。patch 用例 37->39。",
+   "report": "evidence/development/2026-09-12-w06-bounded-parallel-jobs/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w09-apply-lock",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-apply-lock"
+   ],
+   "note": "写入路径持锁：ApplyLock 用 create_new 创建 .atlas-apply.lock 并写入持有者身份，apply/revert 在整段校验+写入期间持有它；第二个进程以 apply_lock_held:<path>:holder=<who> 拒绝且不写任何文件；guard drop 在所有错误路径释放（用例：外部持锁时 apply 拒绝且文件未变、被拒绝的 apply 不留锁、revert 同样持锁）。patch 用例 39->42。仍未做：合并、逐文件磁盘备份（撤销来源是内容寻址 blob）、跨机器锁。",
+   "report": "evidence/development/2026-09-12-w09-apply-lock/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w09-patch-unlock",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-patch-unlock"
+   ],
+   "note": "补上锁的操作面：atlas patch unlock --target <checkout> 删除 .atlas-apply.lock，删除前报出原持有者（此后唯一的记录就是这行输出），没有锁时以 no_apply_lock 报错而不是静默成功；用例验证解锁后提案真的可以 apply。patch 用例 42->43。",
+   "report": "evidence/development/2026-09-12-w09-patch-unlock/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w09-lock-timestamp",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-lock-timestamp"
+   ],
+   "note": "锁文件第二行写入取锁毫秒时间戳：apply_lock_held 拒绝消息带 since_ms，patch unlock 报出 since_ms，旧格式缺时间戳时报 since_ms=null + since_unknown=lock_file_has_no_timestamp（不猜）。patch 用例 43->44。",
+   "report": "evidence/development/2026-09-12-w09-lock-timestamp/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w09-unlock-age-guard",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-unlock-age-guard"
+   ],
+   "note": "清锁加年龄门：patch unlock --stale-after（默认 300s）只清理达到该年龄的锁，年轻或时间未知的锁以 lock_not_stale:<path>:holder=...:age_ms=...:use --force 拒绝；--force 是唯一越过方式，并且仍然报出（可能为 unknown 的）年龄而不猜。用例：新鲜锁被拒且 apply 仍被挡 → --force 清除 → 10 分钟前的锁无需 --force 清除并报出持有者 → 无锁时报 no_apply_lock → 提案随后可 apply。",
+   "report": "evidence/development/2026-09-12-w09-unlock-age-guard/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/handoff-consolidation",
+   "status": "DELIVERED",
+   "work_items": [
+    "handoff-state"
+   ],
+   "note": "把当前状态写进 docs/HANDOFF.md：本会话交付的 8 组能力与对应门禁窗口、按价值排序的下一轮起点（2D 层级 / 大仓库资格 / 合并备份 / 采样 / Modus 宿主侧阻塞）、已知限制清单、复验入口。这一轮是**状态固化**，不是能力切片，不声称新增能力。",
+   "report": "evidence/development/2026-09-12-handoff-consolidation/REPORT.md"
+  },
+  {
+   "id": "2026-09-12/w09-shared-hierarchy",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09"
+   ],
+   "note": "2D 与 3D 共用一个几何无关的层级定义（atlas.hierarchy.v1）：身份、成员、被计数事实、层级分组只在 web/hierarchy.js 写一次；cityLevelView 退化为\"共享块集 + 几何\"，2D 概览按层级绘制同一批块。层级省略（omitted）与渲染预算（budget）分开报告，2D 还自报\"只加载了一页对象\"。画布点选走均匀网格空间索引（命中/代价/具名未命中）。app 行为断言 32→40，city3d 25 项重构后不变（等价证据）；verify.py 新增 web-syntax-hierarchy 并把手资产计入指纹（含 build.rs 同步修复）。不声称：2D 未翻页、层级不经 fragment 传递、无行级采样。",
+   "report": "evidence/development/2026-09-12-w09-shared-hierarchy/REPORT.md",
+   "verification": "evidence/development/2026-09-12-w09-shared-hierarchy/verification.json"
+  },
+  {
+   "id": "2026-09-12/w09-column-scale",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09"
+   ],
+   "note": "尺度合同：atlasScaleHeight/Tier/Radius/Compression/Report/Ruler 写进 web/hierarchy.js（2D/3D 共用），city3d 柱高走该尺度并画压缩标记环，层数受压缩高度限制；页面新增「尺度」行给出标尺、中位/最高、不足 1% 的列数（并给出线性尺度下的对照）。可读性基准 scripts/bench_view_readability.py（node 驱动读取同一份尺度实现，不重抄公式）以 --self-check 进入门禁。第一次门禁运行 24/24 绿但 status=UNSTABLE（运行中改了源文件），原始记录保留在 runs/run-1-unstable-sources-changed/，冻结后重跑为 PASS。仍未做：玻璃、边界端口、正交/平面视角、相机与折叠保存、按需重绘、搜索定位到层、类层组、visibility_reason、文件树/小图/时间轴；2D 真实布局是下一步。",
+   "report": "evidence/development/2026-09-12-w09-column-scale/REPORT.md",
+   "verification": "evidence/development/2026-09-12-w09-column-scale/verification.json"
+  },
+  {
+   "id": "2026-09-12/w09-layered-layout",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09"
+   ],
+   "note": "规格明确要求布局用 ELK 方向而不是手搓坐标，并要求先在 fixture 上评估。评估结果：elkjs 0.12.0、无依赖、未修改、1.61MB、EPL-2.0；真实规模焦点图 30–115ms（纯 node），浏览器内 21 块约 230ms 且 engine=elk_pinned。适配器 Atlas 侧：按距离分层、未解析保留为边界桩、超预算折叠为摘要边（带成员）或折叠标记；端口逐边独立；交叉/标签碰撞/确定性可测。三个由基准抓出的真 bug：分布到未绘制节点的摘要边被守卫丢弃、折叠尾巴每个成员生成一个标记、缺失坐标被当成 0（后者改为具名拒绝 elk_returned_no_coordinates）。elkjs 无同步 API，故布局异步；迟到结果按 generation 丢弃。未做：layout worker/deadline/取消、3D 全部缺口、2D 概览仍为网格。",
+   "report": "evidence/development/2026-09-12-w09-layered-layout/REPORT.md",
+   "verification": "evidence/development/2026-09-12-w09-layered-layout/verification.json"
+  },
+  {
+   "id": "2026-09-12/w09-function-finder",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-UI"
+   ],
+   "note": "UI 优先的第一次真实交付（非 mockup）：①第一屏五件事；②找函数，打通「选中函数」这条此前不存在的入口。门禁 25/25 exit 0、指纹 45681d70… 双向一致。未修：finder 位置在长树之下、可视区外；矩阵未提到主视图；167 处未知不可点开。",
+   "report": "evidence/development/2026-09-12-w09-function-finder/REPORT.md",
+   "verification": "evidence/development/2026-09-12-w09-function-finder/verification.json"
+  },
+  {
+   "id": "2026-09-12/w09-finder-first",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-UI"
+   ],
+   "note": "入口可见性修正：finder 提到 explorer 顶部，项目清单折叠为 details。验证=真实截图 + 25/25 门禁 + 指纹一致。仍未做：finder 各状态截图、矩阵进主视图、167 处未知可点开。",
+   "report": "evidence/development/2026-09-12-w09-finder-first/REPORT.md",
+   "verification": "evidence/development/2026-09-12-w09-finder-first/verification.json"
+  },
+  {
+   "id": "2026-09-12/w09-node-identity",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-UI"
+   ],
+   "note": "按身份取实体：/api/node + 契约表条目 + 页面 resolveEntity/openUnloaded，打通深链接与不可点击邻居。验证=真实 API（两种引用形式）+ 真实页面深链接截图 + 25/25 门禁。发现未命名拒绝的既有缺陷。",
+   "report": "evidence/development/2026-09-12-w09-node-identity/REPORT.md",
+   "verification": "evidence/development/2026-09-12-w09-node-identity/verification.json"
+  },
+  {
+   "id": "2026-09-12/w09-named-refusals",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09"
+   ],
+   "note": "具名拒绝：Ok(Err) 分支保留解析器给出的具名码（entity_not_found 等）并把完整原因放进 detail；影响所有 query 端点。验证=真实服务三例 + 新增集成断言 + 25/25 门禁。缺口：歧义分支未被触发。",
+   "report": "evidence/development/2026-09-12-w09-named-refusals/REPORT.md",
+   "verification": "evidence/development/2026-09-12-w09-named-refusals/verification.json"
+  },
+  {
+   "id": "2026-09-12/w09-values-workspace",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-UI"
+   ],
+   "note": "值状态矩阵进主视图：工具条新增关系/值状态切换，矩阵由 DOM 搬移到 #matrix（同一渲染器），深链接 &view= 可分享视图。验证=真实页面深链接截图 + 25/25 门禁 + 44/44 行为用例。未做：167 处未知可点开、执行画像主视图、歧义样本、node CLI。",
+   "report": "evidence/development/2026-09-12-w09-values-workspace/REPORT.md",
+   "verification": "evidence/development/2026-09-12-w09-values-workspace/verification.json"
+  },
+  {
+   "id": "2026-09-12/w09-unknown-list",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-UI"
+   ],
+   "note": "167 处未知可点清单 + 分组揭示三个缺失语言特性（79/78/10）；点条目按身份打开文件。布局 bug（绝对定位盖住全页）由截图发现并修复。未做：区间高亮、三个特性的实际支持、执行主视图、歧义样本、node CLI。",
+   "report": "evidence/development/2026-09-12-w09-unknown-list/REPORT.md",
+   "verification": "evidence/development/2026-09-12-w09-unknown-list/verification.json"
+  },
+  {
+   "id": "2026-09-12/w09-param-shapes",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09"
+   ],
+   "note": "参数形状：bindParameterPattern 递归登记解构/rest 绑定的名字为参数，登记为 0 才发具名未知区域。真实数据 167→79，与上一轮 UI 清单的分解预测完全一致。残余：for_in 79 处未处理；形状关系未建模（IR 无该字段，未发明）。",
+   "report": "evidence/development/2026-09-12-w09-param-shapes/REPORT.md",
+   "verification": "evidence/development/2026-09-12-w09-param-shapes/verification.json"
+  },
+  {
+   "id": "2026-09-12/w09-forin",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09"
+   ],
+   "note": "for-in/of 建模为 unknown-cond while，循环变量注册为 const/let 未知值；无声明形式防护。rxjs 未知区域 79→0（三轮 167→0）。两条测试失败均由测试当场抓出并修正（漏改断言尾部、断言形态过严）。残余：迭代次数/元素形状/in-of 差异未区分；新可见调用未逐条核对。",
+   "report": "evidence/development/2026-09-12-w09-forin/REPORT.md",
+   "verification": "evidence/development/2026-09-12-w09-forin/verification.json"
+  },
+  {
+   "id": "2026-09-12/w09-forin",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09"
+   ],
+   "note": "for-in/of 建模 + 循环变量赋值 + 无声明形式防护；两份契约副本同步改写。自造问题两个已修：假 TDZ 理由、worker 版本未升。残余：迭代次数/元素形状/in-of 差异未区分，新可见调用未逐条核对。",
+   "report": "evidence/development/2026-09-12-w09-forin/REPORT.md",
+   "verification": "evidence/development/2026-09-12-w09-forin/verification.json"
+  },
+  {
+   "id": "2026-09-12/w09-quality-check",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-QA"
+   ],
+   "note": "对上一轮断言做实测核对：同一函数前后对照（CFG 3→9、返回值 unknown→确定 undefined、新增理由为掩盖的真相、调用点数量不变）。纠正了\"循环内调用全部消失\"的夸大表述并记录在案。残余：只核对 1 个函数；未统计\"调用点存在但目标未解析\"的比例变化。",
+   "report": "evidence/development/2026-09-12-w09-quality-check/REPORT.md",
+   "verification": "evidence/development/2026-09-12-w09-forin-r3/verification.json"
+  },
+  {
+   "id": "2026-09-12/w09-corpus-check",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-QA"
+   ],
+   "note": "全库逐函数对照（facts 聚合，6573 同名函数）：结构无回退（块 69 增 0 减）、返回值更精确（3 个从无结论变确定，0 反向）、flow 层调用点 +93；纠正\"调用点一直存在\"的不精确；新出现 unmodeled_assignment_target 34 例**全部是循环函数**，归因于我发出的循环变量赋值，其中一半循环函数 assignTarget 失败，列为缺陷。",
+   "report": "evidence/development/2026-09-12-w09-quality-check/CORPUS.md",
+   "verification": "evidence/development/2026-09-12-w09-forin-r3/verification.json"
+  },
+  {
+   "id": "2026-09-12/w09-assign-target",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09-QA"
+   ],
+   "note": "unmodeled_assignment_target 归因：排除自身改动（以全库逐项相同的测量为据并撤回该改动），确认原因是 assignTarget 不支持元素访问赋值目标（42/42 命中源码），属既有限制、非回退。下一步为 worker+引擎两侧支持 element 目标（写堆未知 ⇒ may_write_heap，常量 key 可收敛为 property）。残余：非循环的 275 个函数未逐类归因。",
+   "report": "evidence/development/2026-09-12-w09-assign-target/REPORT.md",
+   "verification": "evidence/development/2026-09-12-w09-forin-r3/verification.json"
+  },
+  {
+   "id": "2026-09-12/w09-element-target",
+   "status": "DELIVERED",
+   "work_items": [
+    "W09"
+   ],
+   "note": "元素访问赋值（obj[key]=v）三处改动：合约 Element 变体、worker 产出、引擎求值三子表达式并具名\"位置未知\"。测量：317→10（该理由）、307 个函数带新理由、调用点 +12、0 回退。未做：ElementWrite 的写堆语义、常量 key 收敛、剩余 10 例归因。",
+   "report": "evidence/development/2026-09-12-w09-element-target/REPORT.md",
+   "verification": "evidence/development/2026-09-12-w09-element-target/verification.json"
+  },
+  {
+   "id": "2026-09-12/agent-brief",
+   "status": "DELIVERED",
+   "work_items": [
+    "handoff"
+   ],
+   "note": "Agent 交接简报（文档，无代码改动）。核心是让接手者不必相信任何叙述：验证命令、状态数字、以及 10 条已踩过的坑（契约多副本、worker 版本、UNSTABLE、必须看画面、vm 里的引擎、先写结论会写错、无证据的修复要撤回、子集不能当全量等）。",
+   "report": "docs/AGENT-BRIEF.md",
+   "verification": "evidence/development/2026-09-12-w09-element-target/verification.json"
+  },
+  {
+   "id": "2026-09-12/w09-demo",
+   "status": "DELIVERED",
+   "work_items": [
+    "demo"
+   ],
+   "note": "可玩 demo：一条命令打开 + 自带 4 文件示例（调用链/循环/副作用/未解析调用）+ 五步引导 + 明示缺口。三个脚本/界面缺陷由实际运行发现并修复。残余：引导按钮只有第③步经深链接验证；无真人测试；示例规模小。",
+   "report": "evidence/development/2026-09-12-w09-demo/REPORT.md",
+   "verification": "evidence/development/2026-09-12-w09-demo/verification.json"
+  },
+  {
+   "id": "2026-09-15/ui-v2-u1-u6",
+   "started_local": "2026-09-15T00:00:00+08:00",
+   "status": "SELF_TEST_PASSED_NEEDS_INDEPENDENT_REVIEW",
+   "work_items": [
+    "U1-explore-shell",
+    "U2-run-hierarchy-tasks-cancel",
+    "U3-review-3col-apply-newversion-revert",
+    "U4-project-open-switch-settings",
+    "U5-agent-locate-3d-members",
+    "U6-final-package-journey"
+   ]
+  },
+  {
+   "id": "2026-09-15/ui-v2-fix-r1-r4",
+   "started_local": "2026-09-15T00:00:00+08:00",
+   "status": "SELF_TEST_PASSED_NEEDS_INDEPENDENT_REVIEW",
+   "work_items": [
+    "R1-write-follows-project",
+    "R2-draft-scope-analysis-entity",
+    "R3-record-own-analysis",
+    "R4-per-project-settings"
+   ]
+  }
+ ],
+ "next_work_item": "M1-M6-project-map-multi-area",
+ "next_action": "执行 docs/design/atlas-explore-next/DEVELOPMENT_PROMPT.md，按任务书v6 M1→M6把最新探索页设计接成真实产品。现有独立复验资格保留；本轮仅编写任务书，未新增产品实现。",
+ "baseline": {
+  "foundation_evidence": "../../evidence/foundation/verification.json",
+  "status": "REFERENCE_ONLY",
+  "daily_baseline": "evidence/daily/2026-09-09/w01/baseline/",
+  "dispatch_inspection": "35 recorded source/config hashes matched at baseline copy time; no HEAD at dispatch; verify.py is now parameterized and never rewrites foundation evidence."
+ },
+ "dependency_semantics": "Prerequisites are entry conditions, not proof that all subfeatures are ready. W05 consumes each algorithm only after its corresponding semantics are verified. Existing Foundation is preserved; NOT_IMPLEMENTED describes each W target as a whole.",
+ "items": [
+  {
+   "id": "W00",
+   "title": "开工基线与证据隔离",
+   "prerequisites": [],
+   "contract_refs": [
+    "AL-00",
+    "AL-14",
+    "AL-15"
+   ],
+   "implementation": "IMPLEMENTED",
+   "automated_checks": "PASS",
+   "qualification": "QUALIFIED_WITHIN_PROFILE",
+   "review_status": "NEEDS_INDEPENDENT_REVIEW",
+   "features": [
+    "受控起始副本+SHA-256 清单(54 文件)与 foundation 35 hash 对比全匹配",
+    "verify.py 输出目录/标签参数化(schema atlas.verification.v2),显式拒绝写 evidence/foundation",
+    "Modus 保护检查改为可选:无基线/无 Modus 时记录 cannot-verify,不伪造保护结论",
+    "无 HEAD 时 git whitespace 检查覆盖范围如实记录",
+    "失败后未运行检查记录为 not_run_after_failure"
+   ],
+   "evidence": [
+    "evidence/daily/2026-09-09/w01/baseline/source-manifest.json",
+    "evidence/daily/2026-09-09/w01/baseline/verification/verification.json"
+   ],
+   "blockers": []
+  },
+  {
+   "id": "W01",
+   "title": "语言材料与版本化 Flow IR",
+   "prerequisites": [
+    "W00"
+   ],
+   "contract_refs": [
+    "AL-01",
+    "AL-02",
+    "AL-04"
+   ],
+   "implementation": "IMPLEMENTED",
+   "automated_checks": "PASS",
+   "qualification": "NOT_QUALIFIED",
+   "review_status": "FIXES_DELIVERED_REREVIEW_PENDING",
+   "features": [
+    "worker 0.2.0 输出 atlas.flow-ir.v1 / js-structured-control.v1:结构化语句/表达式树、UTF-8 锚点、Scope/Binding、参数默认值、捕获、unknown_regions",
+    "声明 profile 外构造一律显式 unknown+原因(for-of/in、解构、await/yield、模板插值、逻辑赋值、rest/展开、element access、with、class、delete、JSX、正则值)",
+    "Rust 校验:schema/producer/snapshot、锚点与字符边界、binding/scope 引用、catch 参数、重复 ID、语句/块/操作预算",
+    "函数内块/函数/catch/for/switch 作用域;var 提升到函数作用域;TDZ use-before-declare 仍解析到真绑定"
+   ],
+   "evidence": [
+    "workers/typescript/tests/flow.test.mjs (19/19)",
+    "crates/atlas-engine/src/flow.rs validate_flow"
+   ],
+   "blockers": [],
+   "independent_review": {
+    "id": "2026-09-09-w01-independent",
+    "findings": [
+     "R6",
+     "R7"
+    ],
+    "note": "w01 independent review findings R6,R7 and w02 review findings F1-F5 are delivered with named regression tests; no independent re-review has been performed, so qualification stays withheld."
+   }
+  },
+  {
+   "id": "W02",
+   "title": "CFG 与完成语义",
+   "prerequisites": [
+    "W01"
+   ],
+   "contract_refs": [
+    "AL-05"
+   ],
+   "implementation": "IMPLEMENTED",
+   "automated_checks": "PASS",
+   "qualification": "NOT_QUALIFIED",
+   "review_status": "FIXES_DELIVERED_REREVIEW_PENDING",
+   "features": [
+    "基本块 CFG:Goto/Branch/Return/Throw/共享 finally Dispatch/Sink",
+    "Completion(kind,value) 驱动 finally:正常结束恢复原 completion 并保留环境修改,自身 abrupt 覆盖;finally 体自身终止时不挂 dispatch;catch 内异常不重入同一 catch",
+    "短路 &&/||/?? 与条件表达式为显式分支+路径内临时变量(路径敏感值);switch 分支链与顺序 fallthrough;label break/continue;参数默认值在入口条件赋值",
+    "looping_blocks(迭代 Kosaraju)标记循环块;异常边 (op,handler) 表",
+    "await/yield/async 未建模(profile 外),不伪造挂起边"
+   ],
+   "evidence": [
+    "crates/atlas-engine/tests/flow_semantics.rs D02/D03/D04/D05",
+    "scripts/test_integration.py flow-lab finally/loop 断言"
+   ],
+   "blockers": [],
+   "independent_review": {
+    "id": "2026-09-09-w01-independent",
+    "findings": [
+     "R1",
+     "R7"
+    ],
+    "note": "w01 independent review findings R1,R7 and w02 review findings F1-F5 are delivered with named regression tests; no independent re-review has been performed, so qualification stays withheld."
+   }
+  },
+  {
+   "id": "W03",
+   "title": "局部抽象解释与数据来源",
+   "prerequisites": [
+    "W02"
+   ],
+   "contract_refs": [
+    "AL-06"
+   ],
+   "implementation": "IMPLEMENTED",
+   "automated_checks": "PASS",
+   "qualification": "NOT_QUALIFIED",
+   "review_status": "FIXES_DELIVERED_REREVIEW_PENDING",
+   "features": [
+    "维度:可达性、绑定环境(值+初始化状态+reaching defs)、CappedSet(常量8/目标64/来源8)、平坦堆(site,field)+wildcard、效果、completion",
+    "def-use 每绑定 defs/每定义 uses;TDZ 读取→may_throw+原因;来源 Parameter(i)/Constant/CallResult/Allocation/FunctionValue/External/Capture/Derived/Exception/This",
+    "堆:唯一具体对象(非循环分配点)强更新,其余弱更新+wildcard 合并;循环分配点强制弱更新",
+    "JS 常量折叠规则显式声明(f64 算术含 NaN/±0/除零、整数值字符串拼接、===/!==、同型比较、&&/||/??、typeof/!/void);位运算等不折叠→Top 带原因",
+    "worklist:BTreeSet 确定性、块访问上限+300k transfer 预算→partial_budget+frontier;常量条件剪枝记录 pruned_edges;cap 超限→Top+cap_exceeded 原因",
+    "跨函数绑定经 function directory 解析(捕获的模块函数→目标集合);跨过程摘要与有界标量context由 inter.rs 驱动；pending/未收敛保持未知"
+   ],
+   "evidence": [
+    "crates/atlas-engine/tests/flow_semantics.rs D01/D07/D08/D09/D10/D12",
+    "examples/flow-lab",
+    "evidence/development/2026-09-10-continuation/verified/verification.json"
+   ],
+   "blockers": [],
+   "independent_review": {
+    "id": "2026-09-09-w01-independent",
+    "findings": [
+     "R1",
+     "R2",
+     "R3",
+     "R4"
+    ],
+    "note": "w01 independent review findings R1,R2,R3,R4 and w02 review findings F1-F5 are delivered with named regression tests; no independent re-review has been performed, so qualification stays withheld."
+   }
+  },
+  {
+   "id": "W04",
+   "title": "调用点与跨过程摘要",
+   "prerequisites": [
+    "W01",
+    "W02",
+    "W03"
+   ],
+   "contract_refs": [
+    "AL-07",
+    "AL-08"
+   ],
+   "implementation": "IMPLEMENTED",
+   "automated_checks": "PASS",
+   "qualification": "NOT_QUALIFIED",
+   "review_status": "NEEDS_INDEPENDENT_REVIEW",
+   "features": [
+    "符号化函数摘要(returns/throws/effects,来源含 Parameter(i))",
+    "调用点代回:Parameter origin 按实参重代入,不同 caller 实参/返回不串线(D13)",
+    "观测调用图 SCC 凝聚、callee-first 拓扑求解;递归 SCC 有限轮迭代,未收敛记 partial_recursion(D15)",
+    "pending 摘要永不充当 no-return/no-throw 证明;未知 callee 保持 Top",
+    "五层调用链 origin 存活(D14);call 边与 forwarded 数据边分开记录(D17)",
+    "FunctionFlowFact.interprocedural(status/summary/callsites(targets_complete/unknown_component/args/result))",
+    "coverage: interproc_sccs/interproc_recursive_sccs",
+    "每 callee 至多8个完整标量实参调用点context；键绑定caller/op/规范化实参，实参变化重调度，超限/对象/符号参数回退符号摘要",
+    "参数换位不将caller Parameter重解释成callee Parameter；跨函数Allocation堆未导入时显式unknown；NaN context稳定判等",
+    "捕获的可写函数绑定不按原声明解析成唯一目标，显式unknown；完整closure环境实例化仍未实现"
+   ],
+   "evidence": [
+    "crates/atlas-engine/src/inter.rs",
+    "crates/atlas-engine/tests/flow_semantics.rs d13/d14/d15/d17",
+    "examples/flow-lab indirect + test_flow_facts_through_real_worker_store_cli_and_http",
+    "crates/atlas-engine/tests/interproc_context.rs",
+    "scripts/test_semantic_contracts.py",
+    "evidence/development/2026-09-10-continuation/verified/verification.json"
+   ],
+   "blockers": [],
+   "independent_review": {
+    "id": "2026-09-09-w01-independent",
+    "findings": [
+     "R2",
+     "M1"
+    ],
+    "note": "Executor automated_checks PASS remains historical self-test scope; new independent counterexamples fail. Implementation exists, qualification withheld."
+   }
+  },
+  {
+   "id": "W05",
+   "title": "不可变存储、查询与真实函数面板",
+   "prerequisites": [
+    "W01"
+   ],
+   "contract_refs": [
+    "AL-12",
+    "AL-14"
+   ],
+   "implementation": "IMPLEMENTED",
+   "automated_checks": "PASS",
+   "qualification": "NOT_QUALIFIED",
+   "review_status": "NEEDS_INDEPENDENT_REVIEW",
+   "features": [
+    "facts 表 (analysis,symbol,kind='flow') 与 Analysis 同事务原子发布;flow_digest 绑定派生事实内容到 analysis 身份",
+    "CLI flows/flow;HTTP /api/flows、/api/flow(沿用会话鉴权/Host/Origin);错误语义与既有一致(invalid_or_unavailable_query)",
+    "函数面板显示:算法/状态/预算、返回/抛出值摘要、效果、unknown 原因、块级绑定状态(有界截断);真实浏览器验证+截图",
+    "旧分析 flow facts 在重索引后可读(有测试);伪造 symbol 查询被拒绝(有测试)",
+    "flow查询暴露frontier；partial结果同步调用点、返回、抛出与绑定unknown，保留原完整函数分母和job_total_transfers/job_max_transfers"
+   ],
+   "evidence": [
+    "scripts/test_integration.py test_flow_facts_through_real_worker_store_cli_and_http",
+    "evidence/daily/2026-09-09/w01/final/artifacts/flow-panel-branchpick.png",
+    "scripts/test_semantic_contracts.py",
+    "evidence/development/2026-09-10-continuation/verified/verification.json"
+   ],
+   "blockers": [],
+   "independent_review": {
+    "id": "2026-09-09-w01-independent",
+    "findings": [
+     "R1",
+     "R2",
+     "R3",
+     "R4",
+     "M2"
+    ],
+    "note": "Executor automated_checks PASS remains historical self-test scope; new independent counterexamples fail. Implementation exists, qualification withheld."
+   }
+  },
+  {
+   "id": "W06",
+   "title": "作业所有权、取消恢复与资源边界",
+   "prerequisites": [
+    "W05"
+   ],
+   "contract_refs": [
+    "AL-15"
+   ],
+   "implementation": "PARTIAL",
+   "automated_checks": "PASS",
+   "qualification": "NOT_QUALIFIED",
+   "review_status": "NEEDS_INDEPENDENT_REVIEW",
+   "features": [
+    "扫描阶段整体 deadline(--scan-deadline-seconds,默认 300/上限 3600;超限零发布,Rust 单测覆盖)",
+    "多项目同库隔离与跨 analysis 查询拒绝(test_multi_project_store_isolation)",
+    "索引管线级 deadline(--index-deadline-seconds,默认 600/上限 3600;剩余预算分配给 scan/worker 各阶段)",
+    "并发重复 index 幂等同终态(并发两进程同 id)",
+    "worker 阶段既有 1–600s 期限/输出上限/kill_on_drop 沿用",
+    "worker 崩溃矩阵集成测试:非零退出→零新增 Analysis,旧分析(含 flow facts)完整可读",
+    "ExecutionControl贯穿scan/worker/Rust/事务：SIGINT/SIGTERM协作取消，无硬process exit；listener保留至全链结束",
+    "扫描与整体deadline覆盖SQLite writer等待；25ms轮询检查取消；commit与取消接受串行化，先commit终态不反标取消",
+    "worker初始取消不spawn；false sender关闭不误取消；所有失败kill+wait回收直接子进程",
+    "持久作业身份：id 由 (owner,project,request_key) 三元组定义，三元组为唯一权威（id 只是句柄，迁移/导入留下的异形 id 仍可寻址）；UNIQUE 约束保证一请求一行",
+    "幂等提交：completed 重放返回原 analysis 且不重跑（attempt 不增）；failed/cancelled 可重试并计入第 2 次 attempt；同一 key 不同 owner 是不同作业",
+    "租约与心跳：认领、心跳、终态均走同一个立即事务（复用 publication_transaction 的重试纪律）；心跳按 lease/3 续期，租约丢失时协作取消该次运行",
+    "崩溃恢复：租约停止续期是进程死亡的证据；reap 仅收割过期 running，标记 failed/lease_expired 并清空租约，随后该请求可重试",
+    "陈旧持有者无法伪造终态：finish/heartbeat 都要求 state='running' AND lease_holder=当前持有者，被接管后的迟到结果会被拒绝（recorded=false）",
+    "作业写入与 schema 创建共用 SQLite busy 重试纪律：并发两进程同 key 提交不再以 database is locked 失败",
+    "心跳线程短切片唤醒：join 不再等待整段租约间隔（0.75s 的作业从 20s 降到 1.4s 返回，幂等重放 0.03s）",
+    "持久队列：enqueue 只入队不执行（状态 queued、无租约、无 analysis），同请求重复入队仍是一行且可提优先级；runner 参数随作业行存储，排队请求自描述怎么运行",
+    "调度：job work 按优先级降序、同级按入队时间最旧优先认领；--once 只跑一个；租约过期的 running 由工人续跑（attempt+1），因为崩溃不该让队列停摆",
+    "排队取消：queued 可取消；running 不可被旁观者取消（属于租约持有者）。reap 是放弃这次运行，claim_next 是换人接着跑，两种意图分开",
+    "加列迁移：priority/options 以纯增量方式补齐旧库，且依赖新列的索引在迁移之后创建（此前索引先于加列执行会让旧库直接开不了）",
+    "请求身份收进 JobRequest：5 个同类型字符串不再靠参数位置区分 owner 与 project",
+    "队列按 kind 分派：jobs.kind（index|patch_verify，增量加列默认 index）；job work 依据行自身 kind 选择执行路径，两种作业共用身份三元组/优先级/租约/心跳/收割；一行无法自述怎么跑时判失败而不是用本 worker 默认参数顶替",
+    "HTTP 上 owner 由服务端按会话钉定（请求类型里没有 owner 字段），页面无法以他人名义入队；CLI 的 --owner 仍是本机操作者的自我声明",
+    "有界并行执行：job work --parallel N（1..=4，默认 1），每个槽位独立 holder（<pid>-<uuid>-slotN）领取租约；上限是策略（越界 job_parallelism_out_of_range、--once 与并行组合 job_once_with_parallelism）；输出含 parallelism 与 holders 作为并行证据；槽位任务失败以 job_slot_task_failed 报出，租约过期由 job reap 收回"
+   ],
+   "evidence": [
+    "crates/atlas-engine/src/scan.rs deadline + tests",
+    "crates/atlas-engine/src/job.rs（9 个单测：幂等/重试/租约/接管/收割/身份）",
+    "scripts/test_integration.py test_multi_project_store_isolation",
+    "scripts/test_integration.py test_worker_crash_leaves_store_intact_and_old_analyses_readable",
+    "crates/atlas-engine/tests/cancellation.rs",
+    "scripts/test_cancellation.py",
+    "scripts/test_jobs.py（11 个 CLI 级用例：幂等重放/owner 隔离/重试/并发选主/崩溃收割/心跳推进/入队不执行/优先级调度/排队取消/拒绝非排队取消/旧库加列迁移）",
+    "evidence/daily/2026-09-12/w06-jobs/verification.json",
+    "evidence/daily/2026-09-12/w06-queue/verification.json",
+    "evidence/development/2026-09-10-continuation/verified/verification.json",
+    "scripts/test_patch.py::Queued（排队验证、幂等、多 kind 共存、坏作业行判失败）",
+    "scripts/test_bridge.py::Http（会话即 owner 与作者，声明不被采信）"
+   ],
+   "blockers": [
+    "CLI 的 owner 仍是未经认证的操作者声明（本机信任模型）；HTTP 上已改为服务端按会话钉定，因此作业 API 的 HTTP 暴露不再是身份伪造面，但远程/多租户认证仍未实现",
+    "无守护进程与并行 worker 池：job work 需人工触发，单 worker 串行，无重试退避、公平性或配额",
+    "迁移策略只覆盖纯增量变更；改列类型、拆表等非增量变更仍无迁移与回滚方案。断电耐久未资格验证",
+    "协作取消不承诺中断进行中的单次OS I/O或磁盘commit；POSIX信号测试不替代Windows资格"
+   ],
+   "independent_review": {
+    "id": "2026-09-09-w01-independent",
+    "findings": [
+     "R5"
+    ],
+    "note": "Executor automated_checks PASS remains historical self-test scope; new independent counterexamples fail. Implementation exists, qualification withheld."
+   }
+  },
+  {
+   "id": "W07",
+   "title": "增量失效、事实撤回与真实项目规模",
+   "prerequisites": [
+    "W04",
+    "W06"
+   ],
+   "contract_refs": [
+    "AL-11",
+    "GE-2",
+    "GE-3"
+   ],
+   "implementation": "PARTIAL",
+   "automated_checks": "PASS",
+   "qualification": "NOT_QUALIFIED",
+   "review_status": "NEEDS_INDEPENDENT_REVIEW",
+   "features": [
+    "运行键 = H(版本包, 快照 id)；快照 id 本身是 digest(整个 Snapshot)，含 schema/scan_profile/limits/每个条目的 blob 哈希，因此同一运行键等价于同样的字节与同样的版本",
+    "版本包 = producer | ENGINE_VERSION | FACTS_SCHEMA | ANALYSIS_SCHEMA | FLOW_SCHEMA | FLOW_PROFILE | ALGORITHM_VERSION；任一升级即失效缓存（单测逐个常量钉住）",
+    "文件键 = H(版本包, 路径, 自身内容 hash, 依赖闭包摘要)，闭包摘要在导入图 SCC 凝聚上自底向上折叠；互相导入的文件作为一个单位失效，深链 2000 文件不递归溢出",
+    "失效无需额外扫描：文件键恰好在自身或其传递依赖改变时变化；改叶子不会反向失效共享模块（单测钉住依赖方向）",
+    "失效归因：own_content / by_dependency / new，并列出导致失效的直接依赖（via）",
+    "撤回：withdrawn 列出上次分析过而本次不存在的文件；分析始终从当前文件集合装配，从不合并旧结果",
+    "保守性与安全性：imports 只能连到已解析文件；未解析或无目标路径的 import 不构成边",
+    "成本记账：scan/worker/derivation 分阶段计时与 total，写入 incremental 字段",
+    "热复用：字节与版本都未变时直接返回已发布分析，跳过全部派生",
+    "store.put_blob 修复：内容寻址使发布幂等，已存在的 blob 不再写临时文件并 fsync；scan 3.1–4.9s → 0.049s（60–100×），全量 index 5.7s → 4.4s，且完整性校验保留",
+    "语言 worker 堆上限可配置：--worker-heap-mb（默认 1024，范围 128–8192），随作业行存储；耗尽时报 worker_heap_exhausted:limit_mb=…:raise --worker-heap-mb:stderr=…，而不是笼统的 worker_exit_failed",
+    "并发资格（GE-3 首片）：同一真实树（rxjs@7.8.1, b2bbb6a1…, 1255 源文件）上 1/3/3 串并测量——串行 133.0s/534MB，3 并发共享 store 各 220.2–220.6s，3 并发分 store 各 237.3–238.2s，全部 exit 0，全部发布同一 analysis id dc2f21c4…（与串行基线一致），共享 store 事后读回计数与基线一致"
+   ],
+   "evidence": [
+    "crates/atlas-engine/src/incremental.rs（8 个单测：运行键/文件图/SCC/闭包传播/归因/撤回/空图/深链）",
+    "scripts/test_incremental.py（6 个 CLI 级用例，每条只要可与全量比较就断言 analysis id 相等）",
+    "evidence/daily/2026-09-12/w07-incremental/verification.json",
+    "crates/atlas-app/src/worker.rs（classify_exit + 真实 OOM 单测）",
+    "scripts/test_integration.py::test_the_worker_heap_ceiling_is_configurable_bounded_and_named"
+   ],
+   "blockers": [
+    "局部改动不做增量派生：Rust 侧成本是 inter::analyze_interprocedural_controlled 的全程序 SCC 不动点，单函数求解依赖跨文件被调方摘要，因此按文件缓存派生结果在算法上不成立。实现增量不动点需要摘要稳定性追踪，未做",
+    "只有全程序缓存命中（字节与版本均未变）时才跳过派生；热路径仍付一次 worker 启动（约 0.65s，node + TypeScript 加载固定开销）",
+    "incremental_runs 表只增不删，无回收策略",
+    "单文件超大模块（实测 14000 个函数 / 1.15MB 单文件）是病态输入：128 MiB 上限下 1.5 秒耗尽；同一输入在 1 GiB 上限下 10 分钟未跑完。按文件粒度派生 Flow IR 的代价在该形状下不可接受，未做按函数分批或按文件切分",
+    "并发资格只到 N=3/单机/单语言（JS/TS）：大仓库与 monorepo、多语言、Windows、跨机器、以及并发度上限（是否该有界并行）都未资格；仍无按机器核数推导的并行策略",
+    "真实中型项目已记录（rxjs@7.8.1 冷/热/编辑/删除 + 并发），但它是单包而非 monorepo，且全部为单语言 JS/TS"
+   ],
+   "note": "并发资格 + 真实项目成本已记录；仍非 monorepo/多语言/Windows"
+  },
+  {
+   "id": "W08",
+   "title": "执行画像与受控函数/场景测试",
+   "prerequisites": [
+    "W04",
+    "W06"
+   ],
+   "contract_refs": [
+    "AL-16",
+    "AL-13"
+   ],
+   "implementation": "PARTIAL",
+   "automated_checks": "PASS",
+   "qualification": "NOT_QUALIFIED",
+   "review_status": "NEEDS_INDEPENDENT_REVIEW",
+   "features": [
+    "执行画像：从已发布 flow 事实派生 pure_callable/needs_context/needs_entry_driver/unsupported；判定顺序 unsupported>driver>context>pure；每条理由含 code/detail/evidence(fact 字段路径)",
+    "保守性：status!=complete_within_profile 一律降级（frontier 就是事实缺失的块）；Capture/External/This/heap/global/unknown_call/registers_callback/escaped_value/callsite 不完整均降级；参数按声明偏移排序，排不出则 arity=null 而不是猜",
+    "决定与拒绝：needs_context 中可声明的输入必须给出、捕获绑定只能经 --via 取得实例；needs_entry_driver 需显式 --allow-effects unknown_calls；unsupported 即使全授权也拒绝；拒绝不启动进程并在记录里写 refused/started=false",
+    "RunSpec 固定：analysis/symbol/args/timeout/output_limit/grants/node/env(显式白名单)/fixtures；validate 拒绝非法超时、输出预算、环境键与超量实参",
+    "隔离副本：从不可变快照的每个内容寻址 blob 读入并重新哈希校验后物化到 0700 临时目录；临时根先 canonicalize（否则 Node loader 会在 /var→/private/var 触发未授权读）",
+    "目标解析按源码同一性：模块命名空间内每个函数的 toString 归一化后必须等于快照中该符号的字节切片，唯一命中才调用；改名/遮蔽/同名不误执行，导不出即 target_not_exported",
+    "权限强制：node --permission + 仅副本只读；每进程首次运行前跑能力探针，要求一次真实写入被 ERR_ACCESS_DENIED 拒绝，否则拒绝执行；fs_write/child_process/network 只在显式授权时加 flag",
+    "进程生命周期：子进程自成进程组，超时/取消按组 SIGKILL 并回收；stdin/stdout/stderr 均有预算；harness 报告带每轮唯一标记、最后写入并显式退出（目标自写 stdout 不会被误当报告）",
+    "观测记录：verdict=returned|threw|timeout|cancelled|refused|target_not_exported|target_ambiguous|enclosing_not_exported|enclosing_ambiguous|closure_not_returned|closure_identity_mismatch|module_load_failed|harness_error；抛出时把运行时栈帧映射回快照路径+行+字节偏移+行文本；trace.coverage=not_sampled、unknown_paths=not_observed",
+    "记录身份与不可变：id=digest(固定问题+观测答案)，排除耗时与绝对临时路径，同问同答即同一行，异答新增一条而不是覆盖",
+    "mock 区分：--fixtures 运行在记录里标 isolation.mocks=true，前端明确提示不得读作真实环境观测",
+    "scenario：atlas.scenario.v1 用例集，断言 returns/throws(name,message_contains,code)/denied/awaited；refused 与 failed 分开计数",
+    "HTTP 边界：/api/profile、/api/exec、/api/exec-records；页面不能选择 Node 二进制、注入环境或授予 fs_write/child_process/network（字段不在请求类型里），超时夹到 30s；未授权 401",
+    "Web：函数面板增加执行画像与受控运行；不可运行/参数未知时禁用按钮并给出原因；拒绝与观测分别渲染；观测边界始终显示",
+    "要求分两类：可声明的输入（this_arg 与具名 globals，--this / --global NAME=<json>）与必须承认的未知（analysis_partial/unknown_region/frontier/heap_state/unknown_calls/callsite_incomplete → 单一 unknown_calls 承认项）",
+    "具名 globals 从 External(name) 来源提取，因此要求是可行动的（拒绝里写明 global:NAME）；没有名字可指的全局读取不要求声明一个假值，而是落在承认项里",
+    "模块级状态不需要声明：顶层函数的 Capture 来源视为模块初始化状态（模块整体被复制），只要求承认未知；嵌套函数的外层绑定标记为 unsatisfiable_context，函数不可运行",
+    "拒绝可行动：refusal 带 missing_grants 与 missing_context 列表，一次列全，不让调用者改一个再试一次",
+    "结果记录写明声明了什么：isolation.declared_context 与 trace 事件里的 declared_globals / receiver_declared",
+    "Effect journal（atlas.effect-journal.v1）：记录被拒绝的尝试（permission/resource/error_code）与授予集合；harness 从 ERR_ACCESS_DENIED 上带出 permission 与 resource；节点明确写明「被允许的操作没有逐条日志，空 journal 不等于没有副作用」",
+    "SIGINT 取消受控运行：按进程组 SIGKILL 回收并发布 verdict=cancelled 的记录（取消的运行同样被记录，不丢弃）；scenario 收到取消即停止，declared_cases 与 attempted_cases 分开，避免把未尝试的用例读成已尝试",
+    "外部读分三类：运行时 import（模块状态，不声明）、运行时内建/宿主全局（RUNTIME_GLOBALS，不声明，声明反而会覆盖真构造器）、真正自由标识符（具名要求声明并在拒绝里写 global:NAME）",
+    "FlowFunction.imports（运行时可导入名，import type 排除）+ FunctionFlowFact.imports；engine 的 ReadExternal 仅在该名不是 import 时置 may_access_global",
+    "单一 WORKER_PRODUCER 常量：不兼容的 worker 输出被具名拒绝（worker_producer_not_supported / flow_producer_mismatch），而不是被读成相反结论；ENGINE_VERSION/ALGORITHM_VERSION 同步提升（0.2.2 / 0.2.2）",
+    "场景结果落库：atlas exec --scenario 发布不可变 scenario_results（逐用例结局、passed/failed/refused、declared/attempted、stopped），--scenario-history 与 GET /api/scenarios、/api/scenario 可读；id 是结果摘要，同场景同分析幂等",
+    "嵌套闭包经包含函数取得实例（--via）：捕获绑定不可声明（unsatisfiable_context=captures，并给出 captures 名与 enclosing_symbol/enclosing_name）；--via 必须等于目标包含符号，否则 via_not_the_enclosing_symbol；harness 两阶段（阶段1调包含函数，阶段2只调用返回值中 Function.toString() 与目标钉住字节一致的那个函数），命名空间查找按阶段区分（enclosing_not_exported / target_not_exported）；closure_not_returned 与 closure_identity_mismatch 保留观测到的返回值/源码；只支持一层，更深链静态拒绝 closure_depth_not_supported；via.source_binding 与目标 source_binding 同样重新哈希校验",
+    "副本范围可选且被记录：--materialise snapshot（默认，整快照）| dependencies（目标文件的静态 import 闭包 + 全部 package.json，package.json 有上限）。记录含 mode/basis/files_written/files_in_snapshot/bytes_written/written[]/closure{seed,reached,unresolved_relative[],unresolved_bare,import_edges_read,bounded}/known_risk[]/fallback；未解析 import 分相对（具名）与裸（计数）；动态 import 与运行时数据文件读取列为已知风险；触顶报 bounded；副本缺目标即拒绝 slice_missing_target；HTTP 不允许页面选择范围",
+    "多层闭包链 --via-chain：--via 仍是目标的包含函数，--via-chain 是它之上的祖先（由外到内，[{symbol,args}]，上限 8）。链必须满足图上的包含关系（每环的 enclosing 是上一环、最外层是顶层），否则是请求不成立（via_chain_not_connected / via_chain_not_rooted / via_chain_without_via）；harness 逐环调用并逐环按源码同一性核对下一环的钉住字节，失败记录 failed_stage；记录里 stage_report.stages[] 保留每一环、ancestors[] 是最近一层之上的祖先（一层深为空，旧记录形状不变）、chain 给出完整符号序列；HTTP 与页面同样支持（页面用分析自身的 enclosing_symbol 逐级查出祖先并预填链）"
+   ],
+   "evidence": [
+    "crates/atlas-engine/src/exec.rs（8 个单测：分类顺序/arity/参数顺序/partial 降级/dynamic 拒绝/缺授权/路径校验/栈帧映射）",
+    "crates/atlas-app/src/runner.rs",
+    "crates/atlas-app/src/main.rs（atlas profile / atlas exec，含 --plan/--scenario/--history）",
+    "scripts/test_execution.py（26 个用例：真实执行、真实拒绝、超时、场景、记录身份、pinning、mock 标签）",
+    "scripts/test_integration.py test_http_execution_keeps_the_process_boundary_server_side",
+    "web/tests/app.behavior.test.mjs（新增 7 项执行面板行为）",
+    "workers/typescript/tests/flow.test.mjs（GE-2 回归：嵌套函数不得被外层认领声明）",
+    "evidence/development/2026-09-12-w08/verification.json",
+    "scripts/test_execution.py（32 个用例，新增 5 项上下文模型用例）",
+    "evidence/development/2026-09-12-w08/REPORT.md（上下文模型一节）",
+    "scripts/test_execution.py（35 个用例，新增 3 项 effect journal 用例）",
+    "web/tests/app.behavior.test.mjs（25 项，新增 1 项 journal 呈现）",
+    "scripts/test_execution.py（37 个用例，新增 2 项取消用例）",
+    "workers/typescript/tests/flow.test.mjs（26 项，新增 imports 用例含 import type 排除）",
+    "crates/atlas-engine/src/exec.rs（import/全局/内建三分单测）",
+    "scripts/test_execution.py（39 个用例，新增 3 项分类用例）",
+    "scripts/test_execution.py（40 个用例，新增场景发布用例）",
+    "scripts/test_host_adapter.py（scenarios/scenario 纳入合同覆盖）"
+   ],
+   "blockers": [
+    "needs_context 仍不完整：嵌套函数的闭包实例无法用数据声明，因此这类函数不可运行。worker import 绑定与真正全局已区分（本片修复），但**动态 import / require** 的局部绑定仍无法解析，只能保守地当作未解析名",
+    "没有行级覆盖、运行期调用图与因果链：只有入口调用的返回/抛出与运行时报告的源码位置；未知路径保持未知",
+    "Effect journal 只覆盖被拒绝的尝试：Node 不为被允许的操作提供逐条日志，也没有系统调用级审计；因此 journal 无法回答「这次运行真的写了哪些文件」，只能回答「哪些尝试被挡住了」",
+    "fixtures 只是声明标签：不注入 mock、不做依赖切片、不校验 mock 与真实依赖的区别，仅保证运行结果不会被读作真实环境观测",
+    "profile 的 external/global 判定偏保守，真实项目里大量函数会落入 needs_entry_driver（rxjs 上 add 之外基本如此），精度未做评估",
+    "子进程按组 SIGKILL 依赖 POSIX 进程组；Windows 未资格",
+    "Node 权限模型仍是实验特性（--allow-net 会打印 ExperimentalWarning）；Atlas 用探针而不是版本来判断可用性，但跨版本行为未资格"
+   ],
+   "independent_review": {
+    "id": "pending",
+    "findings": [],
+    "note": "W08 首片待独立复审。"
+   }
+  },
+  {
+   "id": "W09",
+   "title": "正式双视图与 Agent/AI Coding",
+   "prerequisites": [
+    "W05",
+    "W06"
+   ],
+   "contract_refs": [
+    "DV",
+    "HI",
+    "MT"
+   ],
+   "implementation": "PARTIAL",
+   "automated_checks": "PASS",
+   "qualification": "NOT_QUALIFIED",
+   "review_status": "NEEDS_INDEPENDENT_REVIEW",
+   "features": [
+    "共享选区对象 atlas.selection.v1：{id, analysis_id, entity_id, entity_kind, version}；version 就是 analysis id，所以版本相同是可判定的等式",
+    "版本拒绝：投影服务另一个分析时返回 stale_selection_version 并说明，不把旧选区重指到当前版本的某个对象（2D 与 3D 各自实现并有测试）",
+    "跨投影互通：2D 选中即更新 fragment 与 data-* 属性，并给出携带选区与版本的 /city3d 链接；3D 读取同一 fragment 并高亮同一文件列，2D/3D 都暴露 globalThis.atlasBridge",
+    "语义 DOM 与桥接面：data-selection-entity / data-analysis-id；bridge 声明 bounded_actions 且测试断言其中没有写码类动作",
+    "注解即 Intent：kind 限 intent/constraint/scenario/patch，exists 恒为 false，带 proposed_by；id 为内容摘要，同内容幂等、不同作者不同提案、不能被就地改写",
+    "Intent UI：函数面板可登记与查看 Intent，提案明确标注「提案（尚未存在）」而不是已存在代码",
+    "有界 Agent Bridge：请求身份 (owner,request_key) 幂等；状态 queued/leased/done/failed/rejected；越界动作与未知分析在入队时即被拒绝并记录 terminal_reason",
+    "认领即 ACK：认领记 ack_at 并带租约；过期租约收割回队列（不是判失败），attempt 递增可见；只有当前租约持有者能写终态，旁观者与陈旧持有者都被拒绝",
+    "三个有界动作：inspect 读取已发布上下文；annotate 登记 Intent；propose_patch 只登记占位对象（applied=false，带「没有应用」说明），没有任何写源码路径",
+    "HTTP 边界：GET /api/selection、/api/annotations、/api/agent/requests，POST /api/annotation、/api/agent/request、/api/agent/work；页面不能指定 analysis_id（不在请求类型里），未授权 401",
+    "CLI：atlas select/annotate/annotations 与 atlas agent request|work|claim|complete|status|list|reap",
+    "实体解析不再静默兜底：select/annotate/annotations/agent 使用 resolve_entity（函数与文件），解析不到即报错，不给不存在的对象造一个选区",
+    "AI Coding 链 propose：统一 diff 对固定快照字节在内存应用；不匹配则带着期望/实际的那一行拒绝；CRLF 目标拒绝而不是规范化；创建/删除文件不在本切片内",
+    "AI Coding 链 verify：从内容寻址 blob 物化 0700 隔离副本并在其中跑完整索引管线，派生新的 analysis；用户检出目录零改动（有测试）",
+    "图差异：节点按 path+name 配对（id 绑定字节区间，按 id 比较会把编辑读成删除+新增），给出 added/removed/changed 与函数/文件/调用/未解析调用的前后计数；id 原样保留",
+    "声明的 argv 测试命令（不是 shell 字符串）在副本内运行，超时按进程组杀死；退出码与输出作为 Observed 证据；未声明时写明「没有跑任何测试，这不是通过」",
+    "apply/revert：apply 校验目标当前字节仍等于提案依据的固定快照 blob（否则 target_changed_since_apply），revert 校验当前字节等于 apply 写入的字节；状态机 proposed→verified→applied→reverted 单向",
+    "Intent/Static/Observed 三类证据分开存放：proposal 带 intent=true/code_exists=false，verification 里 graph_diff 与 test 各自标注",
+    "提案审阅面：GET /api/patches、GET /api/patch?id=、POST /api/patch/propose 与函数面板提案面板；页面可登记（Intent）并读校验结果/图差异/测试退出码，验证与应用仍只在 CLI",
+    "HTTP 与 CLI 共用 patchwork::propose_from_diff：同一校验路径，页面无法登记一个 CLI 会拒绝的 diff；跨分析的提案查询被拒绝",
+    "补丁验证可排队：patch verify --enqueue --owner X 生成 kind=patch_verify 作业，job work 用同一个 verify_proposal 执行（前台与排队不是两条路径）；终态 artifact 是补丁树派生的 analysis；同一 (owner,project,request_key) 幂等，完成后重排报告 already_completed",
+    "HTTP 身份：注解与提案的作者由服务端按会话写入（请求类型无 proposed_by），页面无法把提案归到别人名下",
+    "观测层与静态层分开：GET /api/run-markers 由已发布执行记录投影；3D 用独立描边色与独立图例行（结论分布 + 落点文件数），cityRunMarkers 为纯函数且测试断言不改变布局，落不进布局的记录报数不丢弃，查询失败显示不可用",
+    "跨版本选区重定位（atlas relocate / GET /api/relocate）：依据 path_and_name → identical_bytes → name_only 按强度排序并公开；entity_withdrawn（文件没了）与 no_counterpart（文件还在实体没了）分开；歧义拒绝；邻居只作上下文不作候选；只返回建议与钉在目标版本的选区，不修改已存记录",
+    "3D 正式层级与 LOD：不可裁剪的形式层级 project→district→file（atlas.city-hierarchy.v1），每节点同一组事实计数、目录与项目为子节点之和；每层视图（atlas.city-layout.v1）只决定画什么（项目 1 根聚合柱体 / 每目录 1 根 / 每文件 1 根）；cityLevelInvariants 逐层重加、project==Σdistrict==Σfile 才算守恒并报出 violations；聚合柱体 aggregate=true 且无单一源码（citySelectionQuery 返回 null）；共享选区落到粗层级指名真实文件并标注聚合；运行标记按 filePaths 落在聚合柱体上并在观测行写明这是聚合；显式 maxFiles=0 是预算而非缺省值",
+    "补丁三种形式：PatchForm=modify|create|delete，由 `--- /dev/null` / `+++ /dev/null` 声明、由 hunks 复核（create 不得含上下文/删除行、delete 不得留下行、两侧表头必须一致）；删除与「编辑成空文件」分开（PatchOutcome.files 与 deleted 分开，记录带 form 与 removed_digest）；apply/revert 按形式各自校验（create 要求路径为空、modify/delete 要求仍是钉住字节、revert create 删掉文件、revert delete 按钉住字节恢复且要求路径仍为空 target_recreated_since_delete）；同一路径在一条 diff 里出现两次被拒；git rename 具名拒绝 rename_not_expressible_in_unified_diff；新建提案的 entity 可以是不存在的路径（resolve_proposal_entity 只在 diff 真的新建它时接受），提案写 target_exists=false；隔离验证副本按 outcome 组装（新建写入、删除不写）",
+    "图形化一键撤销（带显式写边界）：atlas serve --allow-writes <DIR> 才开放 POST /api/patch/apply|revert，不带则 403 http_writes_disabled 且请求无法打开；目录在启动时 canonicalize 一次，请求体没有 target/root 字段（注入不读），必须逐字回显 confirm_path 否则 400 confirmation_mismatch 且不写任何文件；revert 只撤销记录里那个目录（revert_target_is_not_this_checkout）；HTTP 与 CLI 共用 patchwork::apply_proposal/revert_proposal 同一段写入代码；记录写明 applied_by:<actor>（HTTP 用会话身份）；契约增加 writes{enabled,root,how_to_enable,scope}，页面据它显示按钮并显示将写入的目录",
+    "apply/revert 全程持有检出目录锁 .atlas-apply.lock（create_new；文件内写持有者身份；apply_lock_held 拒绝；guard drop 在所有错误路径上释放），消除「两个进程都通过字节校验再都写」的窗口；撤销来源是内容寻址的钉住 blob（无额外磁盘备份），仍无合并",
+    "检出错文件里同时记持有者与取锁时刻（毫秒）：被挡住时拒绝信息给出 holder 与 since_ms，解锁命令报出 since_ms；旧格式（只有持有者）如实报 since_ms=null + since_unknown=lock_file_has_no_timestamp，不猜时间",
+    "patch unlock 的年龄门：--stale-after（默认 300s）只清理达到该年龄的锁，年轻或时间未知时必须 --force；被拒绝时报 lock_not_stale 并给出 holder/age_ms（未知即 unknown）"
+   ],
+   "evidence": [
+    "crates/atlas-engine/src/patch.rs（11 个 diff 单测 + 提案存储与状态迁移）",
+    "crates/atlas-app/src/patchwork.rs（图差异、声明的 argv 测试运行）",
+    "crates/atlas-app/src/main.rs（atlas patch propose|verify|apply|revert|status|list）",
+    "scripts/test_patch.py（16 个用例：全部拒绝路径 + apply/revert 字节校验）",
+    "evidence/development/2026-09-12-w09-ai-coding/verification.json",
+    "scripts/test_patch.py（35 个用例：CLI 32 + HTTP 3）",
+    "web/tests/app.behavior.test.mjs（24 项，新增 4 项提案面板行为）",
+    "adapters/modus/atlas_host_client.mjs（patches/patch/proposePatch）",
+    "scripts/test_patch.py（25 个用例：CLI 16 + 排队 5 + HTTP 3 + 共享基类去重）",
+    "scripts/test_bridge.py（22 个用例，新增 2 项身份用例）",
+    "scripts/test_host_adapter.py（8 个用例，作者断言改为会话）",
+    "web/tests/city3d.behavior.test.mjs（17 项，新增 3 项观测层用例）",
+    "scripts/test_host_adapter.py（run-markers 纳入合同覆盖检查）",
+    "crates/atlas-engine/src/relocate.rs（6 个单测）",
+    "scripts/test_relocate.py（15 个用例：CLI 11 + HTTP 3 + 撤回/歧义/邻居区分）",
+    "web/tests/app.behavior.test.mjs（27 项，新增 3 项重定位行为）"
+   ],
+   "blockers": [
+    "apply 没有合并与逐文件磁盘备份（撤销来源是内容寻址的钉住 blob）；锁是单机文件锁、不约束人工编辑；已提供 `patch unlock --target` 显式清理崩溃残留的锁（不静默、报出持有者）",
+    "重定位只覆盖可判定的依据：同路径同名、字节完全相同、仅同名。**改名且内容也变了**的对象无法识别（名字是字节的一部分），这种情况如实拒绝；跨文件的复杂移动链（A→B→C）也没有追踪",
+    "层级形式化与 LOD 已实现（buildCityHierarchy + cityLevelView + cityLevelInvariants，project/district/file 三层，聚合守恒逐层重加并在页面显示；层级省略与预算截断分开报）。仍未实现：\"激活路径来自 Run\" 需要行级/调用级采样，Atlas 只有入口调用的观测，所以城市里的运行信息仍然是\"哪些入口被跑过\"，不是运行路径；相机驱动的细节切换（远=文件级、近=函数层）保留，但它与正式层级是两件事",
+    "Agent Bridge 没有 owner 认证：owner 是调用者声明；服务端验证权限与版本仍未实现（与 W06 同一缺口）",
+    "bridge 的 inspect 直接展开已发布上下文，没有按请求方做最小披露裁剪；请求预算与配额未实现",
+    "没有被同一 analysis 之外的投影状态持久化：选区只在 fragment 与内存里，刷新页面依赖 URL",
+    "patch verify 会在同一 store 里多发布一个 analysis（补丁树），长期会累积；没有回收策略",
+    "apply 直接写用户检出目录：虽然做了字节漂移校验与原子改名，但没有备份、没有冲突合并、也没有文件锁；并发修改的窗口仍然存在"
+   ],
+   "independent_review": {
+    "id": "pending",
+    "findings": [],
+    "note": "W09 首片待独立复审。"
+   }
+  },
+  {
+   "id": "W10",
+   "title": "Modus 接缝与旧实现退役",
+   "prerequisites": [
+    "W06",
+    "W09"
+   ],
+   "contract_refs": [
+    "HI"
+   ],
+   "implementation": "PARTIAL",
+   "automated_checks": "PASS",
+   "qualification": "NOT_QUALIFIED",
+   "review_status": "NEEDS_INDEPENDENT_REVIEW",
+   "features": [
+    "合同即数据：GET /api/contract 返回 atlas.host-contract.v1，逐条列出接口名/方法/传输方式(http|cli)/用途/保证/限制，与实现同源",
+    "宿主规则写进合同：宿主经接口工作不读存储；写操作都在 Atlas 内部；未解析/未知/截断必须原样呈现；候选/推导/观测三类证据必须能分辨",
+    "参考宿主客户端 adapters/modus/atlas_host_client.mjs：只接受 {url,token}，无第三方依赖，只映射已发布接口",
+    "无存储访问是可检查的：测试读适配器源码断言不含 rusqlite/sqlite/atlas.db/blobs/node:fs/readFile 等访问；构造函数不接受 store 路径",
+    "令牌不外送：适配器拒绝非 http 与非回环 host；错误令牌返回 401 并抛错而不是静默返回空",
+    "真实宿主 E2E：宿主经适配器取 report/nodes/flow/source/profile、导出 context、钉选区、登记 Intent、入队并执行有界动作、计划并执行一次受控调用；断言观测边界字段可见",
+    "合同不泄露存储布局：测试断言 contract 响应里不出现 store 路径或 atlas.db",
+    "HTTP 查询引用形式与 CLI 一致：flow/source/reach/context 接受符号 id、path:name 或裸名，只在当前分析内解析，解析不到即报错",
+    "POST /api/context 同时接受查询参数与 JSON body（body 优先），并把这条规则写进合同，而不是留给实现顺序决定",
+    "迁移与回退边界文档化（docs/HOST_API.md）：旧入口未切换及其理由、增量迁移的 6 步前置条件、回退=停止调用适配器"
+   ],
+   "evidence": [
+    "crates/atlas-app/src/server.rs（CONTRACT 表与 /api/contract）",
+    "adapters/modus/atlas_host_client.mjs",
+    "scripts/test_host_adapter.py（7 个用例：无存储访问、合同覆盖、E2E、桥接、受控调用、不泄露布局、需要会话）",
+    "docs/HOST_API.md",
+    "evidence/development/2026-09-12-w10/verification.json"
+   ],
+   "blockers": [
+    "Modus 旧入口未切换：宿主检出不在本工作区，既不能构建也不能测试宿主侧，因此切换无法验证。前置条件与回退步骤已写在 docs/HOST_API.md，但宿主侧 E2E 未运行",
+    "没有宿主内嵌的适配器包、没有服务发现/自动升级、没有远程或多租户认证，也没有多版本并存协商",
+    "合同是当前接口的快照式声明：没有机器可校验的 schema（无 JSON Schema/OpenAPI），字段变化靠测试断言而非类型校验",
+    "适配器只覆盖 HTTP 面；patch 链只有 CLI 面，宿主若要用补丁链必须自己起子进程"
+   ],
+   "independent_review": {
+    "id": "pending",
+    "findings": [],
+    "note": "W10 首片待独立复审。"
+   }
+  }
+ ],
+ "independent_reviews": [
+  {
+   "id": "2026-09-09-w01-independent",
+   "window": "2026-09-09/w01",
+   "status": "CHANGES_REQUIRED",
+   "reviewed_utc": "2026-09-08T21:01:19.450337+00:00",
+   "report": "evidence/reviews/2026-09-09-w01/REVIEW.md",
+   "continuation_prompt": "evidence/reviews/2026-09-09-w01/NEXT_AGENT_PROMPT.md",
+   "baseline_replay": {
+    "commands_passed": 9,
+    "exit_code": 0
+   },
+   "semantic_probe": {
+    "assertions_failed": 6,
+    "exit_code": 1
+   },
+   "boundary_probe": {
+    "cases": 6,
+    "expectations_met": 1,
+    "exit_code": 1
+   },
+   "required_fixes": [
+    "R1",
+    "R2",
+    "R3",
+    "R4",
+    "R5",
+    "R6",
+    "R7"
+   ],
+   "scope": "Independent CLI/worker/Rust/store counterexamples. Not full product or new visual qualification. See report for phase-isolated deadline probe.",
+   "retained_executor_assessment": [
+    {
+     "id": "W01",
+     "implementation": "IMPLEMENTED",
+     "automated_checks": "PASS",
+     "qualification": "QUALIFIED_WITHIN_PROFILE",
+     "review_status": "NEEDS_INDEPENDENT_REVIEW"
+    },
+    {
+     "id": "W02",
+     "implementation": "IMPLEMENTED",
+     "automated_checks": "PASS",
+     "qualification": "QUALIFIED_WITHIN_PROFILE",
+     "review_status": "NEEDS_INDEPENDENT_REVIEW"
+    },
+    {
+     "id": "W03",
+     "implementation": "IMPLEMENTED",
+     "automated_checks": "PASS",
+     "qualification": "QUALIFIED_WITHIN_PROFILE",
+     "review_status": "NEEDS_INDEPENDENT_REVIEW"
+    },
+    {
+     "id": "W04",
+     "implementation": "IMPLEMENTED",
+     "automated_checks": "PASS",
+     "qualification": "QUALIFIED_WITHIN_PROFILE",
+     "review_status": "NEEDS_INDEPENDENT_REVIEW"
+    },
+    {
+     "id": "W05",
+     "implementation": "IMPLEMENTED",
+     "automated_checks": "PASS",
+     "qualification": "QUALIFIED_WITHIN_PROFILE",
+     "review_status": "NEEDS_INDEPENDENT_REVIEW"
+    },
+    {
+     "id": "W06",
+     "implementation": "PARTIAL",
+     "automated_checks": "PASS",
+     "qualification": "NOT_QUALIFIED",
+     "review_status": "NEEDS_INDEPENDENT_REVIEW"
+    }
+   ]
+  },
+  {
+   "id": "2026-09-09-w02",
+   "window": "2026-09-09/w02",
+   "status": "FIXES_DELIVERED_REREVIEW_PENDING",
+   "reviewed_utc": "2026-09-09T02:0:00+00:00",
+   "report": "evidence/reviews/2026-09-09-w02/REVIEW.md",
+   "reviewed_commit": "6b4c47412e81b8fc9e9ea224b4609956ac4e976a",
+   "baseline_replay": {
+    "source_audit_manifest_count": 62,
+    "mismatches": 0
+   },
+   "semantic_probe": {
+    "assertions_failed": 5,
+    "exit_code": 1
+   },
+   "required_fixes": [
+    "F1",
+    "F2",
+    "F3",
+    "F4",
+    "F5"
+   ],
+   "fix_delivery": "c4aa246 (w03 delivery: review fixes F1-F5) + F2/F4/R2 regression tests in tests/flow_semantics.rs; re-verified in every verify.py run since.",
+   "scope": "Independent CLI/worker/Rust/store counterexamples on 6b4c474. Fixes are delivery claims with named tests, not an independent re-review verdict."
+  },
+  {
+   "id": "2026-09-14-frontend-initial",
+   "status": "CHANGES_REQUIRED",
+   "scope": "Targeted actual HTTP/browser and profile probes; not full release acceptance",
+   "report": "evidence/reviews/2026-09-14-frontend-initial/REPORT.md",
+   "continuation_prompt": "evidence/reviews/2026-09-14-frontend-initial/NEXT_AGENT_PROMPT.md",
+   "probe_exit_code": 1,
+   "required_fixes": [
+    "R1",
+    "R2",
+    "R3",
+    "R4"
+   ]
+  },
+  {
+   "id": "2026-09-15-local-delivery",
+   "status": "CHANGES_REQUIRED",
+   "report": "evidence/reviews/2026-09-15-local-delivery/REPORT.md",
+   "continuation_prompt": "evidence/reviews/2026-09-15-local-delivery/NEXT_AGENT_PROMPT.md",
+   "regression_exit_code": 0,
+   "distribution_exit_code": 1,
+   "required_fixes": [
+    "L1-resource-location",
+    "L2-restart-restoration"
+   ],
+   "scope": "Actual shipped binary, copied distribution outside cwd on same machine; not full release or clean-machine acceptance"
+  },
+  {
+   "id": "2026-09-15-s1-s6-independent",
+   "status": "CHANGES_REQUIRED",
+   "report": "evidence/reviews/2026-09-15-s1-s6-independent/REPORT.md",
+   "note": "分发 worker 修复通过，S3 11/11、tour 12/12；显式版本被忽略、重定位草稿未迁移、快速关闭丢页签、unknown_calls 文档错误需要修正。S5 本轮仅审阅已有证据。"
+  },
+  {
+   "id": "2026-09-15-ui-v2-current",
+   "status": "CHANGES_REQUIRED",
+   "report": "evidence/reviews/2026-09-15-ui-v2-current/REPORT.md",
+   "scope": "当前工作树重新构建后的 UI v2 阶段验收；非最终包验收",
+   "note": "六页框架和部分真实操作已落地；运行及修改界面仍待完成，后台任务与设置入口缺操作。浏览器探针13通过2失败；现有web行为68通过。"
+  },
+  {
+   "id": "2026-09-15-ui-v2-u1-u6-independent",
+   "status": "CHANGES_REQUIRED",
+   "report": "evidence/reviews/2026-09-15-ui-v2-u1-u6-independent/REPORT.md",
+   "note": "最终包独立双项目旅程7通过5失败，归并4项整改；源码与包内构建指纹一致；网页既有74项通过。"
+  },
+  {
+   "id": "2026-09-15-ui-v2-r1-r4-rereview",
+   "status": "PASS",
+   "scope": "R1-R4整改、单项目核心回归、双项目切换、设置与写授权重启恢复",
+   "report": "evidence/reviews/2026-09-15-ui-v2-r1-r4-rereview/REPORT.md"
+  }
+ ],
+ "d_family_coverage": {
+  "schema_note": "每家族单一条目: status按子能力拆分; tested_by给出具名测试; gaps如实列出未覆盖子项。",
+  "families": {
+   "D01": {
+    "status": "IMPLEMENTED",
+    "tested_by": [
+     "flow_semantics d01_tdz_read_is_reported",
+     "worker flow.test.mjs shadowing/TDZ tests"
+    ],
+    "gaps": []
+   },
+   "D02": {
+    "status": "IMPLEMENTED",
+    "tested_by": [
+     "flow_semantics d02_short_circuit_rhs_reachability",
+     "flow-lab shortCircuit integration (pruning evidence)",
+     "w03: 短路临时值跨块保留(op_values 保留集)"
+    ],
+    "gaps": []
+   },
+   "D03": {
+    "status": "IMPLEMENTED",
+    "tested_by": [
+     "flow_semantics d03 (preserve/override)",
+     "flow-lab finallyOverrides + withFinally (shared dispatch)"
+    ],
+    "gaps": []
+   },
+   "D04": {
+    "status": "IMPLEMENTED",
+    "tested_by": [
+     "flow_semantics d04",
+     "flow-lab withFinally"
+    ],
+    "gaps": []
+   },
+   "D05": {
+    "status": "IMPLEMENTED",
+    "tested_by": [
+     "flow_semantics d05 (fixpoint, looping blocks)",
+     "flow-lab countdown"
+    ],
+    "gaps": []
+   },
+   "D06": {
+    "status": "PARTIAL",
+    "tested_by": [
+     "test_getters_and_proxies... (getter never executed; unknown_call kept)"
+    ],
+    "gaps": [
+     "getter/external call后的堆值可靠性属R2摘要能力,已在R2覆盖known-setter;Proxy内部机制仍unknown"
+    ]
+   },
+   "D07": {
+    "status": "IMPLEMENTED",
+    "tested_by": [
+     "flow_semantics d07",
+     "flow-lab branchPick (two candidates survive)"
+    ],
+    "gaps": []
+   },
+   "D08": {
+    "status": "IMPLEMENTED",
+    "tested_by": [
+     "flow_semantics d08",
+     "flow-lab strongUpdate"
+    ],
+    "gaps": []
+   },
+   "D09": {
+    "status": "IMPLEMENTED",
+    "tested_by": [
+     "flow_semantics d09 (alias + wildcard weak update)"
+    ],
+    "gaps": [
+     "字段路径深度>1与数组未建模"
+    ]
+   },
+   "D10": {
+    "status": "IMPLEMENTED",
+    "tested_by": [
+     "flow_semantics d10 (cap→Top+原因)"
+    ],
+    "gaps": []
+   },
+   "D11": {
+    "status": "PARTIAL",
+    "tested_by": [
+     "test_getters_and_proxies... externalSink部分(unknown_call/registers_callback/escaped)"
+    ],
+    "gaps": [
+     "外部调用后的堆失效仅保守clobber,无精确write-set"
+    ]
+   },
+   "D12": {
+    "status": "IMPLEMENTED",
+    "tested_by": [
+     "flow_semantics d12",
+     "flow-lab identity (Parameter(0))"
+    ],
+    "gaps": []
+   },
+   "D13": {
+    "status": "IMPLEMENTED",
+    "tested_by": [
+     "flow_semantics d13_caller_isolation_through_summary"
+    ],
+    "gaps": []
+   },
+   "D14": {
+    "status": "PARTIAL",
+    "tested_by": [
+     "flow_semantics d14_five_layer_chain (5层origin存活)"
+    ],
+    "gaps": [
+     "返回函数/闭包工厂的完整目标传递仍部分(经M1代入targets后部分覆盖)"
+    ]
+   },
+   "D15": {
+    "status": "IMPLEMENTED",
+    "tested_by": [
+     "flow_semantics d15 (mutual recursion SCC converges; pending≠no-return)"
+    ],
+    "gaps": []
+   },
+   "D16": {
+    "status": "NOT_IMPLEMENTED",
+    "tested_by": [],
+    "gaps": [
+     "类型签名唯一目标证明属后续"
+    ]
+   },
+   "D17": {
+    "status": "IMPLEMENTED",
+    "tested_by": [
+     "flow_semantics d17 (call边与forwarded数据origin分开)"
+    ],
+    "gaps": []
+   },
+   "D18": {
+    "status": "PARTIAL",
+    "tested_by": [
+     "flow_semantics d18 (矛盾/未知条件保持可能,无执行声明)"
+    ],
+    "gaps": [
+     "路径可行性仅限已证常量;矛盾路径专项反例仍缺"
+    ]
+   },
+   "D19": {
+    "status": "PARTIAL",
+    "tested_by": [
+     "flow_semantics d10 (cap)",
+     "test_nested_finally... (20层finally CFG线性+60分支预算内)",
+     "scan_deadline 单测",
+     "flow_semantics 全套件 + ATLAS_MAX_TRANSFERS/ATLAS_MAX_TOTAL_TRANSFERS 测试钩子触发 partial_budget(发布部分结果+frontier,与 deadline 拒绝区分)",
+     "inter::budget_tests::total_budget_includes_first_and_context_passes",
+     "scripts/test_semantic_contracts.py budget=0/1/15 的全链发布合同；frontier/unknown/计数及旧版本不变",
+     "scripts/test_cancellation.py SIGINT/SIGTERM/发布锁deadline；tests/cancellation.rs扫描deadline与终态"
+    ],
+    "gaps": [
+     "真实大项目规模与自然高扇出资格仍待验证；总transfer预算不等于总内存或OS工作量上限"
+    ]
+   },
+   "D20": {
+    "status": "IMPLEMENTED",
+    "tested_by": [
+     "test_corrupted_blob...(损坏blob拒绝+flow存活+恢复)",
+     "test_flow_queries_reject_unknown_symbols",
+     "validate_flow 注入拒绝(重复binding/悬空引用/缺失函数,边界probe)"
+    ],
+    "gaps": []
+   },
+   "D21": {
+    "status": "IMPLEMENTED",
+    "tested_by": [
+     "test_alpha_renaming_yields_equivalent_flow_facts (产品级逐字节等价)",
+     "worker flow.test.mjs alpha-renaming结构等价"
+    ],
+    "gaps": []
+   },
+   "D22": {
+    "status": "IMPLEMENTED",
+    "tested_by": [
+     "test_flow_facts_through_real_worker_store_cli_and_http"
+    ],
+    "gaps": []
+   },
+   "R2-异常路径堆效果": {
+    "status": "IMPLEMENTED",
+    "tested_by": [
+     "flow_semantics r2_unknown_call_clobbers_escaped_objects(普通路径)",
+     "probe_adjacent exceptional(异常路径 unknown=true)"
+    ],
+    "gaps": [
+     "精确写后值仍为保守 unknown"
+    ]
+   },
+   "F2-多层包装堆写": {
+    "status": "IMPLEMENTED",
+    "tested_by": [
+     "flow_semantics f2_wrapper_layer_heap_write_is_visible(set→wrap→caller 三层)",
+     "probe_adjacent transitive([1,2] 含 2)"
+    ],
+    "gaps": [
+     "无条件写强更新仍为保守合并"
+    ]
+   },
+   "F5-大数转字符串": {
+    "status": "IMPLEMENTED",
+    "tested_by": [
+     "flow_semantics::f5_big_number_to_string_is_exact（已纠正i64边界JS期望）",
+     "scripts/test_semantic_contracts.py::test_number_to_string_matches_node_at_rounding_and_exponent_boundaries（12个Node oracle边界）"
+    ],
+    "gaps": []
+   }
+  }
+ },
+ "performance_baseline": {
+  "recorded_utc": "2026-09-09T00:22:28.569404+00:00",
+  "artifact": "evidence/daily/2026-09-09/w02/final/artifacts/perf-1200.json",
+  "index_1200fn_debug_s": 12.58,
+  "flow_query_s": 0.03,
+  "qualification": "debug build synthetic; not a large-project qualification"
+ },
+ "review_ledger_note": "2026-09-12: registered the previously unlogged w02 independent review and corrected the stale CHANGES_REQUIRED status on W01-W03 to FIXES_DELIVERED_REREVIEW_PENDING. Qualification is unchanged: only an independent re-review can restore it.",
+ "corrections": [
+  {
+   "window": "2026-09-12/w09-forin",
+   "claim": "for...of 的语句级未知让\"循环头与循环体里的调用全部消失\"",
+   "measured": "改前改后该函数的调用点都是 2 个（subscriber.next / subscriber.complete），调用点由解析阶段抽取，与 flow lowering 无关",
+   "corrected": "语句级未知让循环内部没有任何 flow 事实（CFG 3 块、返回值无结论）；调用点一直存在",
+   "found_by": "2026-09-12/w09-quality-check 的真实 store 前后对照"
+  },
+  {
+   "window": "2026-09-12/w09-quality-check",
+   "claim": "第 8 轮：\"调用点一直存在（循环内的调用没有消失）\"",
+   "measured": "调用图层面确实一直存在；但 flow 事实层面的调用点总数为 11335→11428（+93），循环体内的调用点此前不在 flow 事实里",
+   "corrected": "两层必须分开说：调用图不变，flow 事实新增 93 个调用点",
+   "found_by": "2026-09-12/w09-corpus-check 全库对照"
+  },
+  {
+   "window": "2026-09-12/w09-corpus-check",
+   "claim": "本轮报告初稿：\"unmodeled_assignment_target 的新增并非全部由循环造成，非循环函数上也出现了\"",
+   "measured": "同一次测量的最后两行：新出现 34 例中，循环函数 34、非循环函数 0",
+   "corrected": "全部 34 例都来自我发出的循环变量赋值；非循环函数上没有任何新增。按缺陷对待",
+   "found_by": "同一次运行内的数字自相矛盾（先写下结论、后看到数字）"
+  }
+ ],
+ "execution_order_update": {
+  "work_order": "docs/DAILY_DEVELOPMENT_WORK_ORDER.md",
+  "note": "用户确认语言不限且服务开发者与编程 Agent；新增真实 Agent 首版验收，统一 S1-S6。仅文档顺序更新，不新增实现或验收状态。"
+ },
+ "frontend_design": {
+  "version": "1.0",
+  "date": "2026-09-13",
+  "status": "DESIGN_PROTOTYPE_CHECKED",
+  "spec": "docs/FRONTEND_DESIGN.md",
+  "api_contract": "docs/FRONTEND_API_CONTRACT.md",
+  "handoff": "docs/START_FRONTEND_AGENT.md",
+  "prototype": "docs/design/workbench-preview.html",
+  "evidence": "evidence/design/2026-09-13-workbench/REPORT.md",
+  "note": "设计原型浏览器19项通过；未执行产品验证，既有实现/资格/独立复审状态不变。"
+ },
+ "design_delivery": {
+  "version": "2.0",
+  "status": "DESIGN_READY_IMPLEMENTATION_IN_PROGRESS",
+  "entry": "docs/design/atlas-v2/README.md",
+  "prototype": "docs/design/atlas-v2/index.html",
+  "checks": "docs/design/atlas-v2/checks.json",
+  "note": "六页完整界面设计、动态交互、标注图与开发提示词。原型检查不提升产品验收资格，未改产品代码。"
+ },
+ "explore_map_design": {
+  "status": "DESIGN_PROTOTYPE_CHECKED",
+  "entry": "docs/design/atlas-explore-next/README.md",
+  "spec": "docs/design/atlas-explore-next/DESIGN.md",
+  "evidence": "evidence/design/2026-09-15-explore-map/REPORT.md",
+  "note": "用户新要求：项目思维导图、节点i/菜单、三来源解释/解析记录、批注交接、多区域标签。13项原型检查通过；未改产品实现，保留既有验收资格。",
+  "implementation_prompt": "docs/design/atlas-explore-next/DEVELOPMENT_PROMPT.md",
+  "implementation_status": "READY_TO_IMPLEMENT"
+ },
+ "product_design": {
+  "document": "docs/PRODUCT_DESIGN.md",
+  "updated_on": "2026-09-15",
+  "status": "DESIGNED_NOT_DELIVERY_QUALIFICATION",
+  "current": "A: finish and verify existing M1-M6 implementation",
+  "next": "B: reusable scenarios, assertions, baseline/patch comparison, task-linked review",
+  "later": "C/D: data/impact views, real trace technical proof, project tests and debugger integration"
+ }
+}

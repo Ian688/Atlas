@@ -1,126 +1,365 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Atlas · 函数工作台</title><link rel="stylesheet" href="/style.css"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Atlas · 本地代码工作台</title><link rel="icon" href="data:,">
+<link rel="stylesheet" href="/style.css"></head>
 <body>
 <div id="workbench" class="wb">
-<header class="wb-top">
-  <div class="brand"><span class="mark">A</span><div><strong>ATLAS</strong><small>本地代码工作台</small></div></div>
-  <span class="wb-project">本地项目</span>
-  <span class="wb-version" id="revision">未连接</span>
-  <span id="status" role="status" class="wb-topstatus"></span>
-  <div class="wb-topright">
-    <details class="wb-connect"><summary>连接会话</summary><div class="wb-connect-body"><label for="token">本地会话令牌</label><input id="token" type="password" autocomplete="off" placeholder="启动命令输出的 session_file 中的 token"><button id="connect-button">连接工作台</button><p class="subtle">令牌只经本机 URL fragment 传递，不进入 HTTP 请求与日志。</p></div></details>
-    <a class="wb-3dlink" href="/city3d" title="同一份分析的三维投影：目录为地块、文件为柱、函数为层">3D 城市 →</a>
-  </div>
-</header>
-<div class="wb-body">
-<nav class="wb-side" aria-label="项目函数导航">
-  <label for="fn-search">查找函数</label>
-  <input id="fn-search" type="search" placeholder="名称或路径，例如 redeem" autocomplete="off">
-  <div id="fn-count" class="wb-sidecount">未加载</div>
-  <div id="fn-list"></div>
-  <button id="fn-more" hidden>加载更多结果</button>
-  <div class="wb-sidefoot">
-    <div class="wb-recent-head">最近查看</div>
-    <div id="recent-list" class="wb-recent"></div>
-    <button id="nav-back" disabled>← 返回上一个对象</button>
-  </div>
-</nav>
-<main class="wb-work">
-  <div class="wb-heading">
-    <div class="wb-heading-title">
-      <div id="selection-path" class="wb-breadcrumb">未选择对象</div>
-      <h1 id="selection-name">查找并选择一个函数</h1>
+
+  <!-- G2 顶栏：当前页、项目、当前代码版本、帮助 -->
+  <header class="wb-top">
+    <div class="brand"><span class="mark">A</span><div><strong>ATLAS</strong><small>本地代码工作台</small></div></div>
+    <nav class="wb-crumb" aria-label="当前位置"><span id="page-title">项目</span></nav>
+    <button id="project-name" class="wb-project" title="当前项目（来源：启动本服务时打开的项目）" aria-haspopup="dialog">未连接</button>
+    <div class="wb-version-wrap">
+      <button id="revision" class="wb-version" aria-haspopup="dialog" aria-expanded="false">未连接</button>
+      <div id="version-popover" class="wb-popover" role="dialog" aria-label="代码版本" hidden></div>
     </div>
-    <div class="wb-heading-actions">
-      <button id="run-shortcut" class="wb-primary" disabled>运行这个函数</button>
-      <button id="source-toggle" aria-label="显示或收起源码区">收起源码</button>
+    <span id="status" role="status" class="wb-topstatus"></span>
+    <div class="wb-topright">
+      <button id="help-open" class="wb-icon" title="帮助与快捷键" aria-haspopup="dialog">?</button>
+      <details class="wb-connect"><summary>连接会话</summary><div class="wb-connect-body"><label for="token">本地会话令牌</label><input id="token" type="password" autocomplete="off" placeholder="启动命令输出的 session_file 中的 token"><button id="connect-button">连接工作台</button><p class="subtle">令牌只经本机 URL fragment 传递，不进入 HTTP 请求与日志。</p></div></details>
     </div>
-  </div>
-  <nav class="wb-tabs" role="tablist" aria-label="工作任务">
-    <button data-mode="structure" aria-pressed="false">结构定位</button>
-    <button data-mode="understand" aria-pressed="true">理解代码</button>
-    <button data-mode="run" aria-pressed="false">运行验证</button>
-    <button data-mode="review" aria-pressed="false">审阅修改</button>
-  </nav>
-  <div class="wb-content">
-    <section class="wb-main">
-      <div id="task-structure" class="wb-lenses" hidden>
-        <span class="wb-eyebrow">结构总览 · 聚合来自同一份分析</span>
-        <div class="levels" role="group" aria-label="层级切换">
-          <button id="level-project" class="level-button" aria-pressed="false">项目</button>
-          <button id="level-district" class="level-button" aria-pressed="false">目录</button>
-          <button id="level-file" class="level-button" aria-pressed="true">文件</button>
+  </header>
+
+  <div class="wb-body">
+    <!-- G1 左导航：项目、全局搜索、六个页面、后台任务、设置 -->
+    <nav class="wb-nav" aria-label="工作空间">
+      <div class="nav-project">
+        <span class="nav-project-label">工作空间</span>
+        <button id="nav-project-button" class="nav-project-name" title="打开或切换项目">未打开项目</button>
+      </div>
+      <button id="nav-command" class="nav-command" title="搜索代码或操作（⌘/Ctrl K）"><span>搜索代码或操作</span><kbd>⌘K</kbd></button>
+      <div class="nav-group" role="group" aria-label="页面">
+        <button class="nav-button" data-go="home"><span class="nav-glyph">◫</span>项目总览</button>
+        <button class="nav-button" data-go="explore" aria-pressed="true"><span class="nav-glyph">⌘</span>探索代码</button>
+        <button class="nav-button" data-go="city"><span class="nav-glyph">▥</span>3D 地图</button>
+        <button class="nav-button" data-go="run"><span class="nav-glyph">▷</span>运行验证</button>
+        <button class="nav-button" data-go="review"><span class="nav-glyph">▤</span>修改审阅<span id="nav-review-count" class="nav-count" hidden></span></button>
+        <button class="nav-button" data-go="agent"><span class="nav-glyph">◇</span>Agent 协作</button>
+      </div>
+      <div class="nav-group" id="rail-areas-group" hidden>
+        <div class="nav-group-label">打开的展示区 <span id="rail-area-count" class="nav-count">0</span></div>
+        <div id="rail-areas" class="rail-list"></div>
+      </div>
+      <div class="nav-group" id="rail-favorites-group" hidden>
+        <div class="nav-group-label">我的关注</div>
+        <div id="rail-favorites" class="rail-list"></div>
+      </div>
+      <div class="nav-group nav-foot">
+        <button id="nav-tasks" class="nav-button"><span class="nav-glyph">◷</span>后台任务<span id="nav-task-count" class="nav-count" hidden></span></button>
+        <button id="nav-settings" class="nav-button"><span class="nav-glyph">⚙</span>项目设置</button>
+      </div>
+      <div class="nav-connection" id="nav-connection"><span class="nav-dot" aria-hidden="true"></span><span id="nav-connection-text">未连接</span><button id="nav-connection-detail" class="nav-link">详情</button></div>
+    </nav>
+
+    <main class="wb-pages" id="pages">
+
+      <!-- ===== 项目 H ===== -->
+      <section class="wb-page" data-page="home" hidden aria-label="项目">
+        <div class="page-head">
+          <div><p class="eyebrow">PROJECT</p><h1>项目</h1><p class="lede">打开代码，从一个问题开始。</p></div>
         </div>
-        <button id="reset">清除焦点</button>
-      </div>
-      <div id="task-understand" hidden>
-        <div class="wb-lenses" role="group" aria-label="理解镜头">
-          <button data-lens="calls" aria-pressed="true">调用关系</button>
-          <button data-lens="values" aria-pressed="false">值从哪来</button>
-          <button data-lens="unknowns" aria-pressed="false">未知边界</button>
-          <span class="wb-lensnote">静态候选 · 非运行顺序</span>
+        <div class="page-body home-grid">
+          <section class="card home-open">
+            <h2>打开你的项目</h2>
+            <p class="subtle">输入本机目录，Atlas 建立代码索引（不运行你的代码），完成后进入探索。</p>
+            <div id="home-open-body" class="home-open-body"></div>
+            <div class="home-open-form">
+              <label for="home-open-path">本机绝对路径</label>
+              <div class="row-actions">
+                <input id="home-open-path" type="text" placeholder="/Users/you/your-project" autocomplete="off" spellcheck="false">
+                <button id="home-open-button" class="wb-primary">打开并分析</button>
+              </div>
+              <label class="open-write-option"><input id="home-open-write" type="checkbox"> 以可写方式打开（应用/撤销写入该目录；服务需以 --allow-writes 启动）</label>
+              <div id="home-open-progress" class="subtle" role="status"></div>
+            </div>
+          </section>
+          <section class="card home-recent">
+            <h2>最近项目</h2>
+            <div id="home-recent-body" class="stack"></div>
+          </section>
+          <section class="card home-settings">
+            <h2>项目设置</h2>
+            <p class="subtle">这里声明的测试命令会真实用于之后的每一次验证（隔离副本内执行）。</p>
+            <div id="home-settings-body" class="stack"></div>
+          </section>
+          <section class="card home-facts">
+            <h2>这个项目里有什么</h2>
+            <div id="home-facts-body" class="facts-grid"></div>
+          </section>
         </div>
-        <section id="flow-panel" class="wb-panel" hidden><div id="flow-body" class="flow-body"></div></section>
-        <section id="unknown-panel" class="wb-panel" hidden><h3 class="wb-panel-title">未知边界</h3><div id="unknown-body"></div></section>
-      </div>
-      <div class="canvas" id="canvas-host">
-        <svg id="graph" viewBox="0 0 850 580" aria-label="文件与函数调用候选图" role="img"></svg>
-        <div id="empty">连接后展示本地解析结果</div>
-      </div>
-      <div id="task-run" class="wb-panel" hidden>
-        <section id="exec-panel" hidden>
-          <h3 class="wb-panel-title">执行画像与受控运行</h3>
-          <div id="exec-body" class="flow-body"></div>
-          <div id="exec-form" hidden>
-            <div class="wb-runline"><h4 class="wb-panel-title">输入</h4><button id="exec-mode" aria-label="切换输入编辑模式">按参数编辑</button></div>
-            <div id="exec-fields"></div>
-            <textarea id="exec-args" aria-label="受控运行的 JSON 字面量实参（数组）" hidden></textarea>
-            <div id="exec-context"></div>
-            <div id="exec-input-error" class="wb-error" role="alert" hidden></div>
-            <div class="context-actions"><button id="exec-run" disabled>受控运行</button><span class="subtle" id="exec-run-note">在隔离副本中以目标 Node 的权限模型执行一次固定调用</span></div>
+      </section>
+
+      <!-- ===== 探索 E：项目地图与多展示区 =====
+           这一页由 /explore.js 驱动：根节点是当前项目，按父节点加载成员，
+           每个展示区有自己的标签、选区、展开、滚动与缩放。 -->
+      <section class="wb-page page-map" data-page="explore" hidden aria-label="探索代码">
+        <div class="map-head">
+          <div class="map-head-main">
+            <p class="eyebrow">PROJECT MAP</p>
+            <h1 id="map-title">探索代码</h1>
+            <p class="lede" id="map-lede">以当前项目为根，逐层进入目录、文件与函数。</p>
           </div>
-          <div class="context-actions" id="exec-via-row" hidden><label id="exec-via-label" for="exec-via-args"></label><input id="exec-via-args" type="text" aria-label="包含函数的 JSON 字面量实参" placeholder="包含函数的实参 JSON 数组，例如 [100]"><input id="exec-via-chain" type="text" aria-label="包含函数的祖先链，由外到内" placeholder='祖先链 JSON（由外到内，符号来自分析）：[{"symbol":"...","args":[]}]'><label><input id="exec-via-enable" type="checkbox"> 经由包含函数取得闭包实例</label></div>
-          <div id="exec-result" class="flow-body" aria-live="polite"></div>
-          <details id="exec-history-panel" hidden><summary>这个对象的运行记录（本次服务）</summary><div id="exec-history" class="flow-body"></div></details>
-        </section>
-      </div>
-      <div id="task-review" class="wb-panel" hidden>
-        <section id="patch-panel" hidden>
-          <h3 class="wb-panel-title">补丁提案（Intent，不是已存在的代码）</h3>
-          <div id="patch-body" class="flow-body"></div>
-          <textarea id="patch-input" aria-label="统一 diff 提案" placeholder="粘贴统一 diff：--- a/... +++ b/... @@ ..."></textarea>
-          <div class="context-actions"><button id="patch-propose">登记提案</button></div>
-        </section>
-        <section id="annotation-panel" hidden>
-          <h3 class="wb-panel-title">Intent / 约束（不是已存在的代码）</h3>
-          <div id="annotation-body" class="flow-body"></div>
-          <div class="context-actions"><input id="annotation-input" type="text" aria-label="新增约束文本" placeholder="给当前选区加一条约束或意图"><button id="annotation-add">登记 Intent</button></div>
-        </section>
-      </div>
-      <div class="wb-scope"><span id="graph-status">尚未加载</span></div>
-    </section>
-    <aside class="wb-source" id="inspector" aria-label="所选对象的源码与依据">
-      <div class="wb-sourcehead"><span>源码与依据</span><button id="source-close" aria-label="收起源码区">收起</button></div>
-      <div id="sourcepath" class="wb-sourcepath"></div>
-      <pre id="source"><code>尚未选择对象</code></pre>
-      <div id="source-status" class="subtle"></div>
-      <div class="wb-evidence">
-        <p id="selection-facts" class="facts">选择对象后，这里显示关联候选与观测边界。</p>
-        <div class="wb-evidence-actions">
-          <button id="export" disabled>导出选区上下文</button>
-          <a id="open-3d" href="/city3d" title="同一份分析的第二投影，携带同一个选区">在 3D 中打开同一选区 →</a>
+          <div class="map-head-actions">
+            <button id="map-layout" title="在左右分区与上下分区之间切换">▥ 上下分区</button>
+            <button id="map-new-area" title="新建一个独立的展示区">＋ 新建展示区</button>
+            <button id="map-save" class="wb-primary" title="把展示区、标签、展开与缩放按项目保存到服务端">保存工作区</button>
+          </div>
         </div>
-        <details id="context-panel" hidden><summary>固定选区上下文 JSON</summary><textarea id="context-json" aria-label="固定选区上下文 JSON" readonly></textarea><div class="context-actions"><button id="context-copy">复制 JSON</button><a id="context-download">下载 JSON</a></div></details>
-      </div>
-    </aside>
+        <div class="map-tools">
+          <label class="map-search" for="map-search-input">
+            <span class="map-search-glyph" aria-hidden="true">⌕</span>
+            <input id="map-search-input" type="search" placeholder="搜索文件、函数或路径…" autocomplete="off" aria-label="全项目搜索">
+            <kbd>⌘K</kbd>
+          </label>
+          <span class="map-toolnote" id="map-search-note">实线是包含关系；搜索在整份分析里进行，不依赖画布已加载的节点</span>
+          <button id="map-outline-toggle" aria-pressed="false" title="用列表形式看目录结构">☷ 目录索引</button>
+          <button id="map-inspector-toggle" aria-pressed="true" title="显示或收起右侧节点详情">◧ 节点详情</button>
+          <span class="map-status" id="map-status" role="status"></span>
+        </div>
+        <div class="map-searchpanel" id="map-search-panel" hidden></div>
+        <div class="map-work" id="map-work">
+          <div class="map-outline" id="map-outline" hidden aria-label="目录索引"></div>
+          <div class="map-groups" id="map-groups"></div>
+          <aside class="map-inspector" id="map-inspector" aria-label="节点详情"></aside>
+        </div>
+      </section>
+
+      <!-- 旧三栏探索页：保留为隐藏页。运行/审阅/Agent 页共用的选区渲染仍写在
+           这些元素上（app.js 的 select() 目标），不删除，也不再作为入口。 -->
+      <section class="wb-page page-explore" data-page="explore-legacy" hidden aria-label="探索代码（旧三栏）">
+        <div class="page-head page-head-compact">
+          <div class="page-head-main">
+            <p class="eyebrow">CODE EXPLORER</p>
+            <h1 id="explore-heading">探索代码</h1>
+            <p class="lede" id="explore-lede">从关系找到上下文，从源码核对依据。</p>
+          </div>
+          <div class="page-head-actions">
+            <button id="explore-back" disabled>← 返回</button>
+            <button id="run-shortcut" class="wb-primary" disabled>准备输入并运行 →</button>
+          </div>
+        </div>
+        <div class="explore-cols">
+          <!-- E1 搜索 -->
+          <section class="col col-search" aria-label="搜索" data-region="E1">
+            <div class="col-head"><label for="fn-search">查找函数或路径</label></div>
+            <input id="fn-search" type="search" placeholder="名称或路径，例如 charge" autocomplete="off">
+            <div id="fn-count" class="col-count">未加载</div>
+            <div id="fn-list" class="col-scroll"></div>
+            <button id="fn-more" class="wb-retry" hidden>加载更多结果</button>
+            <div class="col-foot">
+              <div class="subtle">最近查看</div>
+              <div id="recent-list" class="wb-recent"></div>
+            </div>
+          </section>
+          <!-- E2/E3 阅读中心 -->
+          <section class="col col-read" aria-label="阅读中心" data-region="E2">
+            <div class="col-head">
+              <div class="lenses" role="group" aria-label="理解镜头">
+                <button data-lens="calls" aria-pressed="true">调用关系</button>
+                <button data-lens="values" aria-pressed="false">值从哪来</button>
+                <button data-lens="unknowns" aria-pressed="false">未知边界</button>
+              </div>
+              <span class="subtle" id="graph-status">尚未加载</span>
+            </div>
+            <div class="overview-tools" id="overview-tools">
+              <span class="subtle">概览层级</span>
+              <div class="levels" role="group" aria-label="层级切换">
+                <button id="level-project" class="level-button" aria-pressed="false">项目</button>
+                <button id="level-district" class="level-button" aria-pressed="false">目录</button>
+                <button id="level-file" class="level-button" aria-pressed="true">文件</button>
+              </div>
+              <button id="reset" class="nav-link">清除焦点</button>
+            </div>
+            <div class="selection-line">
+              <div id="selection-path" class="crumbs">未选择对象</div>
+              <h2 id="selection-name">查找并选择一个函数</h2>
+            </div>
+            <section id="flow-panel" class="panel" hidden><div id="flow-body" class="flow-body"></div></section>
+            <section id="unknown-panel" class="panel" hidden><h3 class="panel-title">未知边界</h3><div id="unknown-body"></div></section>
+            <div class="canvas" id="canvas-host">
+              <svg id="graph" viewBox="0 0 850 580" aria-label="文件与函数调用候选图" role="img"></svg>
+              <div id="empty">连接后展示本地解析结果</div>
+            </div>
+          </section>
+          <!-- E4 源码依据 -->
+          <aside class="col col-source" id="inspector" aria-label="源码与依据" data-region="E4">
+            <div class="col-head"><span>源码依据</span><button id="source-close" class="nav-link">收起</button></div>
+            <div id="sourcepath" class="sourcepath"></div>
+            <pre id="source" class="source-view"><code>尚未选择对象</code></pre>
+            <div id="source-status" class="subtle"></div>
+            <div class="evidence">
+              <p id="selection-facts" class="facts">选择对象后，这里显示关联候选与观测边界。</p>
+              <div class="row-actions">
+                <button id="export" disabled>导出选区上下文</button>
+                <button id="source-agent" disabled>交给 Agent</button>
+                <button id="source-review" disabled>查看修改</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ===== 3D 地图 D ===== -->
+      <section class="wb-page" data-page="city" hidden aria-label="3D 地图">
+        <div class="page-head page-head-compact">
+          <div class="page-head-main">
+            <p class="eyebrow">CODE CITY</p><h1>3D 地图</h1>
+            <p class="lede">代码在项目里的位置，以及从这里进入同一个函数。</p>
+          </div>
+          <div class="page-head-actions">
+            <a id="city-open" class="wb-primary button-like" href="/city3d" title="同一份分析的三维投影，携带同一个选区">在 3D 视图中打开 →</a>
+          </div>
+        </div>
+        <div class="page-body">
+          <section class="card">
+            <h2>从位置进入函数</h2>
+            <div id="city-body" class="flow-body"></div>
+          </section>
+          <section class="card">
+            <h2>文件成员</h2>
+            <div id="city-members" class="flow-body"></div>
+          </section>
+        </div>
+      </section>
+
+      <!-- ===== 运行 R ===== -->
+      <section class="wb-page page-run" data-page="run" hidden aria-label="运行验证">
+        <div class="page-head page-head-compact">
+          <div class="page-head-main">
+            <p class="eyebrow">FUNCTION RUNNER</p><h1>运行验证</h1>
+            <p class="lede">这组输入会得到什么结果？</p>
+          </div>
+          <div class="page-head-actions">
+            <button id="run-view-source">查看源码</button>
+            <button id="run-back">← 返回探索</button>
+          </div>
+        </div>
+        <div class="run-banner" id="run-banner"></div>
+        <section id="exec-panel" class="panel" hidden>
+          <div class="run-cols">
+            <div class="col col-input" data-region="R2">
+              <div class="col-head"><span>输入</span><button id="exec-mode" class="nav-link">按参数编辑</button></div>
+              <div id="exec-body" class="flow-body"></div>
+              <div id="exec-form" hidden>
+                <div id="exec-fields"></div>
+                <textarea id="exec-args" aria-label="受控运行的 JSON 字面量实参（数组）" hidden></textarea>
+                <div id="exec-context"></div>
+                <div id="exec-input-error" class="wb-error" role="alert" hidden></div>
+                <div class="row-actions">
+                  <button id="exec-clear" class="wb-retry">清空</button>
+                  <button id="exec-run" class="wb-primary" disabled>运行这组输入</button>
+                  <button id="exec-cancel" hidden>取消运行</button>
+                </div>
+                <p class="subtle" id="exec-run-note">在隔离副本中以目标 Node 的权限模型执行一次固定调用</p>
+              </div>
+              <div id="exec-via-row" hidden><label id="exec-via-label" for="exec-via-args"></label><input id="exec-via-args" type="text" aria-label="包含函数的 JSON 字面量实参" placeholder="包含函数的实参 JSON 数组，例如 [100]"><input id="exec-via-chain" type="text" aria-label="包含函数的祖先链，由外到内" placeholder='祖先链 JSON（由外到内，符号来自分析）：[{"symbol":"...","args":[]}]'><label><input id="exec-via-enable" type="checkbox"> 经由包含函数取得闭包实例</label></div>
+            </div>
+            <div class="col col-result" data-region="R4">
+              <div class="col-head"><span>运行观测</span></div>
+              <div id="exec-result" class="run-result" aria-live="polite"></div>
+              <section class="panel" id="run-compare-panel">
+                <h3 class="panel-title">比较修改前后</h3>
+                <div id="run-compare-body" class="flow-body"></div>
+              </section>
+              <section id="exec-history-panel" class="panel" hidden>
+                <h3 class="panel-title">这个对象的运行记录</h3>
+                <div id="exec-history" class="flow-body"></div>
+              </section>
+            </div>
+          </div>
+        </section>
+        <section id="exec-empty" class="panel">
+          <div id="exec-empty-body" class="flow-body"></div>
+        </section>
+      </section>
+
+      <!-- ===== 修改审阅 C ===== -->
+      <section class="wb-page page-review" data-page="review" hidden aria-label="修改审阅">
+        <div class="page-head page-head-compact">
+          <div class="page-head-main">
+            <p class="eyebrow">CHANGE REVIEW</p><h1>修改审阅</h1>
+            <p class="lede">看清源码差异，核对测试和行为，再决定应用。</p>
+          </div>
+          <div class="page-head-actions">
+            <button id="review-agent" >Agent 交接 ↗</button>
+            <button id="patch-propose-open" class="wb-primary">＋ 粘贴 diff</button>
+          </div>
+        </div>
+        <section id="patch-panel" class="panel review-panel" hidden>
+          <div id="patch-body" class="review-cols">
+            <div class="review-side" data-region="C2">
+              <div class="col-head"><span>提案</span><span id="review-count" class="subtle"></span></div>
+              <div id="review-list" class="review-list"></div>
+              <details id="patch-input-panel"><summary>登记一份统一 diff 提案（Intent，不写源码）</summary>
+                <textarea id="patch-input" aria-label="统一 diff 提案" placeholder="粘贴统一 diff：--- a/... +++ b/... @@ ..."></textarea>
+                <div class="row-actions"><button id="patch-propose">登记提案</button></div>
+              </details>
+            </div>
+            <div class="review-center" id="review-center" data-region="C3"></div>
+            <div class="review-evidence" id="review-evidence" data-region="C4"></div>
+          </div>
+        </section>
+        <section id="patch-empty" class="panel"><div id="patch-empty-body" class="flow-body"></div></section>
+        <section id="annotation-panel" class="panel" hidden>
+          <h3 class="panel-title">Intent / 约束（不是已存在的代码）</h3>
+          <div id="annotation-body" class="flow-body"></div>
+          <div class="row-actions"><input id="annotation-input" type="text" aria-label="新增约束文本" placeholder="给当前选区加一条约束或意图"><button id="annotation-add">登记 Intent</button></div>
+        </section>
+      </section>
+
+      <!-- ===== Agent 协作 A ===== -->
+      <section class="wb-page" data-page="agent" hidden aria-label="Agent 协作">
+        <div class="page-head page-head-compact">
+          <div class="page-head-main">
+            <p class="eyebrow">AGENT HANDOFF</p><h1>Agent 协作</h1>
+            <p class="lede">把当前函数的上下文交接出去，并核对收到的提案。</p>
+          </div>
+          <div class="page-head-actions">
+            <button id="agent-connection">连接说明</button>
+            <button id="agent-preview" class="wb-primary">预览并复制交接文本</button>
+          </div>
+        </div>
+        <div class="page-body agent-grid">
+          <section class="card">
+            <h2>交接目标</h2>
+            <div id="agent-target" class="stack"></div>
+            <textarea id="agent-goal" aria-label="交接目标" placeholder="用一句话写清要 Agent 做什么，例如：修复折扣越界，保留正常情况"></textarea>
+            <div class="row-actions"><button id="agent-export">导出函数上下文</button><button id="agent-open-explore">在探索中查看目标</button></div>
+          </section>
+          <section class="card">
+            <h2>收到的提案</h2>
+            <div id="agent-proposals" class="stack"></div>
+          </section>
+          <section class="card">
+            <h2>活动记录</h2>
+            <div id="agent-activity" class="stack"></div>
+          </section>
+        </div>
+      </section>
+
+    </main>
   </div>
-</main>
+
+  <!-- G3 底状态 -->
+  <footer class="wb-bottom">
+    <span id="selection-status">当前选择：无</span>
+    <span class="wb-bottom-right"><span id="connection-state">本机服务未连接</span> · <span>静态候选 / 运行观测 / 修改提案分别呈现</span></span>
+  </footer>
 </div>
-<footer class="wb-bottom"><span id="selection-status">当前选择：无</span><span>静态候选 · 观测结果 · Intent 分别呈现；线条不代表实际执行或完整数据流</span></footer>
-</div>
+
+<dialog id="help-dialog" class="wb-dialog"><form method="dialog"><h2>快捷键与主流程</h2><ul class="stack"><li><kbd>⌘/Ctrl K</kbd> 搜索代码或操作</li><li><kbd>⌘/Ctrl 1..6</kbd> 切换页面</li><li><kbd>Esc</kbd> 关闭弹层并回到触发位置</li><li>探索：搜索 → 点节点/连线 → 读源码 → 运行</li><li>审阅：选择提案 → 看差异与验证 → 确认后应用或撤销</li></ul><div class="row-actions"><button value="close">关闭</button></div></form></dialog>
+<dialog id="command-dialog" class="wb-dialog"><form method="dialog"><h2>搜索代码或操作</h2><input id="command-input" type="search" placeholder="函数名、路径或页面名"><div id="command-results" class="stack"></div><div class="row-actions"><button value="close">关闭</button></div></form></dialog>
+<dialog id="version-dialog" class="wb-dialog"><form method="dialog"><h2>代码版本</h2><div id="version-dialog-body" class="stack"></div><div class="row-actions"><button value="close">关闭</button></div></form></dialog>
+<dialog id="tasks-dialog" class="wb-dialog"><form method="dialog"><h2>后台任务</h2><p class="subtle">在服务端进行的执行与索引：离开页面不会停止它们；取消以服务端终态为准。</p><div id="tasks-body" class="stack"></div><div class="row-actions"><button id="tasks-refresh" value="">刷新</button><button value="close">关闭</button></div></form></dialog>
+<dialog id="write-dialog" class="wb-dialog"><form method="dialog"><h2 id="write-dialog-title">确认写入</h2><div id="write-dialog-body" class="stack"></div><div class="row-actions"><button value="cancel">取消</button><button id="write-dialog-confirm" class="wb-primary" value="confirm">确认</button></div></form></dialog>
+<dialog id="context-dialog" class="wb-dialog"><form method="dialog"><h2>固定选区上下文 JSON</h2><textarea id="context-json" aria-label="固定选区上下文 JSON" readonly></textarea><div class="row-actions"><button id="context-copy" value="">复制 JSON</button><a id="context-download" class="button-like">下载 JSON</a><button value="close">关闭</button></div></form></dialog>
+<dialog id="agent-connection-dialog" class="wb-dialog"><form method="dialog"><h2>连接说明</h2><p class="subtle">Atlas 只监听本机回环地址，用一次性会话令牌鉴权。下面的地址与令牌来自当前服务的会话文件；令牌不要写进要提交的文件。</p><div id="agent-connection-body" class="stack"></div><div class="row-actions"><button id="agent-connection-copy" value="">复制连接信息</button><button value="close">关闭</button></div></form></dialog>
+<dialog id="agent-dialog" class="wb-dialog"><form method="dialog"><h2>交接文本</h2><p class="subtle" id="agent-dialog-note"></p><textarea id="agent-text" aria-label="交接文本" readonly></textarea><div class="row-actions"><button id="agent-copy" value="">复制</button><button value="close">关闭</button></div></form></dialog>
+
 <script src="/hierarchy.js" defer></script>
 <script src="/vendor/elk.bundled.js" defer></script>
 <script src="/layout.js" defer></script>
 <script src="/app.js" defer></script>
+<script src="/explore.js" defer></script>
 </body></html>

@@ -1,0 +1,16 @@
+flowchart TB
+  subgraph consumers["消费者"]
+    web["前端组件\n地图 / 源码 / 场景 / 审阅 / 任务"]
+    external["外部 Agent / CLI"]
+  end
+  api["Rust 本地服务与公开接口\n鉴权 / 项目与版本 / 作业与取消"]
+  web --> api
+  external --> api
+  api --> analysis["现有分析链\n语言 worker + Rust 分析与查询"]
+  api --> execution["现有执行与补丁链\n隔离运行 / 测试 / 对照 / 应用撤销"]
+  api --> workflow["扩展任务数据\n批注 / 场景断言 / 提案关联 / 审阅记录"]
+  api --> adapters["后续适配器\n测试报告 / 轨迹 / 调试 / 浏览器场景"]
+  analysis --> store["版本快照与记录存储\nProject / Analysis / NodeRef\nTask / Scenario / Run / Proposal / Review"]
+  execution --> store
+  workflow --> store
+  adapters --> store

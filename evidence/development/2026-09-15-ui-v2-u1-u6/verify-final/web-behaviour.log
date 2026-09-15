@@ -1,0 +1,76 @@
+ok   a second connect() with the emptied field keeps the live session
+ok   an empty field with no session asks for a token instead of querying
+ok   a failed selection clears the previous flow facts
+ok   a flow fact from another symbol is refused, not rendered
+ok   reset clears the inspector as one unit
+ok   the selection canvas draws resolved targets, unresolved targets and edge labels
+ok   the overview aggregates file-to-file candidates, not a function list
+ok   the same hierarchy backs both projections and conserves every counted fact
+ok   switching level changes what a block stands for, never what is counted
+ok   a coarse block says it is an aggregate and refuses to open one file of many
+ok   the pick index answers a real query and reports a named miss
+ok   a file-level budget is reported as a budget, not as level omission
+ok   a level over a partially loaded page says so instead of totalling the project
+ok   the level switch never re-anchors a focused function
+ok   neither page carries a private copy of the level definitions
+ok   the block-by-binding state map marks each kind without inventing records
+ok   the effect journal is shown, and an empty journal is not read as "no effects"
+ok   a refused profile disables the run button and names the evidence
+ok   an unknown arity disables the run instead of guessing arguments
+ok   pressing run posts the pinned request and draws the observed boundary
+ok   a run is a background task, and its terminal state comes from the server record
+ok   cancelling asks the server and waits for its terminal record
+ok   a refused record is shown as a refusal, never as a result
+ok   a mock-labelled run says so and an observed record keeps its identity
+ok   a nested closure is offered only through its real enclosing function
+ok   a closure nested three levels deep discovers its ancestors and posts the chain
+ok   an unmatched closure instance is shown as an observation, not as the target
+ok   a profile from another symbol is refused, not rendered
+ok   a missing profile leaves the run button disabled and says why
+ok   selecting publishes a pinned selection and points the other projection at it
+ok   an Intent is registered as a proposal, never as existing code
+ok   a shared selection from the same analysis is applied on connect
+ok   a shared selection from another analysis is relocated with its evidence stated
+ok   a refused relocation leaves the selection alone and says why
+ok   a failed relocation query is reported as a failure, not as a refusal
+ok   the bridge exposes bounded actions only, and none of them writes code
+ok   a rejected proposal is shown as unreviewable, never as verified
+ok   a verified proposal shows the graph diff, the observed test and the CLI-only boundary
+ok   a create or delete proposal is shown as that, not as an edit
+ok   a proposal with no verification says so instead of implying one
+ok   a one-click revert appears only when the operator allowed writes
+ok   proposing posts the diff and reports a refusal without pretending it worked
+ok   the call view is layered and every edge leaves from its own port
+ok   the node budget folds instead of dropping, and says what it folded
+ok   an engine that answers without coordinates is refused, not drawn at the origin
+ok   a layout that arrives after the selection moved on is discarded
+ok   the left rail searches the server and shows matches, not a local filter
+ok   an empty search result and a failed search read differently
+ok   a slow search answer from an older keystroke never renders
+ok   function A proposals that land after switching to B go nowhere
+ok   source and relations fail independently, with a retry on the failed one
+ok   selection navigation keeps a back stack and a recent list
+ok   task tabs exist and the run shortcut follows the selection kind
+ok   value rows carry byte anchors and clicking loads a bounded source window
+ok   unknown rows with anchors locate, anchor-less unknowns say so
+ok   a failed source window reports the failure and keeps the old view
+ok   diagnostics unknowns open the file at the real byte window
+ok   the form renders per-parameter inputs and posts the declared inputs
+ok   an empty parameter field or bad JSON shows an inline error and never POSTs
+ok   a profile without context needs shows no receiver or globals inputs
+ok   history lists records and refills the form without auto-running
+ok   a proposed patch offers verify, which queues and then reports honestly
+ok   a rejected proposal offers no verify button
+ok   a finished verification poll refreshes the proposal list for the same selection
+ok   tab and lens persist in the fragment and restore on boot
+ok   drawn boxes sit on the layout coordinates their ports use (R4)
+ok   verifying a second proposal still POSTs after navigating away mid-verify (R1)
+ok   run inputs persist locally and restore after a fresh boot
+ok   the run result leads with the verdict and splits inputs and logs into tabs
+ok   background tasks list real runs, cancel through the server and reopen results
+ok   the review page selects one proposal and the agent entry lands on the same one
+ok   project settings PUT the declared argv and take effect in the shown config
+ok   the project page opens a directory, lists recent projects and switches
+ok   an applied proposal from the previous analysis stays reachable for revert after a re-index
+
+all 74 web behaviour checks passed

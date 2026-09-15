@@ -1,4 +1,6 @@
 mod agent;
+mod knowledge;
+mod llm;
 mod patchwork;
 mod runner;
 mod server;
@@ -21,6 +23,14 @@ use std::{
     },
     time::Duration,
 };
+
+/// How much of the language worker's response Atlas reads, in MiB.
+///
+/// One project's facts are one JSON document holding every symbol, call and
+/// flow, so the size is a property of the project. 256 MiB fits a real
+/// single-project index with room to spare; `--worker-output-mb` is the escape
+/// hatch for the project that outgrows it, and the failure says so by name.
+pub const DEFAULT_WORKER_OUTPUT_MB: u32 = 256;
 
 #[derive(Parser)]
 #[command(
@@ -58,6 +68,12 @@ enum Action {
         /// Heap ceiling for the language worker, in MiB.
         #[arg(long, default_value_t = 1024)]
         worker_heap_mb: u32,
+        /// How much of the language worker's response is read, in MiB. Raise it
+        /// for a project whose facts exceed the ceiling; the failure names it.
+        #[arg(long, default_value_t = DEFAULT_WORKER_OUTPUT_MB)]
+        worker_output_mb: u32,
+        #[command(flatten)]
+        scan: ScanLimitArgs,
     },
     Report {
         analysis: String,
@@ -198,6 +214,50 @@ enum Action {
         /// all; a request cannot turn it on.
         #[arg(long, value_name = "DIR")]
         allow_writes: Option<PathBuf>,
+        /// The language worker the server uses when it re-indexes a proposal's
+        /// isolated copy. Omitted means "find it next to this executable", so a
+        /// copied distribution keeps working from any working directory.
+        #[arg(long, value_name = "PATH")]
+        worker: Option<PathBuf>,
+        /// Node binary used for the same re-index. Defaults to `node` on PATH.
+        #[arg(long, default_value = "node")]
+        node: PathBuf,
+        /// A declared test command as a JSON argv array, e.g.
+        /// '["node","--test"]'. Never a shell string. It runs inside the
+        /// isolated copy only. Omitted means no test is run, and the
+        /// verification says so instead of implying a pass.
+        #[arg(long, value_name = "JSON")]
+        test_argv: Option<String>,
+        #[arg(long, default_value_t = 120000)]
+        test_timeout_ms: u64,
+        /// Heap ceiling for the language worker, in MiB.
+        #[arg(long, default_value_t = 1024)]
+        worker_heap_mb: u32,
+        /// How much of the language worker's response is read, in MiB. The
+        /// server re-indexes with it, so opening a project in the page obeys
+        /// the same ceiling as a command-line index.
+        #[arg(long, default_value_t = DEFAULT_WORKER_OUTPUT_MB)]
+        worker_output_mb: u32,
+        /// What the remembered task belongs to. Defaults to the analysis, so
+        /// two projects never share state; passing the project directory keeps
+        /// the task across a re-index of the same project, where the analysis
+        /// id changes but the work does not.
+        #[arg(long, value_name = "DIR_OR_LABEL")]
+        project: Option<PathBuf>,
+        /// How long the language worker may take for one index, in seconds.
+        /// The server re-indexes when the page opens a project, so this is the
+        /// ceiling that decides whether a large project can be opened at all
+        /// from the page -- the same three budgets `index` takes.
+        #[arg(long, default_value_t = 60)]
+        timeout_seconds: u64,
+        /// Overall deadline for the scan stage of that re-index.
+        #[arg(long, default_value_t = 300)]
+        scan_deadline_seconds: u64,
+        /// Overall deadline for the whole re-index the page triggers.
+        #[arg(long, default_value_t = 600)]
+        index_deadline_seconds: u64,
+        #[command(flatten)]
+        scan: ScanLimitArgs,
     },
     /// Durable job identity: idempotent submit, lease, and crash recovery.
     Job {
@@ -280,8 +340,10 @@ enum PatchAction {
         priority: i64,
         #[arg(long, default_value = "node")]
         node: PathBuf,
-        #[arg(long, default_value = "workers/typescript/worker.mjs")]
-        worker: PathBuf,
+        /// Omitted means "the worker next to this executable", so a copied
+        /// distribution verifies from any working directory.
+        #[arg(long, value_name = "PATH")]
+        worker: Option<PathBuf>,
         #[arg(long, default_value_t = 60)]
         timeout_seconds: u64,
         #[arg(long, default_value_t = 300)]
@@ -296,6 +358,13 @@ enum PatchAction {
         /// Heap ceiling for the language worker, in MiB.
         #[arg(long, default_value_t = 1024)]
         worker_heap_mb: u32,
+        /// How much of the language worker's response is read, in MiB. The
+        /// verification re-indexes the isolated copy, so the ceiling that lets
+        /// the base project index is the ceiling that lets it be verified.
+        #[arg(long, default_value_t = DEFAULT_WORKER_OUTPUT_MB)]
+        worker_output_mb: u32,
+        #[command(flatten)]
+        scan: ScanLimitArgs,
     },
     /// Write the verified files into a checkout, refusing if its bytes moved.
     Apply {
@@ -417,6 +486,38 @@ struct QueueIdentityArgs {
     request_key: Option<String>,
 }
 
+/// How much of one project a single snapshot may capture.
+///
+/// Every one of these is a refusal, not a truncation: a snapshot that silently
+/// covered part of a project would make every count derived from it a lie, so
+/// the honest outcomes are "this project fits" and "this project does not". The
+/// defaults fit one application; a monorepo needs them raised, which is why
+/// each refusal names the ceiling it reached and the flag that raises it.
+#[derive(Args, Clone, Copy)]
+struct ScanLimitArgs {
+    #[arg(long, default_value_t = 20_000)]
+    max_entries: usize,
+    /// Per-file ceiling, in MiB. A larger file is catalogued, not captured.
+    #[arg(long, default_value_t = 2)]
+    max_file_mb: u64,
+    /// Total captured bytes for one snapshot, in MiB.
+    #[arg(long, default_value_t = 64)]
+    max_total_mb: u64,
+}
+
+impl ScanLimitArgs {
+    fn limits(&self) -> Result<ScanLimits, Box<dyn std::error::Error>> {
+        if self.max_entries == 0 || self.max_file_mb == 0 || self.max_total_mb == 0 {
+            return Err("scan budgets must be positive".into());
+        }
+        Ok(ScanLimits {
+            max_entries: self.max_entries,
+            max_file_bytes: self.max_file_mb * 1024 * 1024,
+            max_total_bytes: self.max_total_mb * 1024 * 1024,
+        })
+    }
+}
+
 #[derive(Args)]
 struct RunnerArgs {
     #[arg(long, default_value = "node")]
@@ -437,6 +538,13 @@ struct RunnerArgs {
     /// program, so this has to scale with the project.
     #[arg(long, default_value_t = 1024)]
     worker_heap_mb: u32,
+    /// How much of the language worker's response is read, in MiB. The response
+    /// holds every symbol, call and flow, so this has to scale with the project
+    /// too -- raising it is the supported fix for `worker_output_limit`.
+    #[arg(long, default_value_t = DEFAULT_WORKER_OUTPUT_MB)]
+    worker_output_mb: u32,
+    #[command(flatten)]
+    scan: ScanLimitArgs,
 }
 
 #[derive(Subcommand)]
@@ -513,10 +621,18 @@ struct IndexOptions {
     /// holds the whole program, so its footprint scales with the project; a
     /// fixed cap turns a large project into an unexplained failure.
     worker_heap_mb: u32,
+    /// Response ceiling for the language worker, in MiB. Configurable for the
+    /// same reason: the response is the whole project's facts in one document.
+    worker_output_mb: u32,
+    /// How much of the project one snapshot may capture. Carried with the
+    /// request so a queued or retried run scans the same project, and so a
+    /// project that needs a larger budget needs it said once.
+    scan_limits: ScanLimits,
 }
 
 impl IndexOptions {
     fn from_args(runner: RunnerArgs) -> Result<Self, Box<dyn std::error::Error>> {
+        let scan_limits = runner.scan.limits()?;
         Self::new(
             runner.node,
             runner.worker,
@@ -525,6 +641,8 @@ impl IndexOptions {
             runner.index_deadline_seconds,
             runner.incremental,
             runner.worker_heap_mb,
+            runner.worker_output_mb,
+            scan_limits,
         )
     }
 
@@ -537,6 +655,8 @@ impl IndexOptions {
         index_deadline_seconds: u64,
         incremental: bool,
         worker_heap_mb: u32,
+        worker_output_mb: u32,
+        scan_limits: ScanLimits,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         if timeout_seconds == 0 || timeout_seconds > 600 {
             return Err("timeout must be 1..600 seconds".into());
@@ -550,6 +670,9 @@ impl IndexOptions {
         if !(128..=8192).contains(&worker_heap_mb) {
             return Err("worker heap must be 128..8192 MiB".into());
         }
+        if !(1..=4096).contains(&worker_output_mb) {
+            return Err("worker output must be 1..4096 MiB".into());
+        }
         Ok(Self {
             node,
             worker,
@@ -558,6 +681,8 @@ impl IndexOptions {
             index_deadline: Duration::from_secs(index_deadline_seconds),
             incremental,
             worker_heap_mb,
+            worker_output_mb,
+            scan_limits,
         })
     }
 
@@ -566,13 +691,15 @@ impl IndexOptions {
     fn fingerprint(&self, root: &Path) -> String {
         atlas_engine::digest(
             format!(
-                "atlas.index-request.v1|{}|{}|{:?}|{:?}|{:?}|{}",
+                "atlas.index-request.v1|{}|{}|{:?}|{:?}|{:?}|{}|{}|{:?}",
                 root.display(),
                 self.node.display(),
                 self.timeout,
                 self.scan_deadline,
                 self.index_deadline,
-                self.worker_heap_mb
+                self.worker_heap_mb,
+                self.worker_output_mb,
+                self.scan_limits
             )
             .as_bytes(),
         )
@@ -590,6 +717,8 @@ impl IndexOptions {
             index_deadline_seconds: self.index_deadline.as_secs(),
             incremental: self.incremental,
             worker_heap_mb: self.worker_heap_mb,
+            worker_output_mb: self.worker_output_mb,
+            scan_limits: self.scan_limits.clone(),
         })?)
     }
 
@@ -604,6 +733,8 @@ impl IndexOptions {
             stored.index_deadline_seconds,
             stored.incremental,
             stored.worker_heap_mb,
+            stored.worker_output_mb,
+            stored.scan_limits,
         )
     }
 }
@@ -625,6 +756,13 @@ struct StoredVerify {
     /// Defaulted so a row enqueued before this option existed still runs.
     #[serde(default = "default_worker_heap_mb")]
     worker_heap_mb: u32,
+    /// Defaulted for the same reason.
+    #[serde(default = "default_worker_output_mb")]
+    worker_output_mb: u32,
+    /// Defaulted for the same reason: a row enqueued before the budgets were
+    /// settable ran with the defaults, and must still run.
+    #[serde(default = "default_scan_limits")]
+    scan_limits: ScanLimits,
 }
 
 impl StoredVerify {
@@ -638,6 +776,7 @@ impl StoredVerify {
             || self.index_deadline_seconds == 0
             || self.index_deadline_seconds > 3600
             || !(128..=8192).contains(&self.worker_heap_mb)
+            || !(1..=4096).contains(&self.worker_output_mb)
         {
             return Err("stored_verify_deadlines_out_of_range".into());
         }
@@ -650,6 +789,8 @@ impl StoredVerify {
             test_argv: self.test_argv.clone(),
             test_timeout: Duration::from_millis(self.test_timeout_ms.max(1)),
             worker_heap_mb: self.worker_heap_mb,
+            worker_output_mb: self.worker_output_mb,
+            scan_limits: self.scan_limits.clone(),
         })
     }
 }
@@ -667,10 +808,62 @@ struct StoredOptions {
     /// Defaulted for the same reason; 1024 is the current default ceiling.
     #[serde(default = "default_worker_heap_mb")]
     worker_heap_mb: u32,
+    /// Defaulted for the same reason, with the same default the CLI uses.
+    #[serde(default = "default_worker_output_mb")]
+    worker_output_mb: u32,
+    /// Defaulted for the same reason.
+    #[serde(default = "default_scan_limits")]
+    scan_limits: ScanLimits,
 }
 
 fn default_worker_heap_mb() -> u32 {
     1024
+}
+
+fn default_worker_output_mb() -> u32 {
+    DEFAULT_WORKER_OUTPUT_MB
+}
+
+fn default_scan_limits() -> ScanLimits {
+    ScanLimits::default()
+}
+
+/// Where the language worker actually is.
+///
+/// A distribution is a directory with `atlas` at the top and
+/// `workers/typescript/worker.mjs` beside it. The operator can start it from
+/// anywhere, and so can a background verification job, so a path relative to
+/// the working directory is not a location -- it is a guess that happens to
+/// hold only when someone happens to run from the repository. The executable
+/// knows where it lives, so that is the anchor: an explicit `--worker` wins,
+/// otherwise the worker next to the executable is used when it is there.
+fn resolve_worker(explicit: Option<&Path>) -> PathBuf {
+    if let Some(path) = explicit {
+        return path.to_path_buf();
+    }
+    if let Ok(path) = std::env::var("ATLAS_WORKER")
+        && !path.trim().is_empty()
+    {
+        return PathBuf::from(path);
+    }
+    let relative = Path::new("workers").join("typescript").join("worker.mjs");
+    if let Ok(exe) = std::env::current_exe() {
+        for base in [
+            exe.parent().map(|p| p.to_path_buf()),
+            exe.parent()
+                .and_then(|p| p.parent())
+                .map(|p| p.to_path_buf()),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            let candidate = base.join(&relative);
+            if candidate.is_file() {
+                return candidate;
+            }
+        }
+    }
+    relative
 }
 
 /// A lease holder identity: unique per process run, so two runs of the same
@@ -735,6 +928,7 @@ async fn run_pipeline(
     let scan_store = store.clone();
     let scan_control = control.clone();
     let scan_deadline = options.scan_deadline;
+    let scan_limits = options.scan_limits.clone();
     let root = root.to_path_buf();
     // Filesystem and Rust work must not occupy the async runtime that receives
     // signals. The same control remains live through commit.
@@ -742,7 +936,7 @@ async fn run_pipeline(
         let snapshot = scan::scan_controlled(
             &root,
             &scan_store,
-            ScanLimits::default(),
+            scan_limits,
             Some(scan_deadline),
             &scan_control,
         )?;
@@ -764,7 +958,7 @@ async fn run_pipeline(
         &options.worker,
         &request,
         options.timeout.min(remaining),
-        32 * 1024 * 1024,
+        (options.worker_output_mb as usize) * 1024 * 1024,
         options.worker_heap_mb,
         cancel_rx,
     )
@@ -1188,6 +1382,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             index_deadline_seconds,
             incremental: want_incremental,
             worker_heap_mb,
+            worker_output_mb,
+            scan,
         } => {
             let options = IndexOptions::new(
                 node,
@@ -1197,6 +1393,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 index_deadline_seconds,
                 want_incremental,
                 worker_heap_mb,
+                worker_output_mb,
+                scan.limits()?,
             )?;
             let control =
                 ExecutionControl::new(Some(std::time::Instant::now() + options.index_deadline));
@@ -1757,6 +1955,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 test_argv,
                 test_timeout_ms,
                 worker_heap_mb,
+                worker_output_mb,
+                scan,
             } => {
                 let test_argv: Option<Vec<String>> = match test_argv.as_deref() {
                     Some(text) => Some(serde_json::from_str(text)?),
@@ -1764,8 +1964,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 };
                 let options = patchwork::VerifyOptions {
                     node,
-                    worker,
+                    worker: resolve_worker(worker.as_deref()),
                     worker_heap_mb,
+                    worker_output_mb,
+                    scan_limits: scan.limits()?,
                     timeout: Duration::from_secs(timeout_seconds),
                     scan_deadline: Duration::from_secs(scan_deadline_seconds),
                     index_deadline: Duration::from_secs(index_deadline_seconds),
@@ -1790,6 +1992,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         test_argv: options.test_argv.clone(),
                         test_timeout_ms: options.test_timeout.as_millis() as u64,
                         worker_heap_mb: options.worker_heap_mb,
+                        worker_output_mb: options.worker_output_mb,
+                        scan_limits: options.scan_limits.clone(),
                     })?;
                     // Identity: the base analysis groups the request, and the
                     // proposal id is the key, so one proposal is verified once
@@ -1890,9 +2094,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             analysis,
             port,
             allow_writes,
+            worker,
+            node,
+            test_argv,
+            test_timeout_ms,
+            worker_heap_mb,
+            worker_output_mb,
+            project,
+            timeout_seconds,
+            scan_deadline_seconds,
+            index_deadline_seconds,
+            scan,
         } => {
             store.metadata(&analysis)?;
-            server::serve(store, analysis, port, allow_writes).await?;
+            let test_argv: Option<Vec<String>> = match test_argv.as_deref() {
+                Some(text) => Some(serde_json::from_str(text)?),
+                None => None,
+            };
+            // Canonicalised when it names a real directory, so two spellings of
+            // one project are one project and two projects are never one.
+            let project_key = project.map(|path| {
+                path.canonicalize()
+                    .map(|canonical| canonical.display().to_string())
+                    .unwrap_or_else(|_| path.display().to_string())
+            });
+            let config = server::ServerConfig {
+                node,
+                worker: resolve_worker(worker.as_deref()),
+                test_argv,
+                test_timeout_ms,
+                worker_heap_mb,
+                worker_output_mb,
+                scan_limits: scan.limits()?,
+                timeout_seconds,
+                scan_deadline_seconds,
+                index_deadline_seconds,
+                ..server::ServerConfig::default()
+            };
+            server::serve(store, analysis, port, allow_writes, config, project_key).await?;
         }
     }
     Ok(())

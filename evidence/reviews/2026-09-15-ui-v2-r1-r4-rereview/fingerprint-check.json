@@ -1,0 +1,9 @@
+{
+  "current_source_fingerprint": "2029ab355d686b063563d0585f6722e39897105ede84a9965466325f078c8b52",
+  "reported": {
+    "checked": true,
+    "match": true,
+    "expected": "2029ab355d686b063563d0585f6722e39897105ede84a9965466325f078c8b52",
+    "actual": "2029ab355d686b063563d0585f6722e39897105ede84a9965466325f078c8b52"
+  }
+}

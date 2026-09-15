@@ -271,11 +271,17 @@ impl Store {
             params![owner, project, request_key],
             |row| row.get(0),
         )?;
-        // Re-enqueueing a request that has not started may raise its priority;
-        // one that already ran or is running is left exactly as it is.
+        // Re-enqueueing a request that has not started may raise its priority.
+        // The same goes for one that already failed or was cancelled: asking
+        // again is a new submission of how to run it now, so it carries this
+        // call's parameters rather than replaying the ones that failed. A row
+        // that is queued or running is left exactly as it is -- a running job
+        // belongs to its lease holder, and quietly rewriting its instructions
+        // underneath it would make the terminal reason unreadable.
         if !created {
             tx.execute(
-                "UPDATE jobs SET priority=?2, options=?3, updated_at=?4 WHERE id=?1 AND state='queued'",
+                "UPDATE jobs SET priority=?2, options=?3, updated_at=?4
+                 WHERE id=?1 AND state IN ('queued','failed','cancelled')",
                 params![id, priority, request.options, now],
             )?;
         }
@@ -348,19 +354,27 @@ impl Store {
         Ok(updated == 1)
     }
 
-    /// Claim one specific queued row by id, for a runner that already knows
-    /// exactly which request it owns (the HTTP server runs the verifications
-    /// its own page enqueues). Same lease semantics as `claim_next`: the
-    /// holder check is what stops two runners from sharing one job.
+    /// Claim one specific row by id, for a runner that already knows exactly
+    /// which request it owns (the HTTP server runs the verifications its own
+    /// page enqueues). Same lease semantics as `claim_next`: the holder check
+    /// is what stops two runners from sharing one job.
+    ///
+    /// A failed or cancelled row is claimable, and so is a running row whose
+    /// lease expired. "Try again" is the normal thing to ask for after a
+    /// failure, and a by-id claim is already a statement that this runner owns
+    /// the request -- making the caller re-queue it first would only add a
+    /// window in which somebody else's claim could land. A row that is
+    /// currently held is not claimable, so a retry never doubles a running job.
     pub fn claim_job(&self, id: &str, holder: &str, lease_ms: i64) -> Result<Option<Job>> {
         let now = now_ms();
         let conn = self.connection()?;
         let tx = write_tx(&conn)?;
         let updated = tx.execute(
             "UPDATE jobs SET state='running', lease_holder=?2, lease_expires_at=?3,
-                    heartbeat_at=?3, attempt=attempt+1, updated_at=?3
-             WHERE id=?1 AND state='queued'",
-            params![id, holder, now + lease_ms.max(1000)],
+                    heartbeat_at=?3, attempt=attempt+1, updated_at=?3, terminal_reason=NULL
+             WHERE id=?1 AND (state IN ('queued','failed','cancelled')
+                    OR (state='running' AND lease_expires_at IS NOT NULL AND lease_expires_at < ?4))",
+            params![id, holder, now + lease_ms.max(1000), now],
         )?;
         tx.commit()?;
         if updated == 0 {

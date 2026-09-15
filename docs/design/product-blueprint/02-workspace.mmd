@@ -1,0 +1,15 @@
+flowchart TB
+  top["顶部：项目与版本 / 全项目搜索 / 当前任务 / 后台作业"]
+  subgraph body["工作区：可分区、最大化、关闭、恢复"]
+    direction LR
+    nav["左侧导航\n探索 / 验证 / 审阅\n工作区 / 关注 / 3D / 设置"]
+    paneA["区域 A：独立标签\n项目地图 / 子树 / 调用关系"]
+    paneB["区域 B：按需打开\n源码 / 差异 / 数据来源"]
+    inspector["右侧详情\n简介 / 依据 / 批注\n节点动作 / 当前任务讨论"]
+  end
+  bottom["按需展开验证区\n场景列表 / 实际与预期 / 日志 / 已采集轨迹"]
+  top --> body
+  body --> bottom
+  paneA -. "选中节点，更新详情" .-> inspector
+  paneA -. "在新区域打开，保留原图" .-> paneB
+  inspector -. "运行或查看场景" .-> bottom

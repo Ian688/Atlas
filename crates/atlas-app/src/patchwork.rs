@@ -18,6 +18,7 @@ use atlas_engine::{
     patch::{self, FilePatch},
     store::Store,
 };
+use atlas_contract::ScanLimits;
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, path::PathBuf, time::Duration};
 
@@ -173,6 +174,12 @@ pub struct VerifyOptions {
     /// Heap ceiling for the language worker, in MiB, carried through from the
     /// caller exactly like the other runner parameters.
     pub worker_heap_mb: u32,
+    /// Response ceiling for the language worker, in MiB. The verification
+    /// re-indexes the isolated copy, so it needs the ceiling the base project
+    /// was indexed with -- a smaller one would fail the edit, not the project.
+    pub worker_output_mb: u32,
+    /// Scan budgets for the same re-index, for the same reason.
+    pub scan_limits: ScanLimits,
     pub timeout: Duration,
     pub scan_deadline: Duration,
     pub index_deadline: Duration,
@@ -220,6 +227,8 @@ pub async fn verify_proposal(
         options.index_deadline.as_secs(),
         false,
         options.worker_heap_mb,
+        options.worker_output_mb,
+        options.scan_limits.clone(),
     )
     .map_err(|e| e.to_string())?;
     let control = ExecutionControl::new(Some(

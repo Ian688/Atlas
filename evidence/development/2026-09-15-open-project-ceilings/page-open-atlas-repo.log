@@ -1,0 +1,48 @@
+nav-connection: 已连接 · b818f700
+project: calculator
+t+1s status="正在索引 /Users/yinsijie/CodeRepo/Atlas；完成后自动切换到新分析。" progress="正在索引（有界：超时与文件预算由服务端执行参数决定）。已用 1 秒。取消这次索引"
+t+6s status="正在索引 /Users/yinsijie/CodeRepo/Atlas；完成后自动切换到新分析。" progress="正在索引（有界：超时与文件预算由服务端执行参数决定）。已用 6 秒。取消这次索引"
+t+11s status="正在索引 /Users/yinsijie/CodeRepo/Atlas；完成后自动切换到新分析。" progress="正在索引（有界：超时与文件预算由服务端执行参数决定）。已用 11 秒。取消这次索引"
+t+16s status="正在索引 /Users/yinsijie/CodeRepo/Atlas；完成后自动切换到新分析。" progress="正在索引（有界：超时与文件预算由服务端执行参数决定）。已用 16 秒。取消这次索引"
+t+21s status="正在索引 /Users/yinsijie/CodeRepo/Atlas；完成后自动切换到新分析。" progress="正在索引（有界：超时与文件预算由服务端执行参数决定）。已用 20 秒。取消这次索引"
+t+26s status="正在索引 /Users/yinsijie/CodeRepo/Atlas；完成后自动切换到新分析。" progress="正在索引（有界：超时与文件预算由服务端执行参数决定）。已用 23 秒。取消这次索引"
+t+31s status="正在索引 /Users/yinsijie/CodeRepo/Atlas；完成后自动切换到新分析。" progress="正在索引（有界：超时与文件预算由服务端执行参数决定）。已用 23 秒。取消这次索引"
+t+34s status="打开未完成：failed（flow_function_budget_exceeded:what=bindings:count=10975:limit=4000:path=web/vendor/elk.bundled.js:start=8841:end=1604190）" progress=""
+--- api calls ---
+GET http://127.0.0.1:8791/api/report? -> 200
+GET http://127.0.0.1:8791/api/contract? -> 200
+GET http://127.0.0.1:8791/api/nodes?limit=100 -> 200
+GET http://127.0.0.1:8791/api/edges?limit=100 -> 200
+GET http://127.0.0.1:8791/api/exec/runs? -> 200
+GET http://127.0.0.1:8791/api/projects? -> 200
+GET http://127.0.0.1:8791/api/ui-state?name=workbench -> 200
+GET http://127.0.0.1:8791/api/search?q=&kind=function&limit=100 -> 200
+PUT http://127.0.0.1:8791/api/ui-state -> 200
+PUT http://127.0.0.1:8791/api/ui-state -> 200
+POST http://127.0.0.1:8791/api/project/open -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+GET http://127.0.0.1:8791/api/project/open?id=2a2fdc1900d04deb971fa51cb4dcded9 -> 200
+--- console ---
+[console.error] Loading the image 'data:,' violates the following Content Security Policy directive: "default-src 'self'". Note that 'img-src' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked.
+[console.verbose] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o

@@ -1,0 +1,10 @@
+{
+  "current_source_fingerprint": "02378fedc716441eb8d3ae385485a72d723268d207305780f19c0d1fd8c3d297",
+  "reported": {
+    "checked": true,
+    "match": true,
+    "expected": "02378fedc716441eb8d3ae385485a72d723268d207305780f19c0d1fd8c3d297",
+    "actual": "02378fedc716441eb8d3ae385485a72d723268d207305780f19c0d1fd8c3d297"
+  },
+  "verify_status": "PASS"
+}

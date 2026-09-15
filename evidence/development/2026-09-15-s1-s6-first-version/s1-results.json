@@ -1,0 +1,110 @@
+{
+  "results": [
+    {
+      "name": "从另一个工作目录(cwd=/)启动含空格路径的分发包",
+      "ok": true,
+      "detail": "http://127.0.0.1:41613/ ()"
+    },
+    {
+      "name": "服务可读且返回固定分析版本",
+      "ok": true,
+      "detail": "977e0bf966f5ae02a2f6539c06fb65ae7f9d21c2a5a1d8b1bdc4c6a37362203d"
+    },
+    {
+      "name": "按名字找到目标函数",
+      "ok": true,
+      "detail": "src/price.js:applyDiscount"
+    },
+    {
+      "name": "登记多行补丁提案并通过固定快照校验",
+      "ok": true,
+      "detail": "93a87c067003e75e4bd4b25e2bed76f69ae2661cf047ce485de7a839908753cc · proposed"
+    },
+    {
+      "name": "启动配置里声明的测试命令对页面可见",
+      "ok": true,
+      "detail": "{\"node\":\"node\",\"note\":\"页面触发的验证使用服务端启动配置；测试命令只能是这里的 argv，页面不能临时附加。\",\"test_argv\":[\"node\",\"--test\"],\"test_timeout_ms\":120000,\"worker\":\"/tmp/Atlas 首版 S1/dist/workers/typescript/worker.mjs\"}"
+    },
+    {
+      "name": "页面触发的验证进入服务端队列",
+      "ok": true,
+      "detail": "\"89af140cbc39dbfd47dd5834d1dfa11ce679c0045ae44ae39a8907ab0dc94030\""
+    },
+    {
+      "name": "后台验证作业完成（不再是 worker_missing）",
+      "ok": true,
+      "detail": "state=completed reason=无"
+    },
+    {
+      "name": "验证在隔离副本里真的跑了声明的测试",
+      "ok": true,
+      "detail": "{\"argv\":[\"node\",\"--test\"],\"duration_ms\":265,\"exit_code\":0,\"note\":\"这是执行观测：命令的退出码与输出。它只说明这条命令在这个隔离副本里的结果。\",\"observed\":true,\"passed\":true,\"ran\":true,\"stderr\":\"\",\"stdout\":\"✔ normal discount is unchanged (1.020802ms)\\n✔ percent is clamped at both ends (0.163911ms)\\nℹ tests 2\\nℹ suites 0\\nℹ pass 2\\nℹ fail 0\\nℹ cancelled 0\\nℹ skipped 0\\nℹ todo 0\\nℹ duration_ms 148.486155\\n\"}"
+    },
+    {
+      "name": "已验证的提案再次验证被具名拒绝（不静默重跑，也不报成功）",
+      "ok": true,
+      "detail": "{\"status\":409,\"body\":{\"detail\":\"proposal_state:verified\",\"error\":\"proposal_not_verifiable\"}}"
+    },
+    {
+      "name": "写路径只在启动时授权的目录内",
+      "ok": true,
+      "detail": "{\"enabled\":true,\"how_to_enable\":\"atlas --store S serve <analysis> --allow-writes <目录>\",\"root\":\"/private/tmp/Atlas 首版 S1/proj\",\"scope\":\"只有 patch/apply 与 patch/revert；页面不能指定目录，只能在请求里回显这里给出的 root\"}"
+    },
+    {
+      "name": "应用到授权目录",
+      "ok": true,
+      "detail": "{\"proposal\":{\"analysis_id\":\"977e0bf966f5ae02a2f6539c06fb65ae7f9d21c2a5a1d8b1bdc4c6a37362203d\",\"created_at\":1789378061156,\"entity_id\":\"symbol:src/price.js:0:116\",\"id\":\"93a87c067003e75e4bd4b25e2bed76f69"
+    },
+    {
+      "name": "应用后文件字节等于补丁内容",
+      "ok": true,
+      "detail": "190 字节"
+    },
+    {
+      "name": "撤销成功",
+      "ok": true,
+      "detail": "{\"proposal\":{\"analysis_id\":\"977e0bf966f5ae02a2f6539c06fb65ae7f9d21c2a5a1d8b1bdc4c6a37362203d\",\"created_at\":1789378061156,\"entity_id\":\"symbol:src/price.js:0:116\",\"id\":\"93a87c067003e75e4bd4b25e2bed76f69"
+    },
+    {
+      "name": "撤销后文件逐字节回到原始内容",
+      "ok": true,
+      "detail": "117 字节"
+    },
+    {
+      "name": "让测试失败的补丁被如实报告为失败（有退出码，不是\"没跑\"）",
+      "ok": true,
+      "detail": "{\"argv\":[\"node\",\"--test\"],\"duration_ms\":264,\"exit_code\":1,\"note\":\"这是执行观测：命令的退出码与输出。它只说明这条命令在这个隔离副本里的结果。\",\"observed\":true,\"passed\":false,\"ran\":true,\"stderr\":\"\",\"stdout\":\"✖ normal discount is unchanged (2.973029ms)\\n✖ percent is clamped at both ends (0.327751ms)\\nℹ tests 2\\nℹ suites 0\\nℹ pass 0\\nℹ fail 2\\nℹ cancelled 0\\nℹ skipped 0\\nℹ todo 0\\nℹ duration_ms 150.042819\\n\\n✖ failing tests:\\n\\ntest at t"
+    },
+    {
+      "name": "验证过程没有改动用户检出目录",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "故意指向缺失 worker 的验证可以入队",
+      "ok": true,
+      "detail": "{\n  \"job\": {\n    \"analysis_id\": null,\n    \"attempt\": 0,\n    \"created_at\": 1789378069214,\n    \"heartbeat_at\": null,\n    \"id\": \"d31d29b72f1877c8728e271d53146320dc30d1681392d9bfc0cb8e4b0d1fa8b4\",\n    \"ki"
+    },
+    {
+      "name": "缺失 worker 的验证作业失败并给出具名原因",
+      "ok": true,
+      "detail": "{\n  \"outcomes\": [\n    {\n      \"error\": \"worker_missing\",\n      \"job\": {\n        \"analysis_id\": null,\n        \"attempt\": 1,\n        \"created_at\": 1789378069214,\n        \"heartbeat_at\": null,\n        \"id\": \"d31d29b72f1877c8728e271d53146320dc30d1681392d9bfc0cb8e4b0d1fa8b4\",\n        \"kind\": \"patch_verif"
+    },
+    {
+      "name": "页面用服务端资源重试同一份失败的验证",
+      "ok": true,
+      "detail": "{\"status\":200,\"outcome\":\"retrying\",\"state\":\"failed\"}"
+    },
+    {
+      "name": "重试后验证真的跑起来并完成（attempt 递增，不是停在失败态）",
+      "ok": true,
+      "detail": "state=completed attempt=2 passed=false"
+    },
+    {
+      "name": "CLI 不带 --worker、从 / 执行前台验证也找得到 worker",
+      "ok": true,
+      "detail": "exit=0 {\n  \"analysis_id\": \"977e0bf966f5ae02a2f6539c06fb65ae7f9d21c2a5a1d8b1bdc4c6a37362203d\",\n  \"created_at\": 1789378077365,\n  \"entity_id\": \"symbol:src/price.js:0:116\",\n  \"id\": \"2b63b37a223f6d061c3b1e4f7350a"
+    }
+  ],
+  "log": "正在索引 /tmp/Atlas 首版 S1/proj …\n索引完成:analysis id = 977e0bf966f5ae02a2f6539c06fb65ae7f9d21c2a5a1d8b1bdc4c6a37362203d\n\nAtlas 已就绪,在浏览器打开:\n  http://127.0.0.1:41613/#token=386c0c14-7fad-47c0-8c31-1c2b29da177d\n(会话令牌只经本机 URL fragment 传递,不进入任何 HTTP 请求或日志,等同启动密钥)\nCtrl-C 停止服务;数据保留在 /tmp/Atlas 首版 S1/store。\n停止后再启动同一项目会回到同一个端口与同一份上次任务(选区/页签/输入草稿)。\n若上一个实例仍占着该端口,本次会回退到随机端口:页面照常可用,只是浏览器本地缓存不再共享。\n受控运行能力:已实测权限模型会拒绝未授权写入(v26.5.1)。\n\n"
+}

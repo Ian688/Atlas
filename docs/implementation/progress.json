@@ -1,18 +1,36 @@
 {
  "schema": "atlas.daily-development-progress.v1",
- "work_order_version": "3.0",
+ "work_order_version": "6.0",
  "prepared_on": "2026-09-09",
  "timezone": "Asia/Shanghai",
  "repository": "/Users/yinsijie/CodeRepo/Atlas",
  "mode": "external_agent_continuous",
  "active_window": {
-  "window": "2026-09-15/d0-d4-first-local-delivery",
-  "status": "DELIVERED",
-  "note": "首版本地交付完成(D0→D4):R1-R4 全修(probe 9/9:验证切换卡死、全局依赖漏报[worker shorthand 符号解析根因]、验证身份、连线坐标);exec-compare 前后对照端点+可读 diff+对象定位;start.sh 项目路径入口+草稿/会话持久恢复+Ctrl-C 取消;dist/atlas-local-darwin-x64(35MB)从仓库外 /tmp 启动并在 tour+不同结构临时项目走通完整旅程(查找/关系/运行/多行补丁/验证/对照/应用/撤销字节验证/重开/2D-3D)。verify.py PASS exit 0;web 66/66;worker 28/28;cargo 全绿。已知限制:对照需先验证、页面不运行测试命令、HTTP 无作业取消路由、仅 darwin-x64 验证。断点:独立复审(NEEDS_INDEPENDENT_REVIEW),重点=external_names 大样本影响面、exec-compare 授权边界、干净机器 dist 行为。",
-  "evidence_dir": "evidence/development/2026-09-15-d0-delivery",
-  "verification": "evidence/development/2026-09-15-d0-delivery/verify/verification.json"
+  "window": "2026-09-15/ui-v2-fix-r1-r4",
+  "status": "INDEPENDENT_REVIEW_PASSED_FOR_R1_R4",
+  "note": "复审 R1-R4 整改(自测)。R1:写授权改为能力(capable)+跟随当前项目(页内以可写方式打开=明确本机操作者动作,最近项目记录授权);write_gate/apply/revert/reindex/target=here 全部用当前项目目录——双项目(同名同字节 math.js)字节日志证明 beta 全程应用/新版本/撤销而 alpha 恒等于基线。R2:草稿按 analysis|entity 键,connect 整表替换服务端按项目存档,跨版本只经重定位迁移。R3:结果卡按 record.analysis_id 标注并明示跨版本记录;切换/重连清结果卡;外项目任务在面板标注并拒绝冒充当前结果。R4:设置按项目键持久化与切换(入队作业保留自身快照),重启后各项目声明与写授权恢复(restart-check 4/4)。证据:双项目 probe 16/16(真实 Chrome,仓库外最终包,bytesLog 六快照),行为测试 78/78,verify 全 PASS+指纹 2029ab35…三方一致。边界:3D 往返/完整外部 Agent 任务/平台范围维持上轮自测声明。断点:独立复审。 独立复验：复制最终包从仓库外启动，同名双项目及真正停止服务再启动，16/16通过。R1–R4关闭；完整外部Agent任务与3D往返保持待独立验收，不扩大资格。",
+  "evidence_dir": "evidence/development/2026-09-15-ui-v2-fix-r1-r4",
+  "verification": "evidence/development/2026-09-15-ui-v2-fix-r1-r4/verify/verification.json",
+  "probe": "evidence/development/2026-09-15-ui-v2-fix-r1-r4/results.json",
+  "independent_review": "evidence/reviews/2026-09-15-ui-v2-r1-r4-rereview/REPORT.md"
  },
  "windows": [
+  {
+   "id": "2026-09-15/s1-s6-first-version",
+   "started_local": "2026-09-14T16:00:00+08:00",
+   "status": "SELF_TEST_PASSED_NEEDS_INDEPENDENT_REVIEW",
+   "work_items": [
+    "S1-distribution-resource-location",
+    "S2-restart-restoration",
+    "S3-declared-test-and-full-input-compare",
+    "S4-final-package-human-journey",
+    "S5-real-agent-task-and-human-review",
+    "S6-local-trial-delivery"
+   ],
+   "report": "evidence/development/2026-09-15-s1-s6-first-version/REPORT.md",
+   "verification": "evidence/development/2026-09-15-s1-s6-first-version/verify/verification.json",
+   "note": "S1-S6 自测通过。S5 在最终包上复跑:执行 Agent 产出提案 A/B/C(均 verified,未 apply),独立核对 Agent 自建副本复核通过,人在工作台应用/撤销 4/4。本轮修的产品缺陷:资源定位、重启恢复、失败作业无法重试、提案面板在画像到达前渲染导致对照默认输入为空;契约缺 search/exec-compare 由 Agent 找不到入口暴露。"
+  },
   {
    "id": "2026-09-15/d0-d4-first-local-delivery",
    "started_local": "2026-09-14T05:31:51+08:00",
@@ -670,10 +688,34 @@
    "note": "可玩 demo：一条命令打开 + 自带 4 文件示例（调用链/循环/副作用/未解析调用）+ 五步引导 + 明示缺口。三个脚本/界面缺陷由实际运行发现并修复。残余：引导按钮只有第③步经深链接验证；无真人测试；示例规模小。",
    "report": "evidence/development/2026-09-12-w09-demo/REPORT.md",
    "verification": "evidence/development/2026-09-12-w09-demo/verification.json"
+  },
+  {
+   "id": "2026-09-15/ui-v2-u1-u6",
+   "started_local": "2026-09-15T00:00:00+08:00",
+   "status": "SELF_TEST_PASSED_NEEDS_INDEPENDENT_REVIEW",
+   "work_items": [
+    "U1-explore-shell",
+    "U2-run-hierarchy-tasks-cancel",
+    "U3-review-3col-apply-newversion-revert",
+    "U4-project-open-switch-settings",
+    "U5-agent-locate-3d-members",
+    "U6-final-package-journey"
+   ]
+  },
+  {
+   "id": "2026-09-15/ui-v2-fix-r1-r4",
+   "started_local": "2026-09-15T00:00:00+08:00",
+   "status": "SELF_TEST_PASSED_NEEDS_INDEPENDENT_REVIEW",
+   "work_items": [
+    "R1-write-follows-project",
+    "R2-draft-scope-analysis-entity",
+    "R3-record-own-analysis",
+    "R4-per-project-settings"
+   ]
   }
  ],
- "next_work_item": "D2-D4-local-delivery-corrections",
- "next_action": "执行 evidence/reviews/2026-09-15-local-delivery/NEXT_AGENT_PROMPT.md：修复仓库外 worker_missing 和重启恢复，补齐原 D2 测试配置/完整输入对照，重新打包并验收全程；R1-R4 本轮范围内通过，不重复建设。",
+ "next_work_item": "M1-M6-project-map-multi-area",
+ "next_action": "执行 docs/design/atlas-explore-next/DEVELOPMENT_PROMPT.md，按任务书v6 M1→M6把最新探索页设计接成真实产品。现有独立复验资格保留；本轮仅编写任务书，未新增产品实现。",
  "baseline": {
   "foundation_evidence": "../../evidence/foundation/verification.json",
   "status": "REFERENCE_ONLY",
@@ -1350,6 +1392,31 @@
     "L2-restart-restoration"
    ],
    "scope": "Actual shipped binary, copied distribution outside cwd on same machine; not full release or clean-machine acceptance"
+  },
+  {
+   "id": "2026-09-15-s1-s6-independent",
+   "status": "CHANGES_REQUIRED",
+   "report": "evidence/reviews/2026-09-15-s1-s6-independent/REPORT.md",
+   "note": "分发 worker 修复通过，S3 11/11、tour 12/12；显式版本被忽略、重定位草稿未迁移、快速关闭丢页签、unknown_calls 文档错误需要修正。S5 本轮仅审阅已有证据。"
+  },
+  {
+   "id": "2026-09-15-ui-v2-current",
+   "status": "CHANGES_REQUIRED",
+   "report": "evidence/reviews/2026-09-15-ui-v2-current/REPORT.md",
+   "scope": "当前工作树重新构建后的 UI v2 阶段验收；非最终包验收",
+   "note": "六页框架和部分真实操作已落地；运行及修改界面仍待完成，后台任务与设置入口缺操作。浏览器探针13通过2失败；现有web行为68通过。"
+  },
+  {
+   "id": "2026-09-15-ui-v2-u1-u6-independent",
+   "status": "CHANGES_REQUIRED",
+   "report": "evidence/reviews/2026-09-15-ui-v2-u1-u6-independent/REPORT.md",
+   "note": "最终包独立双项目旅程7通过5失败，归并4项整改；源码与包内构建指纹一致；网页既有74项通过。"
+  },
+  {
+   "id": "2026-09-15-ui-v2-r1-r4-rereview",
+   "status": "PASS",
+   "scope": "R1-R4整改、单项目核心回归、双项目切换、设置与写授权重启恢复",
+   "report": "evidence/reviews/2026-09-15-ui-v2-r1-r4-rereview/REPORT.md"
   }
  ],
  "d_family_coverage": {
@@ -1601,9 +1668,8 @@
   }
  ],
  "execution_order_update": {
-  "date": "2026-09-14",
   "work_order": "docs/DAILY_DEVELOPMENT_WORK_ORDER.md",
-  "note": "用户决定先交付首个完整可用版本，再增强细节。扩大当前顺序到 D0-D4；本次仅文档规划，未新增产品能力或资格。"
+  "note": "用户确认语言不限且服务开发者与编程 Agent；新增真实 Agent 首版验收，统一 S1-S6。仅文档顺序更新，不新增实现或验收状态。"
  },
  "frontend_design": {
   "version": "1.0",
@@ -1615,5 +1681,38 @@
   "prototype": "docs/design/workbench-preview.html",
   "evidence": "evidence/design/2026-09-13-workbench/REPORT.md",
   "note": "设计原型浏览器19项通过；未执行产品验证，既有实现/资格/独立复审状态不变。"
+ },
+ "design_delivery": {
+  "version": "2.0",
+  "status": "DESIGN_READY_IMPLEMENTATION_IN_PROGRESS",
+  "entry": "docs/design/atlas-v2/README.md",
+  "prototype": "docs/design/atlas-v2/index.html",
+  "checks": "docs/design/atlas-v2/checks.json",
+  "note": "六页完整界面设计、动态交互、标注图与开发提示词。原型检查不提升产品验收资格，未改产品代码。"
+ },
+ "explore_map_design": {
+  "status": "DESIGN_PROTOTYPE_CHECKED",
+  "entry": "docs/design/atlas-explore-next/README.md",
+  "spec": "docs/design/atlas-explore-next/DESIGN.md",
+  "evidence": "evidence/design/2026-09-15-explore-map/REPORT.md",
+  "note": "用户新要求：项目思维导图、节点i/菜单、三来源解释/解析记录、批注交接、多区域标签。13项原型检查通过；未改产品实现，保留既有验收资格。",
+  "implementation_prompt": "docs/design/atlas-explore-next/DEVELOPMENT_PROMPT.md",
+  "implementation_status": "READY_TO_IMPLEMENT"
+ },
+ "product_design": {
+  "document": "docs/PRODUCT_DESIGN.md",
+  "updated_on": "2026-09-15",
+  "status": "UNIFIED_DESIGN_NOT_DELIVERY_QUALIFICATION",
+  "current": "A: finish and verify existing M1-M6 implementation",
+  "next": "B1 task and acceptance cards; B2 reusable scenarios/assertions; B3 before/after matrix; B4 task review; local MCP adapter reuses mature queries",
+  "later": "C/D: data/impact views, real trace technical proof, project tests and debugger integration",
+  "version": "2.0",
+  "report": "evidence/documentation/2026-09-15-unified-design/REPORT.md",
+  "scope_architecture_audit": "evidence/documentation/2026-09-15-scope-architecture-audit/REPORT.md"
+ },
+ "readme_update": {
+  "date": "2026-09-15",
+  "report": "evidence/documentation/2026-09-15-readme-github/REPORT.md",
+  "scope": "Documentation and copied existing screenshots; no new product acceptance"
  }
 }

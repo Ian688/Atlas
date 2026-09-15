@@ -1,6 +1,8 @@
 # Atlas 架构与改代码入口
 
-更新：2026-09-13。本文说明现有模块的职责、需要保持的语义和可替换的实现。当前任务见 [执行任务书](DAILY_DEVELOPMENT_WORK_ORDER.md)，产品形态见 [USE-CASES](USE-CASES.md)。本次整理不构成产品复验；精确字段/默认值查源码，历史资格查 evidence。
+更新：2026-09-15。本文说明现有模块的职责、需要保持的语义和可替换的实现。当前任务见 [执行任务书](DAILY_DEVELOPMENT_WORK_ORDER.md)，统一产品与架构目标见 [PRODUCT_DESIGN](PRODUCT_DESIGN.md)，稳定用户结果见 [USE-CASES](USE-CASES.md)。本次整理不构成产品复验；精确字段/默认值查源码，历史资格查 evidence。
+
+实施时按 [统一设计第 0 节](PRODUCT_DESIGN.md) 区分当前交付、架构责任、后续能力与非目标。扩大规模和能力靠演进生产器/索引/查询，不以示例大小、UI 层级或传输协议定义核心数据模型。
 
 ## 1. 依赖方向
 
@@ -13,6 +15,8 @@ Atlas 是独立 Rust 核心 + TypeScript 语言 worker + CLI/本地 Web。Modus�
 ```
 
 静态分析不运行用户项目、插件或模型。显式受控执行走 runner，模型解释与提案走消费者/桥接。显示投影不修改事实。
+
+完整语义模型、局部失败、MCP 接入与事实对应表见统一设计第 8–9 节。以下是工程映射，不把计划中的能力列成已实现。运行观测与静态分析并列，按源码版本关联；UI 和外部 Agent 均可直接消费核心接口，内置 Agent 可选。
 
 ## 2. 按故障位置查代码
 
@@ -29,6 +33,7 @@ Atlas 是独立 Rust 核心 + TypeScript 语言 worker + CLI/本地 Web。Modus�
 | 补丁/验证/写入 | `crates/atlas-engine/src/patch.rs`、`crates/atlas-app/src/patchwork.rs` |
 | 桥接/重定位 | `crates/atlas-engine/src/bridge.rs`、`relocate.rs`；`crates/atlas-app/src/agent.rs` |
 | 产品入口/鉴权/进程 | `crates/atlas-app/src/main.rs`、`server.rs`、`worker.rs` |
+| 项目地图/知识/记录 | `web/explore.js`、engine `tree.rs` / `notes.rs`、app `knowledge.rs`；有在途实现，按最新包核对 |
 | 2D/输入/运行/审阅 | `web/app.js`、`web/index.html`、`web/style.css` |
 | 共享层级/布局/3D | `web/hierarchy.js`、`web/layout.js`、`web/city3d.js` |
 
@@ -76,6 +81,8 @@ SQLite/内容存储、作业队列、增量、受控执行与补丁链已有实�
 受控运行物化固定源码副本，记录声明输入、权限、目标同一性、拒绝与副作用观察范围；运行隔离和进程回收是实际执行链职责。空日志不证明没有副作用。嵌套闭包、依赖切片、场景和效果记录的支持范围查 `runner.rs` / `exec.rs`，不要用旧描述推断能力上限。
 
 补丁复用提案→隔离验证→重新索引/测试→审阅→应用/撤销。写入校验目标字节漂移和授权目录，保留锁及错误恢复语义。想支持更丰富的合并/备份可演进此链，不另做无校验写入旁路。
+
+MCP 作为正式规划的接入适配层复用现有服务；HTTP/CLI 已有不代表 MCP 已交付。接入不得绕过项目、版本、作业与授权边界；无需为每种消费者另建分析引擎。Atlas 内嵌外部 Agent 属于另一个会话接入方向。
 
 外部工具使用版本化公开接口和有界证据。环境不可用只阻塞对应集成验证；Atlas 本身继续独立开发。本地源码和数据不默认上传。
 

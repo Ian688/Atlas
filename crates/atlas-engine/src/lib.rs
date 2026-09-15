@@ -7,12 +7,14 @@ pub mod flow;
 pub mod incremental;
 pub mod inter;
 pub mod job;
+pub mod notes;
 pub mod patch;
 pub mod query;
 pub mod relocate;
 pub mod scan;
 pub mod solve;
 pub mod store;
+pub mod tree;
 
 use sha2::{Digest, Sha256};
 use thiserror::Error;

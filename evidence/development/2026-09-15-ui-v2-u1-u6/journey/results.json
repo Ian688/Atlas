@@ -1,0 +1,235 @@
+{
+  "scope": "最终分发包（dist/atlas-local-darwin-x64 复制到 /tmp/atlas-journey/pkg），仓库外真实 Chrome 旅程；分析/项目均为临时样本",
+  "checks": [
+    {
+      "name": "U1 搜索非首屏函数并选中",
+      "result": "PASS",
+      "detail": {
+        "name": "checkout",
+        "path": "math.js"
+      }
+    },
+    {
+      "name": "U1 关系图跳转到被调函数并读源码",
+      "result": "PASS",
+      "detail": {
+        "back": "checkout"
+      }
+    },
+    {
+      "name": "U2 运行 checkout(17,23) 基线返回 -6",
+      "result": "PASS",
+      "detail": {
+        "hero": "返回值\n-6\n观测结果 returned · 109 ms · 退出码 0 · 分析 a18ee8511973 · run bade9b22",
+        "history": "returned · 109 ms · 返回 -6 · 实参 [17,23]\n重填输入（不自动运行）"
+      }
+    },
+    {
+      "name": "U2 输入快照与输出日志页签",
+      "result": "PASS",
+      "detail": {
+        "inputs": "实参 args [17,23]\n这是这一次请求真正发出的完整声明输入；左侧草稿后续的编辑不会改变它。"
+      }
+    },
+    {
+      "name": "U2 后台任务：切换对象后取消仍可达，终态真实",
+      "result": "PASS",
+      "detail": {
+        "terminal": "cancelled（服务端确认）"
+      }
+    },
+    {
+      "name": "U4 项目设置保存测试命令",
+      "result": "PASS",
+      "detail": {
+        "saved": "test_argv=[\"node\",\"--test\"], timeout=60000"
+      }
+    },
+    {
+      "name": "U4 页面打开第二个项目并切换",
+      "result": "PASS",
+      "detail": {
+        "project": "beta"
+      }
+    },
+    {
+      "name": "U4 两个项目状态隔离",
+      "result": "PASS",
+      "detail": {
+        "beta_has": "gamma",
+        "beta_lacks": "checkout"
+      }
+    },
+    {
+      "name": "U4 最近项目切回 alpha",
+      "result": "PASS",
+      "detail": {
+        "project": "alpha"
+      }
+    },
+    {
+      "name": "U5 外部 Agent 经接口提交提案",
+      "result": "PASS",
+      "detail": {
+        "proposal": "1e0d7a57b823",
+        "by": "codex-agent"
+      }
+    },
+    {
+      "name": "U5 Agent 页展示提案并定位到审阅",
+      "result": "PASS",
+      "detail": {
+        "selected": "1e0d7a57b823"
+      }
+    },
+    {
+      "name": "U3 验证：声明的 node --test 真实运行并通过",
+      "result": "PASS",
+      "detail": {
+        "test": "node --test passed inside isolated copy"
+      }
+    },
+    {
+      "name": "U3 运行页同输入对照：基线 -6 vs 补丁 40",
+      "result": "PASS",
+      "detail": {
+        "base": "-6",
+        "patched": "40"
+      }
+    },
+    {
+      "name": "U3 确认应用（真实目录确认层）→ 磁盘更新",
+      "result": "PASS",
+      "detail": {
+        "applied": true,
+        "disk": "checkout → add(a, b)"
+      }
+    },
+    {
+      "name": "U3 打开新版本：重索引切换，源码与运行都是新基线",
+      "result": "PASS",
+      "detail": {
+        "version": "d326699fd4d9",
+        "run": 40
+      }
+    },
+    {
+      "name": "U3 撤销：跨版本提案可达，磁盘恢复",
+      "result": "PASS",
+      "detail": {
+        "reverted": true,
+        "disk_restored": true,
+        "page_shows": "a - b"
+      }
+    },
+    {
+      "name": "U5 3D 选区揭示与文件成员往返",
+      "result": "PASS",
+      "detail": {
+        "city3d_note": "共享选区：symbol:math.js:44:97",
+        "members": "add\ncheckout\nspin"
+      }
+    },
+    {
+      "name": "U6 布局 1600 explore",
+      "result": "PASS",
+      "detail": {
+        "scroll": 1600,
+        "width": 1600
+      }
+    },
+    {
+      "name": "U6 布局 1600 run",
+      "result": "PASS",
+      "detail": {
+        "scroll": 1600,
+        "width": 1600
+      }
+    },
+    {
+      "name": "U6 布局 1600 review",
+      "result": "PASS",
+      "detail": {
+        "scroll": 1600,
+        "width": 1600
+      }
+    },
+    {
+      "name": "U6 布局 1600 home",
+      "result": "PASS",
+      "detail": {
+        "scroll": 1600,
+        "width": 1600
+      }
+    },
+    {
+      "name": "U6 布局 1024 explore",
+      "result": "PASS",
+      "detail": {
+        "scroll": 1024,
+        "width": 1024
+      }
+    },
+    {
+      "name": "U6 布局 1024 run",
+      "result": "PASS",
+      "detail": {
+        "scroll": 1024,
+        "width": 1024
+      }
+    },
+    {
+      "name": "U6 布局 1024 review",
+      "result": "PASS",
+      "detail": {
+        "scroll": 1024,
+        "width": 1024
+      }
+    },
+    {
+      "name": "U6 布局 1024 home",
+      "result": "PASS",
+      "detail": {
+        "scroll": 1024,
+        "width": 1024
+      }
+    },
+    {
+      "name": "U6 布局 390 explore",
+      "result": "PASS",
+      "detail": {
+        "scroll": 390,
+        "width": 390
+      }
+    },
+    {
+      "name": "U6 布局 390 run",
+      "result": "PASS",
+      "detail": {
+        "scroll": 390,
+        "width": 390
+      }
+    },
+    {
+      "name": "U6 布局 390 review",
+      "result": "PASS",
+      "detail": {
+        "scroll": 390,
+        "width": 390
+      }
+    },
+    {
+      "name": "U6 布局 390 home",
+      "result": "PASS",
+      "detail": {
+        "scroll": 390,
+        "width": 390
+      }
+    },
+    {
+      "name": "browser JS errors",
+      "result": "PASS",
+      "detail": []
+    }
+  ]
+}

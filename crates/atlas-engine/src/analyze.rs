@@ -52,9 +52,40 @@ pub fn analyze_controlled(
         .filter(|p| crate::scan::is_source(p))
         .cloned()
         .collect();
-    let acknowledged: BTreeSet<_> = facts.parsed_files.iter().cloned().collect();
-    if expected != acknowledged || acknowledged.len() != facts.parsed_files.len() {
-        return Err(invalid("worker_file_coverage_mismatch"));
+    let acknowledged: BTreeSet<String> = facts.parsed_files.iter().cloned().collect();
+    // The request deliberately carries `package.json`: TypeScript's virtual
+    // resolver reads it, never runs it, and a source file that imports one makes
+    // the worker report it as a parsed file too. So what the worker must
+    // acknowledge is exactly the sources, and what it may acknowledge is
+    // anything Atlas handed it -- no more (a path nobody asked about is a
+    // derivation inventing its input) and no less (a source that disappears is
+    // coverage lying by omission, R6).
+    let offered: BTreeSet<&String> = sources.keys().collect();
+    let complete = expected.iter().all(|path| acknowledged.contains(path));
+    let missing: Vec<&str> = expected
+        .iter()
+        .filter(|path| !acknowledged.contains(*path))
+        .map(String::as_str)
+        .take(5)
+        .collect();
+    let invented: Vec<&str> = acknowledged
+        .iter()
+        .filter(|path| !offered.contains(*path))
+        .map(String::as_str)
+        .take(5)
+        .collect();
+    if !complete || !invented.is_empty() || acknowledged.len() != facts.parsed_files.len() {
+        // Name the files. This refusal exists so a derivation cannot forget a
+        // function quietly, and it is the one answer that is useless without
+        // names: the reader holds a project, not a set difference.
+        return Err(invalid(&format!(
+            "worker_file_coverage_mismatch:requested={}:acknowledged={}:missing={}:invented={}:duplicated={}:missing_files={missing:?}:invented_files={invented:?}",
+            expected.len(),
+            acknowledged.len(),
+            missing.len(),
+            invented.len(),
+            facts.parsed_files.len().saturating_sub(acknowledged.len()),
+        )));
     }
     if facts
         .diagnostics
@@ -297,13 +328,78 @@ pub fn analyze_controlled(
         "Only captured UTF-8 JS/TS inputs; external dependencies, standard library and project tsconfig are not loaded.".into(),
         "Ignored directories are explicit boundaries; their unvisited descendants are not counted.".into(),
     ];
+    // A file whose dataflow cannot be derived inside the per-function budgets
+    // keeps its symbols, calls and sources and loses its dataflow -- declared in
+    // coverage, diagnostics and limitations -- instead of taking the whole
+    // project down with it. One machine-generated function in a vendored bundle
+    // used to refuse the entire analysis, which is a worse answer than "these
+    // functions have no dataflow, and here is the file and the number".
+    //
+    // The unit is the file rather than the function, and that is forced by the
+    // contract: a nested function's captures point at bindings declared in its
+    // enclosing function, so a half-removed file would leave dangling captures.
+    // Applied before validation, so the coverage check sees exactly what was
+    // withheld and holds every other symbol to having flow.
+    let mut withheld_symbols: std::collections::BTreeSet<String> = Default::default();
+    if let Some(mut flow) = facts.flow.take() {
+        let withheld = flow::withheld_files(&flow.functions);
+        if withheld.is_empty() {
+            facts.flow = Some(flow);
+        } else {
+            let paths: std::collections::BTreeSet<&str> =
+                withheld.iter().map(|file| file.path.as_str()).collect();
+            flow.functions
+                .retain(|function| !paths.contains(function.path.as_str()));
+            withheld_symbols = facts
+                .symbols
+                .iter()
+                .filter(|symbol| paths.contains(symbol.path.as_str()))
+                .map(|symbol| symbol.id.clone())
+                .collect();
+            for file in &withheld {
+                facts.diagnostics.push(atlas_contract::Diagnostic {
+                    path: file.path.clone(),
+                    code: "flow_withheld_over_budget".into(),
+                    detail: format!(
+                        "flow_withheld_over_budget {what}={count} limit={limit} offenders={offenders} functions={} [{},{})",
+                        file.functions, file.start, file.end,
+                        what = file.what,
+                        count = file.count,
+                        limit = file.limit,
+                        offenders = file.offenders,
+                    ),
+                });
+            }
+            coverage.insert("flow_withheld_files".into(), withheld.len());
+            coverage.insert(
+                "flow_withheld_functions".into(),
+                withheld.iter().map(|file| file.functions).sum(),
+            );
+            limitations.push(format!(
+                "{} file(s) keep their symbols, calls and sources but have no dataflow: one function in each exceeded a per-function budget ({}/{} bindings/scopes). Each is listed in diagnostics as flow_withheld_over_budget with the file, the number and the span; they are withheld, not analyzed.",
+                withheld.len(),
+                flow::MAX_BINDINGS_PER_FUNCTION,
+                flow::MAX_SCOPES_PER_FUNCTION,
+            ));
+            facts.flow = Some(flow);
+        }
+    }
     // W01-W03: validate the Flow IR, derive CFGs and local dataflow facts.
     let mut flow_records = match &facts.flow {
         Some(flow) => {
-            flow::validate_flow(
+            let symbol_ids: HashSet<&str> = facts
+                .symbols
+                .iter()
+                .map(|symbol| symbol.id.as_str())
+                .collect();
+            let withheld_ids: std::collections::BTreeSet<&str> =
+                withheld_symbols.iter().map(String::as_str).collect();
+            flow::validate_flow_with_symbols(
                 flow,
                 &sources,
                 &symbols_map(&facts.symbols),
+                &symbol_ids,
+                &withheld_ids,
                 snapshot.id.as_str(),
             )?;
             let mut records = Vec::new();

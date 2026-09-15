@@ -1,0 +1,17 @@
+flowchart TD
+  start["打开项目 → 地图或搜索定位价格函数"]
+  start --> understand["看源码、调用者与已有依据"]
+  understand --> goal["创建任务：负金额报错，零金额允许"]
+  goal --> expected["确认场景与预期：负数 / 零 / 正数"]
+  expected --> context["预览必要源码、节点版本、允许范围"]
+  context --> agent["复制交接包或发送给已配置 Agent"]
+  agent --> patch["收到提案，关联原任务与基线"]
+  patch --> isolated["隔离验证：补丁分析 + 声明的测试"]
+  isolated --> matrix["同场景运行基线与补丁，展示断言矩阵"]
+  matrix --> review["审阅：差异、影响、失败与未验证问题"]
+  review --> choice{"用户决定"}
+  choice -->|需要修改| feedback["具体批注与失败证据返回任务"]
+  feedback --> agent
+  choice -->|接受| apply["确认真实目录和文件 → 授权应用"]
+  apply --> fresh["重新分析 → 新版本同一节点"]
+  fresh --> rerun["重跑场景 / 保留记录 / 必要时撤销"]

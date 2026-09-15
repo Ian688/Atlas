@@ -236,7 +236,8 @@ impl Store {
             refused INTEGER NOT NULL,
             body TEXT NOT NULL,
             created_at INTEGER NOT NULL);
-          CREATE INDEX IF NOT EXISTS scenario_results_symbol ON scenario_results(analysis,symbol,created_at);")?;
+          CREATE INDEX IF NOT EXISTS scenario_results_symbol ON scenario_results(analysis,symbol,created_at);
+          CREATE TABLE IF NOT EXISTS ui_state(key TEXT PRIMARY KEY, body TEXT NOT NULL, updated_at INTEGER NOT NULL);")?;
                 tx.commit()?;
                 Ok(())
             })?;
@@ -281,6 +282,102 @@ impl Store {
         // before the column exists fails, and the store never opens. Like the
         // tables, it is only created when it is really missing: the check is a
         // read, and an existing index must not cost a writer lock.
+        // A store created before the workbench could remember a task has no
+        // `ui_state` table. It is a scratchpad, not a published fact, but it
+        // lives in the store for the same reason everything else does: the
+        // store is the one thing that survives a restart and is scoped to what
+        // the operator pointed at.
+        let has_ui_state = {
+            let mut statement =
+                conn.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ui_state'")?;
+            statement.exists([])?
+        };
+        if !has_ui_state {
+            retry_on_busy(|| {
+                conn.execute_batch(
+                    "CREATE TABLE IF NOT EXISTS ui_state(key TEXT PRIMARY KEY, body TEXT NOT NULL, updated_at INTEGER NOT NULL);",
+                )?;
+                Ok(())
+            })?;
+        }
+        // Node knowledge (interpretations and handoffs) was added after the first
+        // workbench shipped, so it is created the same additive way as ui_state:
+        // a store written by the previous version gains the tables without
+        // taking a writer lock on every read-only open.
+        let has_node_knowledge = {
+            let mut statement = conn.prepare(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='interpretations'",
+            )?;
+            statement.exists([])?
+        };
+        if !has_node_knowledge {
+            retry_on_busy(|| {
+                conn.execute_batch(
+                    "CREATE TABLE IF NOT EXISTS interpretations(
+                       id TEXT PRIMARY KEY,
+                       project TEXT NOT NULL,
+                       anchor TEXT NOT NULL,
+                       analysis_id TEXT NOT NULL,
+                       entity_id TEXT NOT NULL,
+                       author TEXT NOT NULL,
+                       body TEXT NOT NULL,
+                       source_refs TEXT NOT NULL,
+                       basis_analysis TEXT NOT NULL,
+                       revises TEXT,
+                       created_at INTEGER NOT NULL);
+                     CREATE INDEX IF NOT EXISTS interpretations_anchor ON interpretations(project,anchor,created_at);
+                     CREATE TABLE IF NOT EXISTS handoffs(
+                       id TEXT PRIMARY KEY,
+                       project TEXT NOT NULL,
+                       analysis_id TEXT NOT NULL,
+                       entity_id TEXT NOT NULL,
+                       anchor TEXT NOT NULL,
+                       created_by TEXT NOT NULL,
+                       title TEXT NOT NULL,
+                       goal TEXT NOT NULL,
+                       scope TEXT NOT NULL,
+                       annotations TEXT NOT NULL,
+                       messages TEXT NOT NULL,
+                       state TEXT NOT NULL,
+                       proposal_id TEXT,
+                       created_at INTEGER NOT NULL,
+                       updated_at INTEGER NOT NULL);
+                     CREATE INDEX IF NOT EXISTS handoffs_anchor ON handoffs(project,anchor,updated_at);",
+                )?;
+                Ok(())
+            })?;
+        }
+        // On-demand model explanations: a generated answer is a record of what a
+        // model said about one node at one version. It is stored apart from the
+        // reader's own interpretations so a regeneration can never overwrite what
+        // a person wrote, and so the model, the endpoint and the version it was
+        // asked about stay visible next to the text.
+        let has_llm = {
+            let mut statement = conn.prepare(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='llm_explanations'",
+            )?;
+            statement.exists([])?
+        };
+        if !has_llm {
+            retry_on_busy(|| {
+                conn.execute_batch(
+                    "CREATE TABLE IF NOT EXISTS llm_explanations(
+                       id TEXT PRIMARY KEY,
+                       project TEXT NOT NULL,
+                       anchor TEXT NOT NULL,
+                       analysis_id TEXT NOT NULL,
+                       entity_id TEXT NOT NULL,
+                       model TEXT NOT NULL,
+                       base_url TEXT NOT NULL,
+                       body TEXT NOT NULL,
+                       state TEXT NOT NULL,
+                       error TEXT,
+                       created_at INTEGER NOT NULL);
+                     CREATE INDEX IF NOT EXISTS llm_anchor ON llm_explanations(project,anchor,created_at);",
+                )?;
+                Ok(())
+            })?;
+        }
         let indexed = {
             let mut statement = conn
                 .prepare("SELECT 1 FROM sqlite_master WHERE type='index' AND name='jobs_queue'")?;
@@ -913,5 +1010,143 @@ impl Store {
             records.push(serde_json::from_str(&row?)?);
         }
         Ok(records)
+    }
+
+    /// Remember where a person left off, keyed by something that identifies the
+    /// task rather than the browser tab.
+    ///
+    /// This is a scratchpad and deliberately not part of the published record:
+    /// it holds the selection, the open task tab and the input drafts so that
+    /// stopping the service and starting it again resumes the same task. A
+    /// caller chooses the key, so the same store can hold the state of two
+    /// different projects without them reading each other.
+    pub fn ui_state(&self, key: &str) -> Result<Option<serde_json::Value>> {
+        if key.is_empty() {
+            return Err(invalid("ui_state_key_required"));
+        }
+        let conn = self.connection()?;
+        let body: Option<String> = conn
+            .query_row(
+                "SELECT body FROM ui_state WHERE key=?1",
+                params![key],
+                |row| row.get(0),
+            )
+            .optional()?;
+        match body {
+            Some(body) => Ok(Some(serde_json::from_str(&body)?)),
+            None => Ok(None),
+        }
+    }
+
+    /// Overwrite one key's remembered state. Last write wins: this is where a
+    /// person left off, not an immutable observation, so there is nothing to
+    /// preserve about an earlier value.
+    pub fn set_ui_state(&self, key: &str, body: &serde_json::Value) -> Result<()> {
+        if key.is_empty() {
+            return Err(invalid("ui_state_key_required"));
+        }
+        let encoded = serde_json::to_string(body)?;
+        // Bounded because this comes from a page: unbounded local state would
+        // be a way to grow the store without ever indexing anything.
+        if encoded.len() > 512 * 1024 {
+            return Err(invalid("ui_state_too_large"));
+        }
+        let conn = self.connection()?;
+        retry_on_busy(|| {
+            conn.execute(
+                "INSERT INTO ui_state(key,body,updated_at) VALUES(?1,?2,?3) \
+                 ON CONFLICT(key) DO UPDATE SET body=excluded.body, updated_at=excluded.updated_at",
+                params![key, encoded, crate::job::now_ms()],
+            )?;
+            Ok(())
+        })
+    }
+
+    /// One generated explanation: what a model said about one anchored node at
+    /// one analysis version. Never a substitute for the reader's own
+    /// interpretation, and never written over one.
+    pub fn save_llm_explanation(&self, value: &serde_json::Value) -> Result<()> {
+        let text = |key: &str| value[key].as_str().unwrap_or("").to_string();
+        let optional = |key: &str| value[key].as_str().map(str::to_string);
+        let conn = self.connection()?;
+        retry_on_busy(|| {
+            conn.execute(
+                "INSERT OR REPLACE INTO llm_explanations(id,project,anchor,analysis_id,entity_id,model,base_url,body,state,error,created_at) \
+                 VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
+                params![
+                    text("id"),
+                    text("project"),
+                    text("anchor"),
+                    text("analysis_id"),
+                    text("entity_id"),
+                    text("model"),
+                    text("base_url"),
+                    text("body"),
+                    text("state"),
+                    optional("error"),
+                    value["created_at"].as_i64().unwrap_or_else(crate::job::now_ms),
+                ],
+            )?;
+            Ok(())
+        })
+    }
+
+    /// One generation, by id. A page that navigated away and came back reads
+    /// the same row; polling and history are not two paths.
+    pub fn llm_explanation(&self, id: &str) -> Result<Option<serde_json::Value>> {
+        let conn = self.connection()?;
+        let mut statement = conn.prepare(
+            "SELECT id,analysis_id,entity_id,model,base_url,body,state,error,created_at
+             FROM llm_explanations WHERE id=?1",
+        )?;
+        let mut rows = statement.query(params![id])?;
+        let Some(row) = rows.next()? else {
+            return Ok(None);
+        };
+        Ok(Some(serde_json::json!({
+            "id": row.get::<_, String>(0)?,
+            "analysis_id": row.get::<_, String>(1)?,
+            "entity_id": row.get::<_, String>(2)?,
+            "model": row.get::<_, String>(3)?,
+            "base_url": row.get::<_, String>(4)?,
+            "body": row.get::<_, String>(5)?,
+            "state": row.get::<_, String>(6)?,
+            "error": row.get::<_, Option<String>>(7)?,
+            "created_at": row.get::<_, i64>(8)?,
+        })))
+    }
+
+    /// The explanations already generated for one anchor, newest first.
+    pub fn llm_explanations(
+        &self,
+        project: &str,
+        anchor: &str,
+        limit: usize,
+    ) -> Result<Vec<serde_json::Value>> {
+        let limit = limit.clamp(1, 50);
+        let conn = self.connection()?;
+        let mut statement = conn.prepare(
+            "SELECT id,analysis_id,entity_id,model,base_url,body,state,error,created_at
+             FROM llm_explanations WHERE project=?1 AND anchor=?2
+             ORDER BY created_at DESC, id DESC LIMIT ?3",
+        )?;
+        let rows = statement.query_map(params![project, anchor, limit as i64], |row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, String>(0)?,
+                "analysis_id": row.get::<_, String>(1)?,
+                "entity_id": row.get::<_, String>(2)?,
+                "model": row.get::<_, String>(3)?,
+                "base_url": row.get::<_, String>(4)?,
+                "body": row.get::<_, String>(5)?,
+                "state": row.get::<_, String>(6)?,
+                "error": row.get::<_, Option<String>>(7)?,
+                "created_at": row.get::<_, i64>(8)?,
+            }))
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
     }
 }

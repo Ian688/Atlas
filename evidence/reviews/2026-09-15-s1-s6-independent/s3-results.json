@@ -1,0 +1,111 @@
+{
+  "scope": "实际分发包 + 真实 Chrome；测试命令以启动配置声明，在隔离副本执行",
+  "checks": [
+    {
+      "name": "搜索并选中目标函数",
+      "result": "PASS",
+      "detail": "total"
+    },
+    {
+      "name": "画像要求 TAX_RATE 时表单出现 globals 输入",
+      "result": "PASS",
+      "detail": "globals · 画像声明读取：TAX_RATE；逐名 JSON 值"
+    },
+    {
+      "name": "声明 globals 后真实运行成功",
+      "result": "PASS",
+      "detail": [
+        "本次目标 symbol:src/tax.js:0:87 · 分析 47b3c53952b8",
+        "实际输入：[100]",
+        "观测结果 returned · 207 ms · 退出码 0",
+        "返回值 125",
+        "观测边界：coverage=not_sampled · unknown_paths=not_observed。只有入口调用的返回/抛出被观测，没有行级覆盖采样；未观测路径保持未知，静态 BFS 不作为执行顺序。"
+      ]
+    },
+    {
+      "name": "未验证前页面显示启动配置声明的测试命令",
+      "result": "PASS",
+      "detail": [
+        "还没有验证：没有派生补丁树，也没有跑测试。",
+        "验证配置（启动时声明）：将在隔离副本内执行 [\"node\",\"--test\"]，超时 120000 ms。测试命令只能是这个 argv，页面不能临时附加。",
+        "验证会从不可变快照物化隔离副本并重新派生分析；未声明测试时如实写\"没有跑任何测试\"。"
+      ]
+    },
+    {
+      "name": "验证完成且页面显示真实测试命令与退出码",
+      "result": "PASS",
+      "detail": [
+        "观测：测试命令 [\"node\",\"--test\"] · 通过（退出码 0） · 退出码 0 · 545 ms",
+        "测试输出（隔离副本内的真实 stdout/stderr）"
+      ]
+    },
+    {
+      "name": "测试输出可读（stdout 在折叠区里）",
+      "result": "PASS",
+      "detail": "测试输出（隔离副本内的真实 stdout/stderr）"
+    },
+    {
+      "name": "对照默认沿用运行页签的声明输入（不是空数组）",
+      "result": "PASS",
+      "detail": "[100]"
+    },
+    {
+      "name": "对照区明确列出将发出的完整声明输入",
+      "result": "PASS",
+      "detail": "两侧使用同一份声明输入：实参 [100] · globals {\"TAX_RATE\":0.25}"
+    },
+    {
+      "name": "对照两侧都真实运行并返回不同结果（125 / 126）",
+      "result": "PASS",
+      "detail": [
+        "两侧同一输入：args [100] · globals {\"TAX_RATE\":0.25}",
+        "基线（当前工作台版本）",
+        "verdict returned · 300 ms · 退出码 0",
+        "返回值/异常：125",
+        "版本 47b3c53952b8 · snapshot c72b844b9961",
+        "补丁（验证派生的候选版本）",
+        "verdict returned · 804 ms · 退出码 0",
+        "返回值/异常：126"
+      ]
+    },
+    {
+      "name": "测试失败被如实显示（退出码非 0，不是\"没跑\"也不是通过）",
+      "result": "PASS",
+      "detail": [
+        "观测：测试命令 [\"node\",\"--test\"] · 失败（退出码非 0） · 退出码 1 · 540 ms",
+        "观测：测试命令 [\"node\",\"--test\"] · 通过（退出码 0） · 退出码 0 · 545 ms"
+      ]
+    },
+    {
+      "name": "receiver（this）被带到对照两侧，两侧都真实运行",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "args": [],
+          "globals": null,
+          "note": "两侧使用同一份声明输入；这里回显实际发出的内容，便于核对没有被丢弃的输入。",
+          "this_arg": {
+            "rate": 3
+          }
+        },
+        "profile": {
+          "required_context": [],
+          "required_grants": [
+            "unknown_calls"
+          ]
+        },
+        "base": "returned",
+        "patched": "returned",
+        "base_value": {
+          "kind": "number",
+          "value": 30
+        },
+        "patched_value": {
+          "kind": "number",
+          "value": 30
+        }
+      }
+    }
+  ],
+  "exit_code": 0
+}

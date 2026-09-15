@@ -1322,6 +1322,7 @@ async function city3dStart(canvas) {
     cityText('city-selected',
       `${column.name} · ${column.path} · 声明 ${column.functionCount} 函数 · 已展开 ${column.visibleSlabs} 层 · 未解析调用 ${column.unresolved}`);
     cityText('city-source', '读取固定快照…');
+    cityRenderMembers(filePath);
     try {
       const source = await state.api('source', { entity: query.entity });
       cityText('city-source', source.content);
@@ -1330,6 +1331,49 @@ async function city3dStart(canvas) {
     } catch (error) {
       cityText('city-source', '该对象可能没有可读取的源码：' + String(error.message || error));
       cityText('city-source-meta', '');
+    }
+  }
+
+  // D2 文件成员：所选文件在这份分析里的真实函数成员。每个成员都能带回 2D
+  // 工作台——选区、分析版本与令牌走 fragment（不进 HTTP 请求），抵达后 2D
+  // 选中同一个对象。聚合柱体没有单一文件，列不出成员就明说。
+  function cityRenderMembers(filePath) {
+    const host = typeof document === 'undefined' ? null : document.getElementById('city-members');
+    if (!host) return;
+    host.replaceChildren();
+    if (!filePath || !state.nodes.length) {
+      const empty = document.createElement('p');
+      empty.className = 'subtle';
+      empty.textContent = filePath ? '这个柱体没有单一文件，切到「文件」层级点选具体文件后列出成员。' : '点选一根文件柱体，这里列出它的函数成员。';
+      host.append(empty);
+      return;
+    }
+    const members = state.nodes.filter((n) => n.kind === 'function' && n.path === filePath);
+    if (!members.length) {
+      const empty = document.createElement('p');
+      empty.className = 'subtle';
+      empty.textContent = `这一份分析没有给出 ${filePath} 的函数成员。`;
+      host.append(empty);
+      return;
+    }
+    for (const member of members.slice(0, 40)) {
+      const link = document.createElement('a');
+      link.className = 'city-member';
+      link.textContent = member.name || member.id;
+      link.title = `在 2D 工作台打开 ${member.name || member.id}（同一对象、同一版本）`;
+      const params = new URLSearchParams();
+      params.set('selection', member.id);
+      params.set('analysis', state.analysisId || '');
+      params.set('page', 'explore');
+      if (state.token) params.set('token', state.token);
+      link.setAttribute('href', `/#${params.toString()}`);
+      host.append(link);
+    }
+    if (members.length > 40) {
+      const note = document.createElement('p');
+      note.className = 'subtle';
+      note.textContent = `另有 ${members.length - 40} 个成员按显示上限省略。`;
+      host.append(note);
     }
   }
 
@@ -1519,6 +1563,7 @@ async function city3dStart(canvas) {
         if (fragment.analysis) roundTrip.set('analysis', fragment.analysis);
         if (fragment.token) roundTrip.set('token', fragment.token);
         // 任务状态(页签/镜头)跟选区一起往返,读者回来还在同一项工作里。
+        if (fragment.page) roundTrip.set('page', fragment.page);
         if (fragment.mode) roundTrip.set('mode', fragment.mode);
         if (fragment.lens) roundTrip.set('lens', fragment.lens);
         back.setAttribute('href', `/#${roundTrip.toString()}`);

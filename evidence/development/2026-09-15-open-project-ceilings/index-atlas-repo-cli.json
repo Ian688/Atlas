@@ -1,0 +1,436 @@
+{
+  "binary_fingerprint": "c15d62229eb6c372892db7f1068250b1d02b0c20c361aee0c547a258230f46b6",
+  "call_count": 78219,
+  "coverage": {
+    "catalog_entries": 2742,
+    "disposition:captured": 2528,
+    "disposition:directory": 198,
+    "disposition:ignored": 16,
+    "encountered_source_files": 74,
+    "flow_complete_within_profile": 2180,
+    "flow_frontier_functions": 0,
+    "flow_functions": 2180,
+    "flow_partial": 0,
+    "flow_unknown_regions": 2,
+    "flow_withheld_files": 1,
+    "flow_withheld_functions": 11126,
+    "interproc_recursive_sccs": 4,
+    "interproc_sccs": 2180,
+    "parsed_source_files": 74
+  },
+  "diagnostics": [
+    {
+      "code": "flow_withheld_over_budget",
+      "detail": "flow_withheld_over_budget bindings=10975 limit=4000 offenders=1 functions=11126 [8841,1604190)",
+      "path": "web/vendor/elk.bundled.js"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "class_declaration [72773,73073)",
+      "path": "web/tests/app.behavior.test.mjs"
+    },
+    {
+      "code": "FLOW_UNKNOWN_REGION",
+      "detail": "class_declaration [73910,74154)",
+      "path": "web/tests/app.behavior.test.mjs"
+    }
+  ],
+  "edge_count": 94354,
+  "engine": "foundation-flow-0.2.2",
+  "file_count": 2537,
+  "flow_digest": "0fee596facb8e8f674ad21498045a8f0092f63b06562da6cd8715b7aea1410e1",
+  "function_count": 13306,
+  "id": "41f5fbb646987d408674f888948aec9ac6b84ab6f6b1d85e084d47d37c009bad",
+  "limitations": [
+    "Lexical declaration candidates, not a complete runtime call graph or execution trace.",
+    "Snapshot captures files over an interval; it is not an atomic filesystem transaction.",
+    "Only captured UTF-8 JS/TS inputs; external dependencies, standard library and project tsconfig are not loaded.",
+    "Ignored directories are explicit boundaries; their unvisited descendants are not counted.",
+    "1 file(s) keep their symbols, calls and sources but have no dataflow: one function in each exceeded a per-function budget (4000/4000 bindings/scopes). Each is listed in diagnostics as flow_withheld_over_budget with the file, the number and the span; they are withheld, not analyzed.",
+    "Local flow facts cover declared profile js-structured-control.v1 only; other constructs are explicit unknowns. Interprocedural summaries are symbolic per function, with up to 8 scalar-argument calling contexts per callee; other calls use the symbolic fallback. Captured origins are not re-substituted and unknown callees stay top."
+  ],
+  "node_count": 16048,
+  "producer": "typescript/5.9.3;worker/0.2.2",
+  "recursive_components": [
+    [
+      "symbol:evidence/development/2026-09-15-open-project-ceilings/probe-worker-output.cjs:532:954"
+    ],
+    [
+      "symbol:web/app.js:101555:102026"
+    ],
+    [
+      "symbol:web/app.js:65319:67272"
+    ],
+    [
+      "symbol:web/tests/app.behavior.test.mjs:14135:14297"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:101249:101305"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:108432:108491"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:108492:108551"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:146297:146372"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:176203:176292",
+      "symbol:web/vendor/elk.bundled.js:254341:254477"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:179103:179193"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:197189:197290",
+      "symbol:web/vendor/elk.bundled.js:306935:307102",
+      "symbol:web/vendor/elk.bundled.js:379725:379946"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:210518:210628"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:228760:228881"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:232410:232532"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:232655:232777"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:239396:239523"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:243652:243782"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:243914:244043",
+      "symbol:web/vendor/elk.bundled.js:260033:260172",
+      "symbol:web/vendor/elk.bundled.js:270786:270932",
+      "symbol:web/vendor/elk.bundled.js:314447:314619",
+      "symbol:web/vendor/elk.bundled.js:534553:534932"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:255027:255163"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:255164:255300"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:257792:257931"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:262715:262856"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:267872:268015"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:270201:270346"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:277327:277476"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:281717:281869"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:296386:296547"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:298331:298492"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:301437:301600",
+      "symbol:web/vendor/elk.bundled.js:422513:422769"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:312373:312544"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:318816:318991",
+      "symbol:web/vendor/elk.bundled.js:418428:418681",
+      "symbol:web/vendor/elk.bundled.js:678572:679212",
+      "symbol:web/vendor/elk.bundled.js:873326:874811"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:320764:320941"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:322188:322365"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:323976:324155"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:332198:332383"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:333876:334062"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:339170:339359"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:356592:356797"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:357212:357418"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:360956:361164"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:363061:363271"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:363483:363693"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:365176:365388"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:368598:368812"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:370103:370317"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:372486:372702",
+      "symbol:web/vendor/elk.bundled.js:498600:498936"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:379059:379280"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:379281:379502"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:380617:380839"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:383076:383299"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:389443:389673"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:390136:390367"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:391762:391993"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:391994:392225"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:398333:398569"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:399519:399756"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:405041:405282"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:405769:406011"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:407957:408200"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:411149:411395"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:424057:424315"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:424316:424574"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:427704:427966"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:432470:432736"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:436231:436500"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:451420:451702"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:452553:452836"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:452837:453120",
+      "symbol:web/vendor/elk.bundled.js:498937:499274"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:454262:454547"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:472795:473097"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:477681:477990"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:483300:483614"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:484246:484561"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:488395:488716"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:489039:489361"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:490336:490660"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:499275:499612"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:501655:501996"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:508571:508920"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:522928:523296"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:523297:523665"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:524407:524777"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:527758:528131"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:531518:531895"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:533413:533792"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:550088:550486"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:561490:561903"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:563563:563979"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:578416:578847"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:581016:581451"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:584078:584517"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:592137:592592"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:600029:600501"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:605299:605783"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:611680:612178"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:623885:624405"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:629663:630192"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:637724:638272"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:691631:692298"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:70414:70459"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:708650:709348"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:712172:712883"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:715763:716486"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:719412:720150"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:726906:727663"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:731479:732251"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:732252:733026"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:738544:739346"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:755044:755896"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:760181:761044"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:764568:765460"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:807486:808554"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:855111:856442"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:866065:867471"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:874812:876345",
+      "symbol:web/vendor/elk.bundled.js:879534:881161"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:89477:89527"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:90255:90306"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:926171:930116"
+    ],
+    [
+      "symbol:web/vendor/elk.bundled.js:96845:96899"
+    ],
+    [
+      "symbol:workers/typescript/src/flow.mjs:3158:3679"
+    ],
+    [
+      "symbol:workers/typescript/tests/flow.test.mjs:13818:14048"
+    ]
+  ],
+  "schema": "atlas.analysis.v1",
+  "snapshot_id": "12e589f885020ef2d37a4bab0486cfeaf110ddcbfff496f6e04502833f3280fb",
+  "unresolved_call_count": 32803
+}

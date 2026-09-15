@@ -1,0 +1,122 @@
+{
+  "scope": "最终分发包 + 真实 Chrome；examples/tour 全程",
+  "checks": [
+    {
+      "name": "查找并选中 redeem",
+      "result": "PASS",
+      "detail": "redeem"
+    },
+    {
+      "name": "点击真实关系后 标题/路径/源码 指向同一对象",
+      "result": "PASS",
+      "detail": {
+        "name": "validate",
+        "path": "src/coupon.js",
+        "source": "src/coupon.js · 字节 107–282",
+        "clicked_with": "真实指针点击"
+      }
+    },
+    {
+      "name": "点击带字节锚点的值行会定位到源码位置",
+      "result": "PASS",
+      "detail": "源码定位：正常返回 · 字节 187–192 · 窗口 107–282（第 6 行起，共 753 字节）显示完整对象"
+    },
+    {
+      "name": "运行 onlyPositive 得到真实返回值",
+      "result": "PASS",
+      "detail": [
+        "本次目标 symbol:src/ledger.js:425:511 · 分析 1fb983909077",
+        "实际输入：[[1,-2,3]]",
+        "观测结果 returned · 133 ms · 退出码 0",
+        "返回值 [1,3]"
+      ]
+    },
+    {
+      "name": "验证等待期间切换对象：别人名下不出现这次的提案",
+      "result": "PASS",
+      "detail": [
+        "提案是 Intent：它还没有写进任何检出目录，也没有改变已发布的分析。",
+        "当前选区还没有提案。"
+      ]
+    },
+    {
+      "name": "切换回来后验证结果落在正确的提案上，且测试真的跑了",
+      "result": "PASS",
+      "detail": [
+        "观测：测试命令 [\"node\",\"--test\"] · 通过（退出码 0） · 退出码 0 · 281 ms"
+      ]
+    },
+    {
+      "name": "对照实参默认沿用运行页签的声明输入",
+      "result": "PASS",
+      "detail": {
+        "profileSymbol": "symbol:src/ledger.js:425:511",
+        "selectedId": "symbol:src/ledger.js:425:511",
+        "params": [
+          {
+            "index": 0,
+            "name": "values"
+          }
+        ],
+        "draft": {
+          "fields": {
+            "0": "[1,-2,3]"
+          },
+          "raw": "[]",
+          "advanced": false,
+          "receiver": "",
+          "globals": {},
+          "viaArgs": "",
+          "viaChain": ""
+        },
+        "formResult": "{\"args\":[[1,-2,3]]}",
+        "formError": null,
+        "argsValue": "[[1,-2,3]]"
+      }
+    },
+    {
+      "name": "前后对照两侧都真实运行且结果不同（[1,3] / [2,6]）",
+      "result": "PASS",
+      "detail": [
+        "两侧同一输入：args [[1,-2,3]]",
+        "基线（当前工作台版本）",
+        "verdict returned · 128 ms · 退出码 0",
+        "返回值/异常：[1,3]",
+        "版本 1fb983909077 · snapshot 23afa4dc3efd",
+        "补丁（验证派生的候选版本）",
+        "verdict returned · 122 ms · 退出码 0",
+        "返回值/异常：[2,6]"
+      ]
+    },
+    {
+      "name": "应用到授权目录后文件字节等于补丁内容",
+      "result": "PASS",
+      "detail": {
+        "status": "提案 已应用：ba41c7778c9a",
+        "bytes": 478
+      }
+    },
+    {
+      "name": "撤销后逐字节回到原始内容",
+      "result": "PASS",
+      "detail": {
+        "status": "提案 已撤销：ba41c7778c9a",
+        "equal": true
+      }
+    },
+    {
+      "name": "3D 用同一选区打开并指名真实文件",
+      "result": "PASS",
+      "detail": {
+        "href": "/city3d#selection=symbol%3Asrc%2Fledger.js%3A425%3A511&analysis=1fb9839090775c0e4bf8ba8826",
+        "citySelection": "ledger.js · src/ledger.js · 声明 5 函数 · 已展开 5 层 · 未解析调用 4"
+      }
+    },
+    {
+      "name": "从 3D 回到 2D 仍是同一个选区",
+      "result": "PASS",
+      "detail": "onlyPositive"
+    }
+  ],
+  "exit_code": 0
+}

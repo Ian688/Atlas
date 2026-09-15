@@ -1,0 +1,13 @@
+{
+  "projects": {
+    "/Users/yinsijie/CodeRepo/Atlas/.tmp-accept/A": {
+      "test_argv": [
+        "node",
+        "--test"
+      ],
+      "test_timeout_ms": 120000,
+      "updated_ms": 1789478177927
+    }
+  },
+  "schema": "atlas.project-settings.v2"
+}

@@ -1,3 +1,9 @@
+# Atlas 设计入口
+
+从 [统一设计](../PRODUCT_DESIGN.md) 了解功能与架构，用 [Mermaid 图谱](product-blueprint/README.md) 查看页面、任务、语义底座及接入关系。当前探索页使用 [项目地图设计](atlas-explore-next/DESIGN.md) 和 [可点击原型](atlas-explore-next/index.html)。
+
+[六页设计包 v2](atlas-v2/README.md) / [图集](atlas-v2/gallery.html) 仅用于其他现有页面的背景参考。下面的旧工作台原型也仅作历史参考。
+
 # 工作台原型
 
 - 双击 [workbench-preview.html](workbench-preview.html) 查看完整页面；不需要 Atlas 服务。

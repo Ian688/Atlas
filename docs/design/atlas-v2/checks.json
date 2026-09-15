@@ -1,0 +1,122 @@
+{
+  "scope": "Design prototype interactions only; no Atlas API/runner qualification",
+  "checks": [
+    {
+      "name": "all six pages render",
+      "result": "PASS"
+    },
+    {
+      "name": "project input validation and analysis cancellation",
+      "result": "PASS"
+    },
+    {
+      "name": "search and graph/source selection",
+      "result": "PASS"
+    },
+    {
+      "name": "single run input snapshot and comparison",
+      "result": "PASS"
+    },
+    {
+      "name": "run cancellation and error recovery",
+      "result": "PASS"
+    },
+    {
+      "name": "review input changes actual displayed comparison",
+      "result": "PASS"
+    },
+    {
+      "name": "test failure and unrun never render passing output",
+      "result": "PASS"
+    },
+    {
+      "name": "agent handoff and same proposal review",
+      "result": "PASS"
+    },
+    {
+      "name": "city selection and keyboard navigation",
+      "result": "PASS"
+    },
+    {
+      "name": "command palette keyboard and empty",
+      "result": "PASS"
+    },
+    {
+      "name": "no document overflow 1600 home",
+      "result": "PASS"
+    },
+    {
+      "name": "no document overflow 1600 explore",
+      "result": "PASS"
+    },
+    {
+      "name": "no document overflow 1600 city",
+      "result": "PASS"
+    },
+    {
+      "name": "no document overflow 1600 run",
+      "result": "PASS"
+    },
+    {
+      "name": "no document overflow 1600 review",
+      "result": "PASS"
+    },
+    {
+      "name": "no document overflow 1600 agent",
+      "result": "PASS"
+    },
+    {
+      "name": "no document overflow 1024 home",
+      "result": "PASS"
+    },
+    {
+      "name": "no document overflow 1024 explore",
+      "result": "PASS"
+    },
+    {
+      "name": "no document overflow 1024 city",
+      "result": "PASS"
+    },
+    {
+      "name": "no document overflow 1024 run",
+      "result": "PASS"
+    },
+    {
+      "name": "no document overflow 1024 review",
+      "result": "PASS"
+    },
+    {
+      "name": "no document overflow 1024 agent",
+      "result": "PASS"
+    },
+    {
+      "name": "no document overflow 390 home",
+      "result": "PASS"
+    },
+    {
+      "name": "no document overflow 390 explore",
+      "result": "PASS"
+    },
+    {
+      "name": "no document overflow 390 city",
+      "result": "PASS"
+    },
+    {
+      "name": "no document overflow 390 run",
+      "result": "PASS"
+    },
+    {
+      "name": "no document overflow 390 review",
+      "result": "PASS"
+    },
+    {
+      "name": "no document overflow 390 agent",
+      "result": "PASS"
+    },
+    {
+      "name": "no browser JS errors",
+      "result": "PASS",
+      "detail": []
+    }
+  ]
+}

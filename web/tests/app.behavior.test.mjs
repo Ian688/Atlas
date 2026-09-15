@@ -77,17 +77,60 @@ function makeDom(options = {}) {
 
 // `__status` on a route makes `fetch` answer with that HTTP status instead.
 function makeFetch(routes, requests) {
+  // 受控运行现在是后台任务：exec 立刻回 run id，终态由 exec/run 查询给出。
+  // 这两个端点在这里合成，测试仍然只声明"这一次执行会得到什么记录"。
+  const runs = new Map();
+  let runSeq = 0;
   return async (url, init = {}) => {
     const u = new URL(url, 'http://127.0.0.1');
     const name = u.pathname.replace(/^\/api\//, '');
     const headers = init.headers || {};
     const auth = headers.Authorization || headers.authorization || '';
     requests.push({ name, auth, params: Object.fromEntries(u.searchParams) });
+    if (init.body !== undefined) requests[requests.length - 1].body = init.body;
+
+    if (name === 'exec/run') {
+      const id = u.searchParams.get('id');
+      if (!runs.has(id)) return { ok: false, status: 404, json: async () => ({ error: 'run_not_found' }) };
+      let record = runs.get(id);
+      // __runningTimes 用于验证"运行中"这段时间：前 n 次查询回答 running。
+      if (record && typeof record === 'object' && record.__runningTimes > 0) {
+        runs.set(id, { ...record, __runningTimes: record.__runningTimes - 1 });
+        return { ok: true, status: 200, json: async () => ({ schema: 'atlas.exec-run.v1', run_id: id, state: 'running' }) };
+      }
+      const verdict = record && record.verdict;
+      const state = verdict === 'cancelled' ? 'cancelled' : (verdict === 'failed' ? 'failed' : 'completed');
+      return { ok: true, status: 200, json: async () => ({ schema: 'atlas.exec-run.v1', run_id: id, state, record }) };
+    }
+    if (name === 'exec/cancel') {
+      let body = {};
+      try { body = JSON.parse(init.body); } catch {}
+      if (!runs.has(body.id)) return { ok: false, status: 404, json: async () => ({ error: 'run_not_found' }) };
+      const current = runs.get(body.id);
+      // 取消是协作式的：终态由记录给出，这里只把记录换成 cancelled 版本。
+      if (current && typeof current === 'object') {
+        if (current.__cancelRecord !== undefined) runs.set(body.id, current.__cancelRecord);
+        else runs.set(body.id, { ...current, verdict: 'cancelled' });
+      }
+      return { ok: true, status: 200, json: async () => ({ schema: 'atlas.exec-run.v1', run_id: body.id, state: 'cancelling' }) };
+    }
+
     const route = routes[name];
     if (route === undefined) return { ok: false, status: 404, json: async () => ({ error: 'unknown_query' }) };
-    if (init.body !== undefined) requests[requests.length - 1].body = init.body;
     const out = typeof route === 'function' ? route(Object.fromEntries(u.searchParams)) : route;
     if (out && out.__status) return { ok: false, status: out.__status, json: async () => ({ error: 'x' }) };
+
+    if (name === 'exec' && init.body !== undefined) {
+      let parsed = {};
+      try { parsed = JSON.parse(init.body); } catch {}
+      if (parsed.background) {
+        runSeq += 1;
+        const runId = `run-${runSeq}`;
+        runs.set(runId, out);
+        requests[requests.length - 1].run_id = runId;
+        return { ok: true, status: 200, json: async () => ({ schema: 'atlas.exec-run.v1', run_id: runId, state: 'running' }) };
+      }
+    }
     return { ok: true, status: 200, json: async () => out };
   };
 }
@@ -667,6 +710,46 @@ check('pressing run posts the pinned request and draws the observed boundary', a
   assert.doesNotMatch(shown, /执行路线/, 'the panel must not claim an execution path');
 });
 
+check('a run is a background task, and its terminal state comes from the server record', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = profile();
+  t.routes.exec = { ...record(), __runningTimes: 1 };
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  t.el('exec-args').value = '[1,2]';
+  await t.run(`execDraft(${JSON.stringify(FN_A.id)}).advanced = true`);
+  await t.run('renderExecForm(state.execProfile)');
+  const running = t.run('runControlled()');
+  await new Promise(r => setTimeout(r, 30));
+  assert.equal(t.el('exec-cancel').hidden, false, '运行期间取消按钮必须可见');
+  assert.match(t.el('exec-run').textContent, /运行中/, '运行按钮原位变成取消/运行中');
+  await running;
+  const body = JSON.parse(t.requests.find(r => r.name === 'exec').body);
+  assert.equal(body.background, true, '一次运行必须是后台任务，不是一个从头等到尾的请求');
+  assert.equal(t.el('exec-cancel').hidden, true, '终态之后不再显示取消');
+  assert.match(t.el('exec-result').textContent, /观测结果 returned/, '终态记录来自服务端查询');
+});
+
+check('cancelling asks the server and waits for its terminal record', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = profile();
+  t.routes.exec = { ...record(), verdict: 'cancelled', __runningTimes: 2 };
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  t.el('exec-args').value = '[1,2]';
+  await t.run(`execDraft(${JSON.stringify(FN_A.id)}).advanced = true`);
+  await t.run('renderExecForm(state.execProfile)');
+  const running = t.run('runControlled()');
+  await new Promise(r => setTimeout(r, 30));
+  assert.equal(await t.run('cancelCurrentRun()'), true, '取消要真的发给服务端');
+  assert.ok(t.requests.some(r => r.name === 'exec/cancel'), '必须有 exec/cancel 请求');
+  await running;
+  assert.match(t.el('exec-result').textContent, /cancelled/, '终态是服务端发布的 cancelled 记录，不是 HTTP 断开');
+  assert.equal(t.el('exec-cancel').hidden, true, '终态之后不再显示取消');
+});
+
 check('a refused record is shown as a refusal, never as a result', async () => {
   const t = boot(routeBase());
   t.routes.profile = profile({ required_grants: ['unknown_calls'] });
@@ -878,8 +961,11 @@ check('a missing profile leaves the run button disabled and says why', async () 
   t.el('token').value = 'TOKEN-1';
   await t.run('connect()');
   await t.run(`select(${JSON.stringify(FN_A)})`);
-  assert.equal(t.el('exec-panel').hidden, true, 'no profile means no execution panel');
+  // 面板本身跟着选区出现（它承载"为什么不能运行"），但运行按钮必须是禁用的，
+  // 而且面板要说明原因——不能把失败渲染成"可以运行"。
+  assert.equal(t.el('exec-panel').hidden, false, 'the run panel follows the selection');
   assert.equal(t.el('exec-run').disabled, true, 'no profile means no run');
+  assert.match(t.el('exec-body').textContent, /画像|失败|不可运行/, 'the panel must say why it cannot run');
   if (t.evalIn('state.execProfile') !== null) throw new Error('a failed profile query must clear the profile');
 });
 
@@ -897,8 +983,8 @@ check('selecting publishes a pinned selection and points the other projection at
   const published = t.el('inspector');
   assert.equal(published['data-selection-entity'], FN_A.id, 'the semantic DOM must carry the selection');
   assert.equal(published['data-analysis-id'], report.id, 'and the version it was pinned to');
-  const href = t.el('open-3d')['href'] || '';
-  assert.match(href, /^\/city3d#selection=/, 'the 3D link must carry the same selection');
+  const href = t.el('city-open')['href'] || '';
+  assert.match(href, /^\/city3d#selection=/, `the 3D link must carry the same selection (got ${JSON.stringify(href)})`);
   assert.match(href, /analysis=/, 'and the analysis version');
   const bridgeSelection = t.run('atlasBridge.getSelection()');
   assert.equal(bridgeSelection.entity_id, FN_A.id);
@@ -1439,13 +1525,13 @@ check('task tabs exist and the run shortcut follows the selection kind', async (
   t.el('token').value = 'TOKEN-1';
   await t.run('connect()');
   await t.run(`select(${JSON.stringify(FN_A)})`);
-  assert.equal(t.evalIn('setMode("review")'), true, 'the review tab exists');
-  assert.equal(t.evalIn('setMode("nope")'), false, 'an unknown mode is refused');
+  assert.equal(t.evalIn('setPage("review")'), true, 'the review page exists');
+  assert.equal(t.evalIn('setPage("nope")'), false, 'an unknown page is refused');
   assert.equal(t.evalIn('setLens("nope")'), false, 'an unknown lens is refused');
   assert.equal(t.el('run-shortcut').disabled, false, 'a function offers the run shortcut');
-  assert.equal(t.evalIn('setMode("run")'), true);
-  assert.equal(t.el('task-run').hidden, false, 'the run task area shows for a function');
-  assert.equal(t.el('exec-panel').hidden, false, 'with a profile, the execution panel shows inside it');
+  assert.equal(t.evalIn('setPage("run")'), true);
+  assert.equal(t.evalIn('state.page'), 'run', 'the run page is current');
+  assert.equal(t.el('exec-panel').hidden, false, 'with a profile, the execution panel shows');
   t.run('resetDetail()');
   assert.equal(t.el('run-shortcut').disabled, true, 'no selection, no run shortcut');
 });
@@ -1734,20 +1820,27 @@ check('a finished verification poll refreshes the proposal list for the same sel
 // selection, so closing the page or round-tripping through the 3D city puts
 // the reader back into the same task. The fragment never carries inputs.
 check('tab and lens persist in the fragment and restore on boot', async () => {
-  const t = boot(routeBase(), { hash: `#mode=run&lens=unknowns` });
+  const t = boot(routeBase(), { hash: `#page=run&lens=unknowns` });
   t.el('token').value = 'TOKEN-1';
   await t.run('connect()');
-  assert.equal(t.evalIn('state.mode'), 'run', 'the fragment restores the task tab');
+  assert.equal(t.evalIn('state.page'), 'run', 'the fragment restores the page');
   assert.equal(t.evalIn('state.lens'), 'unknowns', 'and the lens');
   await t.run(`select(${JSON.stringify(FN_A)})`);
   const hash = await t.run('decodeURIComponent(location.hash)');
-  assert.match(hash, /mode=run/, 'selection updates keep the mode in the fragment');
+  assert.match(hash, /page=run/, 'selection updates keep the page in the fragment');
   assert.doesNotMatch(hash, /lens=/, 'a lens is only recorded where it means something');
-  const set = t.run('setMode("review") && setLens("values")');
+  const set = t.run('setPage("review") && setLens("values")');
   assert.equal(set, true);
   const after = await t.run('location.hash');
-  assert.match(after, /mode=review/, 'a tab switch rewrites the fragment');
-  assert.doesNotMatch(after, /lens=/, 'lens only travels under understand');
+  assert.match(after, /page=review/, 'a page switch rewrites the fragment');
+  assert.doesNotMatch(after, /lens=/, 'lens only travels under explore');
+
+  // 旧链接用 mode=understand/structure，落到等价的新页面而不是丢状态。
+  const legacy = boot(routeBase(), { hash: '#mode=understand&lens=values' });
+  legacy.el('token').value = 'TOKEN-1';
+  await legacy.run('connect()');
+  assert.equal(legacy.evalIn('state.page'), 'explore', 'a legacy mode link lands on explore');
+  assert.equal(legacy.evalIn('state.lens'), 'values', 'and keeps its lens');
 });
 
 // --- D0: review findings R1/R4 ------------------------------------------------
@@ -1803,6 +1896,228 @@ check('run inputs persist locally and restore after a fresh boot', async () => {
   await t2.run('connect()');
   await t2.run(`select(${JSON.stringify(FN_A)})`);
   assert.equal(t2.el('exec-param-0').value, '{"amount":42}', 'the refilled input survives a reload');
+});
+
+// --- U2/U3/U4/U5（界面 v2 本轮）：结果层级、后台任务、提案选择、项目入口 ------
+// 这些检查钉住本轮新增的用户操作：结果页签展示同一份记录的不同侧面、后台
+// 任务能找回并取消、审阅页按提案选择、项目设置真实生效、项目切换入口存在。
+
+check('the run result leads with the verdict and splits inputs and logs into tabs', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = profile();
+  t.routes.exec = record({
+    console: { stdout: 'hello from stdout\n', stderr: '', truncated: false, harness_lines: [] },
+  });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  t.el('exec-args').value = '[17,23]';
+  await t.run(`execDraft(${JSON.stringify(FN_A.id)}).advanced = true`);
+  await t.run('renderExecForm(state.execProfile)');
+  await t.run('runControlled()');
+  const shown = t.el('exec-result').textContent;
+  assert.match(shown, /返回值/, 'the hero names the outcome kind');
+  assert.match(shown, /观测结果 returned/, 'the meta line keeps the machine verdict');
+
+  await t.run(`state.execTab = 'inputs'; renderExecResult()`);
+  const inputs = t.el('exec-result').textContent;
+  assert.match(inputs, /args \[17,23\]/, 'the inputs tab shows the full declared args');
+
+  await t.run(`state.execTab = 'logs'; renderExecResult()`);
+  const logs = t.el('exec-result').textContent;
+  assert.match(logs, /hello from stdout/, 'the logs tab shows real stdout');
+  t.routes.exec = record({ console: { stdout: '', stderr: '', truncated: false, harness_lines: [] } });
+  await t.run('runControlled()');
+  await t.run(`state.execTab = 'logs'; renderExecResult()`);
+  assert.match(t.el('exec-result').textContent, /没有控制台输出/, 'an empty log says so');
+});
+
+check('background tasks list real runs, cancel through the server and reopen results', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = profile();
+  t.routes.exec = record({ value: { kind: 'number', value: 40 } });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  await t.run('runControlled()');
+  // 服务端清单里出现这一次运行（run-1 是测试 fetch 分配的 id）。
+  t.routes['exec/runs'] = { runs: [{ run_id: 'run-1', symbol: FN_A.id, state: 'completed', verdict: 'returned' }] };
+  await t.run('loadTasks()');
+  const listed = t.el('tasks-body').textContent;
+  assert.match(listed, /fnA/, 'the task names its target object');
+  assert.match(listed, /已完成/, 'the terminal state comes from the server list');
+
+  const badge = t.el('nav-task-count');
+  t.routes['exec/runs'] = { runs: [{ run_id: 'run-2', symbol: FN_A.id, state: 'running' }] };
+  await t.run('loadTasks()');
+  assert.equal(badge.hidden, false, 'a running task is visible as a count in the nav');
+  assert.match(badge.textContent, /^1$/, 'and the count is the number of running tasks');
+  const running = t.el('tasks-body').textContent;
+  assert.match(running, /运行中/, 'the running state is named');
+  const cancelButtons = [];
+  collect(t.el('tasks-body'), cancelButtons);
+  assert.ok(cancelButtons.some((el) => el.textContent === '取消'), 'a running task offers a cancel');
+  await t.run(`cancelTaskRun('run-2')`);
+  assert.ok(t.requests.some((r) => r.name === 'exec/cancel'), 'cancelling posts to the server');
+
+  // 「查看结果」把读者带回运行页，并显示该 run 的终态记录。
+  await t.run(`openTaskResult({ run_id: 'run-1', symbol: ${JSON.stringify(FN_A.id)}, state: 'completed' })`);
+  assert.equal(t.evalIn('state.page'), 'run', 'the result opens on the run page');
+  assert.match(t.el('exec-result').textContent, /返回值 40/, 'the reopened result is the same record');
+});
+
+check('the review page selects one proposal and the agent entry lands on the same one', async () => {
+  const idA = 'a'.repeat(64), idB = 'b'.repeat(64);
+  const t = boot(routeBase());
+  const mk = (id, summary) => proposal({ outer: { id, state: 'proposed', proposed_by: 'model-x' }, proposal: { summary, diff: `--- a/${summary}\n+++ b/${summary}\n@@ -1,1 +1,1 @@\n-x\n+y\n`, validation: { ok: true, hunks: 1, patched_paths: [summary] } } });
+  t.routes.patches = { proposals: [mk(idA, 'first-fix.js'), mk(idB, 'second-fix.js')] };
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  // 默认选中第一份，但列表里两份都在。
+  const listed = t.el('patch-body').textContent;
+  assert.match(listed, /first-fix\.js/, 'both proposals are listed');
+  assert.match(listed, /second-fix\.js/, 'and neither is hidden');
+  // Agent 页跳转必须定位到指定提案。
+  await t.run(`setPage('agent'); renderAgentProposals()`);
+  await t.run(`locateProposal(${JSON.stringify(idB)})`);
+  assert.equal(t.evalIn('state.page'), 'review', 'the entry lands on the review page');
+  assert.equal(t.evalIn('state.reviewSelected'), idB, 'the named proposal is the selected one');
+  const center = t.el('review-center-inner').textContent;
+  assert.match(center, /second-fix\.js/, 'the center diff belongs to the selected proposal');
+  assert.doesNotMatch(center, /first-fix\.js/, 'the previous proposal must not bleed into the diff');
+});
+
+check('project settings PUT the declared argv and take effect in the shown config', async () => {
+  const t = boot(routeBase());
+  t.routes['project/settings'] = { saved: true, test_argv: ['node', '--test'], test_timeout_ms: 45000 };
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run('setPage("home"); renderPageContent("home")');
+  const body = t.el('home-settings-body').textContent;
+  assert.match(body, /测试命令/, 'the settings form names the declared test command');
+  t.el('settings-test-argv').value = '["node","--test"]';
+  t.el('settings-test-timeout').value = '45000';
+  const save = (() => { const out = []; collect(t.el('home-settings-body'), out); return out.find((el) => el.textContent === '保存并生效'); })();
+  assert.ok(save, 'a save control exists');
+  await save.onclick();
+  const posted = t.requests.filter((r) => r.name === 'project/settings');
+  assert.equal(posted.length, 1, 'saving posts exactly once');
+  const bodyJson = JSON.parse(posted[0].body);
+  assert.deepEqual(bodyJson.test_argv, ['node', '--test'], 'the declared argv is sent');
+  assert.equal(bodyJson.test_timeout_ms, 45000, 'and the timeout');
+  assert.match(t.el('status').textContent, /已生效/, 'the page says the setting now applies');
+});
+
+check('the project page opens a directory, lists recent projects and switches', async () => {
+  const t = boot(routeBase());
+  let openCalls = 0;
+  t.routes['project/open'] = (params) => {
+    if (params.id) return { schema: 'atlas.project-open.v1', op_id: params.id, state: 'switched', analysis_id: 'd'.repeat(64) };
+    openCalls += 1;
+    return { schema: 'atlas.project-open.v1', outcome: 'indexing', op_id: 'op-1' };
+  };
+  t.routes.projects = { projects: [
+    { path: '/tmp/one', name: 'one', analysis_id: 'c'.repeat(64), current: true },
+    { path: '/tmp/two', name: 'two', analysis_id: 'd'.repeat(64), current: false },
+  ] };
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run('setPage("home"); renderPageContent("home")');
+  const recent = t.el('home-recent-body').textContent;
+  assert.match(recent, /two/, 'the recent list shows the other project');
+  assert.match(recent, /继续这个项目/, 'and offers to switch to it');
+
+  t.el('home-open-path').value = '/tmp/newproj';
+  await t.run('openProjectByPath()');
+  const posted = t.requests.filter((r) => r.name === 'project/open');
+  assert.equal(openCalls, 1, 'opening posts once');
+  assert.equal(JSON.parse(posted[0].body).path, '/tmp/newproj', 'the typed path is sent');
+  await new Promise((r) => setTimeout(r, 60));
+  assert.match(t.el('status').textContent, /已切换|切换|新分析|正在加载/, 'the page reports the switch');
+});
+
+check('an applied proposal from the previous analysis stays reachable for revert after a re-index', async () => {
+  const t = boot(routeBase());
+  // 服务已切到新分析（report.id），而提案固定在旧分析上；按实体查不到它，
+  // 只有按应用目录（target=here）的查询能把它找回来。
+  const oldAnalysis = 'e'.repeat(64);
+  const id = 'w'.repeat(64);
+  t.routes.contract = { writes: { enabled: true, root: '/tmp/checkout' }, endpoints: [] };
+  t.routes.patches = (params) => {
+    if (params.target === 'here') {
+      return { proposals: [{ id, analysis_id: oldAnalysis, state: 'applied', proposed_by: 'session-1', target: '/tmp/checkout',
+        proposal: { summary: 'fix checkout', diff: '--- a/x\n+++ b/x\n@@ -1,1 +1,1 @@\n-a\n+b\n',
+          validation: { ok: true, hunks: 1, patched_paths: ['x'] } } }] };
+    }
+    return { proposals: [] };
+  };
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  const shown = t.el('patch-body').textContent;
+  assert.match(shown, /之前的分析/, 'the cross-version origin must be named');
+  assert.match(shown, /一键撤销/, 'revert stays reachable from the page');
+  assert.match(shown, /打开新版本/, 'so does the re-index entry');
+  await t.run(`writePatch('patch/revert','${id}','/tmp/checkout')`);
+  assert.ok(t.requests.some((r) => r.name === 'patch/revert'), 'revert posts once clicked');
+});
+
+
+check('drafts are scoped to project|version|object, never shared across projects', async () => {
+  const t = boot(routeBase());
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  await t.run(`execDraft(${JSON.stringify(FN_A.id)}).fields[0] = '719'`);
+  // 另一个项目：同一 entity id、不同分析。
+  await t.run(`state.report = { id: ${JSON.stringify('f'.repeat(64))} }`);
+  const fresh = await t.run(`JSON.stringify(execDraft(${JSON.stringify(FN_A.id)}).fields)`);
+  assert.equal(fresh, '{}', 'the same-named function in another project must not inherit the draft');
+  // 回到原分析：草稿还在。
+  await t.run(`state.report = { id: ${JSON.stringify(report.id)} }`);
+  const restored = await t.run(`execDraft(${JSON.stringify(FN_A.id)}).fields[0]`);
+  assert.equal(restored, '719', 'the original project keeps its draft');
+});
+
+check('switching functions clears the previous result card', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = profile();
+  t.routes.exec = record({ value: { kind: 'number', value: 15 } });
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  await t.run('runControlled()');
+  assert.match(t.el('exec-result').textContent, /返回值 15/, 'the run result is shown for fnA');
+  await t.run(`select(${JSON.stringify(FN_B)})`);
+  assert.doesNotMatch(t.el('exec-result').textContent, /返回值 15/, 'fnB must not inherit fnA\'s result card');
+});
+
+check('a task from another analysis is refused as the current result, and labeled in the list', async () => {
+  const t = boot(routeBase());
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  const foreign = 'e'.repeat(64);
+  t.routes['exec/runs'] = { runs: [{ run_id: 'run-9', symbol: FN_A.id, analysis_id: foreign, state: 'completed', verdict: 'returned' }] };
+  await t.run('loadTasks()');
+  const listed = t.el('tasks-body').textContent;
+  assert.match(listed, /属于分析/, 'a foreign task is labeled with its own analysis');
+  await t.run(`openTaskResult({ run_id: 'run-9', symbol: ${JSON.stringify(FN_A.id)}, analysis_id: ${JSON.stringify(foreign)}, state: 'completed' })`);
+  assert.match(t.el('status').textContent, /不是当前项目|属于分析/, 'opening it as the current result is refused');
+});
+
+check('a result record is labeled with its own analysis, not the served one', async () => {
+  const t = boot(routeBase());
+  t.routes.profile = profile();
+  t.el('token').value = 'TOKEN-1';
+  await t.run('connect()');
+  await t.run(`select(${JSON.stringify(FN_A)})`);
+  const foreign = 'e'.repeat(64);
+  const stale = record({ value: { kind: 'number', value: 15 }, analysis_id: foreign });
+  await t.run(`state.execResult = { record: ${JSON.stringify(stale)}, args: [19, 4], via: null, symbol: ${JSON.stringify(FN_A.id)} }; renderExecResult()`);
+  const shown = t.el('exec-result').textContent;
+  assert.match(shown, /不是当前版本/, 'a foreign record is explicitly not the current observation');
+  assert.match(shown, new RegExp(foreign.slice(0, 12)), 'and names its own analysis');
 });
 
 let failed = 0;

@@ -69,6 +69,9 @@ CHECKS = [
     # coordinates there at all, so a vm-based number would describe the host.
     ("view-layout", ["node", "scripts/bench_view_layout.mjs"]),
     ("web-syntax", ["node", "--check", "web/app.js"]),
+    # The project map page: a parse error here would leave the explore page an
+    # empty shell, which is exactly the failure `--check` on app.js cannot see.
+    ("web-syntax-explore", ["node", "--check", "web/explore.js"]),
     # The shared hierarchy: both projections read it, so a parse error here
     # would take down both pages at once.
     ("web-syntax-hierarchy", ["node", "--check", "web/hierarchy.js"]),
@@ -156,6 +159,7 @@ def source_fingerprint() -> str:
     for relative in (
         "web/index.html",
         "web/app.js",
+        "web/explore.js",
         "web/hierarchy.js",
         "web/layout.js",
         "web/vendor/elk.bundled.js",

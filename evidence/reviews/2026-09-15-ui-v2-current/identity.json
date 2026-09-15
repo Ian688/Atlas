@@ -1,0 +1,30 @@
+{
+  "reviewed_at": "2026-09-14T20:20:22.135621+08:00",
+  "head": "c8fada2dd6ac11fbc701b3fc804b326271ebc831",
+  "files": {
+    "web/index.html": {
+      "sha256": "a1a11b3c3eb792b0fdbd0f2aa8cc2a71cbcfedc3db2f08c2d4a877ce8c4bc99f",
+      "bytes": 19034
+    },
+    "web/app.js": {
+      "sha256": "4cdc893860c3d2ef71c3226eb6246a89f591e8ee2dcc12b08e0ac27bf70a147d",
+      "bytes": 143624
+    },
+    "web/style.css": {
+      "sha256": "692451091255ed76732a099e82893ed8cc5406e337558ff0acf248b54985cdcd",
+      "bytes": 27356
+    },
+    "crates/atlas-app/src/server.rs": {
+      "sha256": "0f06a1edad6dc9b813e016842ef342bea954f3f2bd48666bdab08a99e06daf69",
+      "bytes": 89803
+    },
+    "target/debug/atlas": {
+      "sha256": "e427c5c1b30c6f25cb40466f5d5d94f0ba671d61ffbcfb4e32f83d4fbd436b82",
+      "bytes": 39889552
+    },
+    "dist/atlas-local-darwin-x64/atlas": {
+      "sha256": "3c94cde00555c200eb5089a9007021456b63bcb25cbfa1689922858e7fa1af11",
+      "bytes": 12665324
+    }
+  }
+}

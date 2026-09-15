@@ -160,7 +160,14 @@ pub fn scan_controlled(
             check_deadline(started.elapsed())?;
             children.push(item?);
             if children.len() + entries.len() > limits.max_entries {
-                return Err(invalid("entry_budget_exceeded_no_snapshot_published"));
+                // Name the ceiling and the lever, like every other bound Atlas
+                // refuses on: "exceeded" with no number is a dead end for the
+                // reader holding the project that hit it.
+                return Err(invalid(&format!(
+                    "entry_budget_exceeded_no_snapshot_published:entries={}:limit={}:raise --max-entries",
+                    children.len() + entries.len(),
+                    limits.max_entries
+                )));
             }
         }
         children.sort_by_key(|a| a.file_name());
@@ -242,9 +249,11 @@ pub fn scan_controlled(
                                 .checked_add(bytes.len() as u64)
                                 .ok_or_else(|| invalid("byte_overflow"))?;
                             if total > limits.max_total_bytes {
-                                return Err(invalid(
-                                    "total_byte_budget_exceeded_no_snapshot_published",
-                                ));
+                                return Err(invalid(&format!(
+                                    "total_byte_budget_exceeded_no_snapshot_published:observed_mb={}:limit_mb={}:raise --max-total-mb",
+                                    total / (1024 * 1024),
+                                    limits.max_total_bytes / (1024 * 1024)
+                                )));
                             }
                             entry.bytes = bytes.len() as u64;
                             entry.blob = Some(store.put_blob(&bytes)?);

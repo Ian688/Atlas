@@ -1,0 +1,12 @@
+{
+  "projects": [
+    {
+      "analysis_id": "f7e16b6bd092a872b7fa3c76b33a37e1562c91c2854947be3050c3ca1698b56c",
+      "name": "A",
+      "opened_ms": 1789462440641,
+      "path": "/Users/yinsijie/CodeRepo/Atlas/.tmp-accept/A",
+      "write": true
+    }
+  ],
+  "schema": "atlas.projects.v1"
+}

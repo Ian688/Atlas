@@ -10,12 +10,113 @@ use crate::{Result, invalid};
 use atlas_contract::*;
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const MAX_FUNCTIONS: usize = 20_000;
+/// How many functions one analysis may hold.
+///
+/// Unlike the per-function budgets below, this one is not a guard against
+/// unbounded work: a project's function count is a property of the project, the
+/// cost is linear in it (measured at roughly 55 ms per function end to end) and
+/// the pipeline deadline still bounds the run. It is a memory ceiling, and it
+/// was raised from 20_000 to 50_000 after a real repository (a monorepo with
+/// 34_635 functions) was refused by it while the pipeline itself was healthy.
+/// The refusal names the count and the ceiling, so the next project over the
+/// line says so instead of looking broken.
+pub const MAX_FUNCTIONS: usize = 50_000;
 pub const MAX_STATEMENTS_PER_FUNCTION: usize = 20_000;
+/// Bindings and scopes are deliberately tighter than `MAX_STATEMENTS_PER_FUNCTION`.
+///
+/// They look inconsistent with it -- and a minified bundle can hold a function
+/// with 16_054 statements and 10_975 bindings -- but they are not a formatting
+/// preference: they are what keeps one machine-generated function from taking
+/// the whole pipeline down. Raising them to the statement ceiling was measured:
+/// the same project then spent the entire 120 s pipeline budget and ended in
+/// `analysis_deadline_exceeded_no_analysis_published` at 1.65 GB peak RSS,
+/// where this budget refuses it in about 90 s with a named reason. A project
+/// rejected by one of these numbers needs the function excluded from flow with
+/// its coverage recorded, not a larger ceiling.
 pub const MAX_BINDINGS_PER_FUNCTION: usize = 4_000;
 pub const MAX_SCOPES_PER_FUNCTION: usize = 4_000;
 pub const MAX_OPS_PER_FUNCTION: usize = 200_000;
 pub const MAX_BLOCKS_PER_FUNCTION: usize = 100_000;
+
+/// A file whose dataflow is withheld because one of its functions cannot be
+/// derived inside the per-function budgets.
+#[derive(Clone, Debug, PartialEq)]
+pub struct WithheldFlow {
+    pub path: String,
+    /// How many functions in this file lose their flow with it.
+    pub functions: usize,
+    /// How many of them reached a budget themselves.
+    pub offenders: usize,
+    /// The budget the representative offender reached, its count and ceiling,
+    /// and the span to open when a reader follows this up.
+    pub what: &'static str,
+    pub count: usize,
+    pub limit: usize,
+    pub start: usize,
+    pub end: usize,
+}
+
+/// Which budget this function reached, if any, with the number and the ceiling.
+fn over_budget(function: &FlowFunction) -> Option<(&'static str, usize, usize)> {
+    if function.bindings.len() > MAX_BINDINGS_PER_FUNCTION {
+        return Some((
+            "bindings",
+            function.bindings.len(),
+            MAX_BINDINGS_PER_FUNCTION,
+        ));
+    }
+    (function.scopes.len() > MAX_SCOPES_PER_FUNCTION).then(|| {
+        (
+            "scopes",
+            function.scopes.len(),
+            MAX_SCOPES_PER_FUNCTION,
+        )
+    })
+}
+
+/// The files that must have their dataflow withheld, and why.
+///
+/// The unit is the file, not the function, and that is forced rather than
+/// convenient: a nested function's `captures` point at bindings declared in its
+/// enclosing function, so removing one function's flow from a file that keeps
+/// another's leaves a dangling capture -- a protocol break, not an unknown.
+/// Lexical captures never leave their file, so withholding a whole file removes
+/// exactly the bindings that file declared and nothing outside can dangle.
+///
+/// This is what keeps one machine-generated function (a 16_054-statement span
+/// in a vendored bundle declared 10_975 bindings) from taking a whole project
+/// down with it: the file's symbols, calls and sources are still published, and
+/// the withheld dataflow is listed rather than reported as analyzed.
+pub fn withheld_files(functions: &[FlowFunction]) -> Vec<WithheldFlow> {
+    let mut by_path: BTreeMap<&str, WithheldFlow> = BTreeMap::new();
+    for function in functions {
+        let Some((what, count, limit)) = over_budget(function) else {
+            continue;
+        };
+        // The first offender names the file: it is one reason to look here and
+        // one span to open. `offenders` below says how many there were, so
+        // naming one does not claim it was the only one.
+        let entry = by_path.entry(function.path.as_str()).or_insert(WithheldFlow {
+            path: function.path.clone(),
+            functions: 0,
+            offenders: 0,
+            what,
+            count,
+            limit,
+            start: function.start,
+            end: function.end,
+        });
+        entry.offenders += 1;
+    }
+    // Every function in a withheld file loses its flow with the file, so what is
+    // withheld is counted by the file's functions, not by its offenders.
+    for function in functions {
+        if let Some(entry) = by_path.get_mut(function.path.as_str()) {
+            entry.functions += 1;
+        }
+    }
+    by_path.into_values().collect()
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Op {
@@ -199,6 +300,7 @@ pub fn validate_flow(
         sources,
         symbols,
         &symbols.keys().map(|key| key.as_str()).collect(),
+        &BTreeSet::new(),
         snapshot_id,
     )
 }
@@ -206,11 +308,18 @@ pub fn validate_flow(
 /// Extended validation with the full symbol list, so references like
 /// `FunctionRef` can be checked against every extracted symbol (R6), and the
 /// per-function coverage contract can reject silently dropped functions.
+///
+/// `withheld` names the symbols whose file's dataflow was deliberately withheld
+/// (see [`withheld_files`]). It is a whitelist, not a bypass: a symbol in it
+/// must have no flow, must exist in the symbol list, and no other symbol may be
+/// missing flow. Withholding therefore stays a declared, checked act instead of
+/// a way for a derivation to forget a function quietly.
 pub fn validate_flow_with_symbols(
     flow: &FlowFacts,
     sources: &std::collections::HashMap<String, String>,
     symbols: &std::collections::HashMap<String, &Symbol>,
     all_symbol_ids: &std::collections::HashSet<&str>,
+    withheld: &BTreeSet<&str>,
     snapshot_id: &str,
 ) -> Result<()> {
     if flow.schema != FLOW_SCHEMA || flow.snapshot_id != snapshot_id || flow.profile != FLOW_PROFILE
@@ -225,7 +334,10 @@ pub fn validate_flow_with_symbols(
         )));
     }
     if flow.functions.len() > MAX_FUNCTIONS {
-        return Err(invalid("flow_function_budget_exceeded"));
+        return Err(invalid(&format!(
+            "flow_function_budget_exceeded:functions={}:limit={MAX_FUNCTIONS}",
+            flow.functions.len()
+        )));
     }
     let mut binding_owner: BTreeMap<&str, &FlowFunction> = BTreeMap::new();
     let mut scope_ids: BTreeSet<&str> = BTreeSet::new();
@@ -243,7 +355,23 @@ pub fn validate_flow_with_symbols(
         if function.bindings.len() > MAX_BINDINGS_PER_FUNCTION
             || function.scopes.len() > MAX_SCOPES_PER_FUNCTION
         {
-            return Err(invalid("flow_function_budget_exceeded"));
+            // Name the function and the number, not just the fact that some
+            // budget was hit. One machine-generated file can be the entire
+            // reason a project cannot be opened, and "flow_function_budget_
+            // exceeded" alone leaves the reader with no file to look at.
+            let (what, count, limit) = if function.bindings.len() > MAX_BINDINGS_PER_FUNCTION {
+                (
+                    "bindings",
+                    function.bindings.len(),
+                    MAX_BINDINGS_PER_FUNCTION,
+                )
+            } else {
+                ("scopes", function.scopes.len(), MAX_SCOPES_PER_FUNCTION)
+            };
+            return Err(invalid(&format!(
+                "flow_function_budget_exceeded:what={what}:count={count}:limit={limit}:path={}:start={}:end={}",
+                function.path, function.start, function.end
+            )));
         }
         let scope_ids_here: BTreeSet<&str> =
             function.scopes.iter().map(|s| s.id.as_str()).collect();
@@ -336,15 +464,31 @@ pub fn validate_flow_with_symbols(
         }
     }
     // Per-function coverage reconciliation: every extracted symbol must have
-    // flow material or the whole derivation is refused. Silently dropping a
+    // flow material, or be one of the symbols whose file's dataflow was withheld
+    // on purpose, or the whole derivation is refused. Silently dropping a
     // function would make coverage numbers lie by omission (R6).
     for symbol_id in symbols.keys() {
-        if !flow
+        let analyzed = flow
+            .functions
+            .iter()
+            .any(|function| function.symbol == *symbol_id);
+        if !analyzed && !withheld.contains(symbol_id.as_str()) {
+            return Err(invalid("flow_coverage_mismatch"));
+        }
+    }
+    // The other direction, so "withheld" cannot quietly hold a function whose
+    // flow was dropped for some other reason: a withheld symbol must have no
+    // flow and must be a symbol this snapshot actually has.
+    for symbol_id in withheld {
+        if flow
             .functions
             .iter()
             .any(|function| function.symbol == *symbol_id)
         {
-            return Err(invalid("flow_coverage_mismatch"));
+            return Err(invalid("flow_withheld_but_present"));
+        }
+        if !symbols.contains_key(*symbol_id) {
+            return Err(invalid("flow_withheld_symbol_unknown"));
         }
     }
     Ok(())
@@ -580,6 +724,145 @@ fn span_valid(
                 && source.is_char_boundary(end)
         })
         .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    const SOURCE: &str = "function a(){} function b(){}";
+
+    fn function(symbol: &str, path: &str, start: usize, end: usize) -> FlowFunction {
+        FlowFunction {
+            symbol: symbol.into(),
+            name: symbol.into(),
+            path: path.into(),
+            start,
+            end,
+            params: vec![],
+            imports: vec![],
+            scopes: vec![FlowScope {
+                id: format!("scope:{symbol}"),
+                kind: "function".into(),
+                parent: None,
+                bindings: vec![],
+            }],
+            bindings: vec![],
+            body: vec![],
+            captures: vec![],
+            unknown_regions: vec![],
+        }
+    }
+
+    fn symbol(id: &str, path: &str, start: usize, end: usize) -> atlas_contract::Symbol {
+        atlas_contract::Symbol {
+            id: id.into(),
+            path: path.into(),
+            name: id.into(),
+            kind: "function".into(),
+            start,
+            end,
+            container: String::new(),
+            mutated: false,
+        }
+    }
+
+    /// Two functions in two files, the first one analyzed and the second one
+    /// withheld, so the reconciliation has one of each to check.
+    fn two_files() -> (
+        FlowFacts,
+        HashMap<String, String>,
+        HashMap<String, atlas_contract::Symbol>,
+    ) {
+        let flow = FlowFacts {
+            schema: atlas_contract::FLOW_SCHEMA.into(),
+            snapshot_id: "snap".into(),
+            producer: atlas_contract::WORKER_PRODUCER.into(),
+            profile: atlas_contract::FLOW_PROFILE.into(),
+            functions: vec![function("sym:a.ts:0:14", "a.ts", 0, 14)],
+            diagnostics: vec![],
+        };
+        let sources = HashMap::from([
+            ("a.ts".to_string(), SOURCE.to_string()),
+            ("b.ts".to_string(), SOURCE.to_string()),
+        ]);
+        let symbols = HashMap::from([
+            ("sym:a.ts:0:14".to_string(), symbol("sym:a.ts:0:14", "a.ts", 0, 14)),
+            (
+                "sym:b.ts:15:29".to_string(),
+                symbol("sym:b.ts:15:29", "b.ts", 15, 29),
+            ),
+        ]);
+        (flow, sources, symbols)
+    }
+
+    fn validate(
+        flow: &FlowFacts,
+        sources: &HashMap<String, String>,
+        symbols: &HashMap<String, atlas_contract::Symbol>,
+        withheld: &BTreeSet<&str>,
+    ) -> Result<()> {
+        let borrowed: HashMap<String, &atlas_contract::Symbol> =
+            symbols.iter().map(|(id, s)| (id.clone(), s)).collect();
+        let ids: std::collections::HashSet<&str> = symbols.keys().map(|k| k.as_str()).collect();
+        validate_flow_with_symbols(flow, sources, &borrowed, &ids, withheld, "snap")
+    }
+
+    #[test]
+    fn a_withheld_symbol_is_accepted_only_without_flow() {
+        let (flow, sources, symbols) = two_files();
+        let withheld: BTreeSet<&str> = ["sym:b.ts:15:29"].into_iter().collect();
+        validate(&flow, &sources, &symbols, &withheld).expect("a withheld file's symbol must pass");
+
+        // The whitelist is not a bypass: a symbol that simply lost its flow and
+        // is not listed is still refused.
+        let error = validate(&flow, &sources, &symbols, &BTreeSet::new()).unwrap_err();
+        assert!(error.to_string().contains("flow_coverage_mismatch"), "{error}");
+
+        // And a symbol cannot be both analyzed and withheld.
+        let both = FlowFacts {
+            functions: vec![
+                function("sym:a.ts:0:14", "a.ts", 0, 14),
+                function("sym:b.ts:15:29", "b.ts", 15, 29),
+            ],
+            ..flow.clone()
+        };
+        let error = validate(&both, &sources, &symbols, &withheld).unwrap_err();
+        assert!(error.to_string().contains("flow_withheld_but_present"), "{error}");
+
+        // An unknown symbol in the whitelist is refused too.
+        let ghosts: BTreeSet<&str> = ["sym:b.ts:15:29", "sym:ghost"].into_iter().collect();
+        let error = validate(&flow, &sources, &symbols, &ghosts).unwrap_err();
+        assert!(error.to_string().contains("flow_withheld_symbol_unknown"), "{error}");
+    }
+
+    #[test]
+    fn one_over_budget_function_withholds_its_file_and_names_the_budget() {
+        let mut huge = function("sym:a.ts:0:14", "bundle.js", 0, 14);
+        huge.scopes = (0..(MAX_SCOPES_PER_FUNCTION + 1))
+            .map(|i| FlowScope {
+                id: format!("s{i}"),
+                kind: "block".into(),
+                parent: None,
+                bindings: vec![],
+            })
+            .collect();
+        let small = function("sym:b.ts:15:29", "bundle.js", 15, 29);
+        let other = function("sym:c.ts:0:14", "app.js", 0, 14);
+
+        let withheld = withheld_files(&[small, huge, other]);
+        assert_eq!(withheld.len(), 1, "only the file that reached a budget is withheld");
+        assert_eq!(withheld[0].path, "bundle.js");
+        assert_eq!(withheld[0].functions, 2, "the file is the unit, so both go");
+        assert_eq!(withheld[0].offenders, 1, "one function reached the budget");
+        assert_eq!(withheld[0].what, "scopes");
+        assert_eq!(withheld[0].limit, MAX_SCOPES_PER_FUNCTION);
+        assert_eq!(withheld[0].count, MAX_SCOPES_PER_FUNCTION + 1);
+
+        // Nothing to withhold when every function is inside the budgets.
+        assert!(withheld_files(&[function("sym:c.ts:0:14", "app.js", 0, 14)]).is_empty());
+    }
 }
 
 fn check_stmt_spans(

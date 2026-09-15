@@ -1,0 +1,11 @@
+PASS 浏览器里按名字选到函数 :: "add"
+PASS 真实运行返回观测结果 :: ["本次目标 symbol:math.js:0:45 · 分析 142709eeb98c","实际输入：[17,23]","观测结果 returned · 178 ms · 退出码 0","返回值 40"]
+PASS 第一次会话结束前确有可恢复状态 :: {"selection":"add","mode":"review","drafts":1}
+PASS 停止服务并重开后，选区/页签/草稿都恢复了 :: {"before":{"selection":"add","mode":"review","drafts":1},"after":{"selection":"add","mode":"review","drafts":1,"status":"已恢复上次任务：add · 页签 review · 输入草稿已回填"},"port_before":"47156","port_after":"47156"}
+PASS 恢复的是草稿内容本身（17 / 23） :: ["17","23"]
+PASS 另一个项目里同名 add 不继承上一个项目的状态 :: {"selection":"选择一个函数","mode":"understand","drafts":0,"saved":null}
+FAIL relocated function restores actual draft inputs :: {"movedInputs":["",""],"status":"已从版本 142709ee 重定位到当前版本：依据 path_and_name，源码字节相同。页签 review 与输入草稿一并恢复。"}
+PASS 源码位移后按依据重定位并说明依据 :: {"selection":"add","status":"已从版本 142709ee 重定位到当前版本：依据 path_and_name，源码字节相同。页签 review 与输入草稿一并恢复。"}
+PASS 函数改名后不能恢复时明确拒绝（不静默改指其他函数） :: {"selection":"选择一个函数","status":"该选区固定在另一个分析版本上，重定位被拒绝（no_counterpart）：没有同名或字节相同的对应物；同一路径下的 1 个对象只是邻居，不是匹配。选区保持原样，不重指。"}
+
+8/9 通过

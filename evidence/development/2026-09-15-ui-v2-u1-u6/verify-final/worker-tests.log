@@ -1,0 +1,38 @@
+✔ flow IR carries version, profile and per-function anchors (27.898125ms)
+✔ block shadowing produces distinct binding ids (D01) (5.061723ms)
+✔ TDZ use-before-declare still resolves to the real binding (D01) (15.301989ms)
+✔ short-circuit and conditional operators become structured control (D02) (1.991222ms)
+✔ try/catch/finally lowers with catch param binding and anchors (D03/D04) (2.420797ms)
+✔ labeled break/continue keep labels (D05) (2.871221ms)
+✔ for-of and for-in are modelled as loops, and the bound name is a binding (1.879464ms)
+✔ module peers resolve to bindings and are recorded as captures (D14 setup) (1.690089ms)
+✔ object and array literals keep field names and element anchors (2.17978ms)
+✔ destructuring declarations become explicit unknowns, not silent copies (profile) (2.407154ms)
+✔ alpha-renaming preserves flow structure modulo identity (D21) (5.5467ms)
+✔ a folded global name loses to a shadowing binding (V-08b) (4.851032ms)
+✔ the unshadowed global undefined still folds to a constant (V-08b) (0.912947ms)
+✔ non-finite numeric literals are explicit unknowns, not unwireable constants (0.945273ms)
+✔ finite numeric literals are unaffected by the non-finite guard (0.852924ms)
+✔ a nested function keeps its own declarations out of the enclosing function (GE-2 regression) (4.70059ms)
+✔ runtime imports are named on every function, and type-only imports are not (10.922122ms)
+✔ shorthand property reads resolve the local binding, not a property symbol (R2) (1.412543ms)
+✔ a block-scoped let does not hide the outer global read (R2) (1.181269ms)
+✔ cross-file alias and re-export resolve using captured sources (48.288412ms)
+✔ lexical shadowing does not bind to a global namesake (2.412628ms)
+✔ reassigned function declarations are marked; indirect and constructor calls stay unknown (6.022506ms)
+✔ duplicate script declarations are ambiguous, not first-declaration wins (1.586218ms)
+✔ UTF-8 byte spans retain Chinese and emoji source anchors (2.522762ms)
+✔ nested calls with identical start offsets have distinct full-span IDs (1.559884ms)
+✔ compiler host never falls back to ambient source or config reads (2.305911ms)
+✔ syntax failures and dynamic language features are explicit (2.220519ms)
+✔ request isolation rejects traversal and duplicates; source is never evaluated (3.095846ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 513.503173
+npm notice run @atlas/typescript-worker@0.1.0 test
+npm notice run node --test tests/*.test.mjs

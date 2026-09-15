@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# 打开就能玩：索引随仓库附带的演示项目，起本地服务，打印**带会话令牌的地址**。
+# 打开就能玩：索引一个项目（默认随仓库附带的演示项目），起本地服务，
+# 打印**带会话令牌的地址**。
+#
+# 用法：bash scripts/demo.sh [项目目录]
+# 目录参数是真实的：传什么就索引什么（绝对或相对路径均可），不传用 examples/tour。
 #
 # 为什么要有这一条：Atlas 的价值只有在屏幕上才能被判断，而此前要看到它，
 # 得先自己造项目、自己 index、自己 serve、再去 session 文件里抄 token。
@@ -10,7 +14,7 @@ cd "$(dirname "$0")/.."
 
 PORT="${ATLAS_DEMO_PORT:-0}"   # 0 = 由系统挑一个空闲端口，避免撞上别的 atlas
 STORE="${ATLAS_DEMO_STORE:-local-state/demo-tour}"
-PROJECT="examples/tour"
+PROJECT="${1:-examples/tour}"
 BIN="./target/debug/atlas"
 
 if [ ! -x "$BIN" ]; then
@@ -18,11 +22,11 @@ if [ ! -x "$BIN" ]; then
   exit 1
 fi
 if [ ! -d "$PROJECT" ]; then
-  echo "找不到演示项目 ${PROJECT}" >&2
+  echo "找不到项目目录 ${PROJECT}；用法：bash scripts/demo.sh [项目目录]" >&2
   exit 1
 fi
 
-echo "① 索引演示项目 ${PROJECT} → ${STORE}"
+echo "① 索引项目 ${PROJECT} → ${STORE}"
 ANALYSIS=$("$BIN" --store "$STORE" index "$PROJECT" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
 echo "   分析版本 ${ANALYSIS:0:12}…"
 
@@ -31,7 +35,8 @@ echo "   分析版本 ${ANALYSIS:0:12}…"
 rm -f "${STORE}"/web-session-*.json
 
 echo "② 起服务（端口 ${PORT}）。停止：Ctrl-C"
-"$BIN" --store "$STORE" serve "$ANALYSIS" --port "${PORT}" >/tmp/atlas-demo-serve.log 2>&1 &
+# --project 让页面能显示"现在打开的是哪个项目"，并让任务状态按项目身份保存。
+"$BIN" --store "$STORE" serve "$ANALYSIS" --port "${PORT}" --project "$PROJECT" >/tmp/atlas-demo-serve.log 2>&1 &
 SERVE_PID=$!
 trap 'kill ${SERVE_PID} 2>/dev/null || true' EXIT
 

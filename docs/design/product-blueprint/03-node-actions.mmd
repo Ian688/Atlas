@@ -1,0 +1,16 @@
+flowchart LR
+  node["节点：项目 / 目录 / 文件 / 代码成员"]
+  node --> select["单击：本区域选中 + 详情"]
+  node --> open["双击或 Enter：本区域节点标签"]
+  node --> info["i：解释面板"]
+  info --> sources["算法摘要 / 原始注释 / 按需 LLM"]
+  sources --> save["查看依据 → 编辑 → 保存 → 历史"]
+  node --> more["更多菜单"]
+  more --> area["新展示区：保留原区，独立探索"]
+  more --> note["批注 → 创建任务 → 预览交接上下文"]
+  more --> typed{"节点类型"}
+  typed --> project["项目：测试配置 / 重新分析 / 本次修改"]
+  typed --> folder["目录：子地图 / 范围搜索 / 模块依赖"]
+  typed --> file["文件：源码 / 声明引用 / 文件差异"]
+  typed --> fn["函数：调用 / 值来源 / 运行 / 场景"]
+  typed --> other["文本配置：阅读 / 批注 / 修改交接"]

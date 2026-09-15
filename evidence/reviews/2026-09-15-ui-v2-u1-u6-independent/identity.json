@@ -1,0 +1,7 @@
+{
+  "at": "2026-09-14T20:46:16.935Z",
+  "head": "c8fada2dd6ac11fbc701b3fc804b326271ebc831",
+  "package_sha256": "cc189bbf404d0a4eca47b9937b045da803512c9fc05153f87d255f0c8ffe78b0",
+  "binary_fingerprint": "02378fedc716441eb8d3ae385485a72d723268d207305780f19c0d1fd8c3d297",
+  "scope": "copied final distribution launched outside repository with start.sh; own temporary sample projects"
+}

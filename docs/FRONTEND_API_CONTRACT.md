@@ -1,4 +1,6 @@
-# 前端接线：现有能力与最小接口补充
+# 前端接线：历史接口核对
+
+本文保留v1时期的接口核对，部分字段与缺口已经变化。**当前实现请从[v2区域与技术栈映射](design/atlas-v2/DESIGN.md)及各页操作规格开始，具体字段核对当前server/contract。** 本文不再决定页面或开发顺序。
 
 2026-09-13，只读核对 `server.rs`、`query.rs`、`facts.rs`、`exec.rs`、`runner.rs`、`patchwork.rs` 与 `web/app.js`。下面行号是本次源码定位提示，改动后以符号为准。没有执行产品测试；拟议项不是已存在 API。版式和交互见 [主设计](FRONTEND_DESIGN.md)。
 
@@ -58,6 +60,13 @@ RunSpec 已有 `this_arg,globals`；HTTP `ExecRequest` 未接这两项。新增�
 当前 HTTP 执行同步等待最终结果，无取消路由；局部 `_cancel_tx` 没有发送取消。**AbortController 只能停止客户端等待，不能显示“进程已取消”。** 首个真实运行闭环可沿现接口完成，取消按钮需等后端具备实际能力才出现。
 
 拟议兼容现 `/exec`，增异步提交返回 owner-bound `run_id`，状态查询和 `POST /api/exec/cancel {run_id}`；复用 runner 已有 watch cancel 与进程回收。queued/running/cancelling/terminal 区分，断连后凭同一 ID 查询，不重复执行未知结果。优先复用现有作业/请求基础，不另起并行终态账本。若第一片只做进程内句柄，必须说明重启不恢复，不能称持久作业。
+
+> **2026-09-15 已接通**：`POST /api/exec` 支持 `background:true`（立即返回 `run_id`）；
+> `GET /api/exec/run?id=` 状态、`POST /api/exec/cancel` 协作取消、`GET /api/exec/runs`
+> 本会话运行清单均已存在。句柄在进程内（重启不恢复），已发布执行记录仍在 store。
+> 项目编排（`projects` / `project/open` / `project/open/cancel` / `project/reindex` /
+> `project/settings`）也已接通：页面可打开/切换项目、应用后重新索引出新版本、
+> 声明测试命令。以 `GET /api/contract` 为准。
 
 ### F4：网页触发补丁验证
 

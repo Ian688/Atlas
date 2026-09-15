@@ -1,0 +1,58 @@
+{
+  "scope": "UI design sample only, no product execution or real LLM",
+  "checks": [
+    {
+      "name": "node info switches to exact target",
+      "result": "PASS"
+    },
+    {
+      "name": "algorithm vs comments are separate",
+      "result": "PASS"
+    },
+    {
+      "name": "new area and code keep root map",
+      "result": "PASS"
+    },
+    {
+      "name": "LLM explicit generation and editable save",
+      "result": "PASS"
+    },
+    {
+      "name": "annotation plus editable agent handoff",
+      "result": "PASS"
+    },
+    {
+      "name": "node type menus differ",
+      "result": "PASS"
+    },
+    {
+      "name": "nested file and section nodes",
+      "result": "PASS"
+    },
+    {
+      "name": "saved record marked stale after version update",
+      "result": "PASS"
+    },
+    {
+      "name": "region annotation screenshot",
+      "result": "PASS"
+    },
+    {
+      "name": "viewport 1280",
+      "result": "PASS"
+    },
+    {
+      "name": "viewport 1024",
+      "result": "PASS"
+    },
+    {
+      "name": "viewport 390",
+      "result": "PASS"
+    },
+    {
+      "name": "browser errors",
+      "result": "PASS",
+      "errors": []
+    }
+  ]
+}

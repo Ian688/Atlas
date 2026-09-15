@@ -1,0 +1,17 @@
+flowchart TB
+  ui["工作台：任务 / 地图 / 验证 / Review"] --> api["统一能力服务"]
+  agent["外部 Agent"] --> mcp["规划：本地 MCP 适配"]
+  mcp --> api
+  cli["现有 CLI / HTTP 消费者"] --> api
+  optional["可选内置 Agent"] --> api
+  api --> query["基础查询与任务查询"]
+  api --> execution["显式运行 / 测试 / 提案验证"]
+  source["固定源码版本"] --> language["语言适配与索引"]
+  language --> semantic["符号 / 定义 / 引用 / 类型材料"]
+  semantic --> program["调用 / 控制流 / 数据流 / 未知"]
+  program --> query
+  execution --> observation["实际记录；后续采集轨迹"]
+  program --> evidence["来源 / 版本 / 范围 / 完整性"]
+  observation --> evidence
+  evidence --> query
+  query --> impact["变化对象 / 候选影响 / 关联证据"]

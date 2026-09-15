@@ -134,6 +134,29 @@ impl Store {
         Ok(out)
     }
 
+    /// Proposals recorded against one applied target directory, whatever
+    /// analysis they were proposed against. This is how a proposal stays
+    /// reviewable after the project was re-indexed (apply → new version): the
+    /// analysis id moved, but the proposal still belongs to this checkout.
+    pub fn patch_proposals_by_target(
+        &self,
+        target: &str,
+        limit: usize,
+    ) -> Result<Vec<PatchProposal>> {
+        let limit = limit.clamp(1, 100);
+        let conn = self.connection()?;
+        let mut statement = conn.prepare(
+            "SELECT * FROM patch_proposals WHERE target=?1
+             ORDER BY created_at DESC, id LIMIT ?2",
+        )?;
+        let rows = statement.query_map(params![target, limit as i64], row_to_proposal)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
     /// Attach verification. Only a proposal that was accepted can be verified:
     /// a rejected diff has nothing to re-index.
     pub fn mark_patch_verified(&self, id: &str, verification: &serde_json::Value) -> Result<bool> {

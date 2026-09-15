@@ -1,0 +1,58 @@
+{
+  "scope": "真实服务 + 真实子进程 + 真实 Chrome；取消以服务端记录为准",
+  "analysis_id": "0beea66f69e7eacaa935a3cbd59b990313e6cb667f8cdccfba1b9306633a06bc",
+  "checks": [
+    {
+      "name": "运行期间：按钮原位显示运行中，并且出现取消入口",
+      "result": "PASS",
+      "detail": {
+        "runButton": "运行中…",
+        "cancelShown": true,
+        "note": "执行在服务端进行；可以离开这一页，回来仍能看到结果或取消。",
+        "banner": "src/slow.js · spin固定分析版本 0beea66f69e7一次执行仍在服务端进行（run a96eb8f1）。离开这一页不会停它；可以回来查状态或取消。"
+      }
+    },
+    {
+      "name": "服务端确有受控子进程在跑（取消前）",
+      "result": "PASS",
+      "detail": {
+        "processes": "1"
+      }
+    },
+    {
+      "name": "点击取消后页面说明\"信号已发出、终态待服务端确认\"",
+      "result": "PASS",
+      "detail": {
+        "status": "取消中：已发出取消信号，等待服务端结束进程…",
+        "note": "执行在服务端进行；可以离开这一页，回来仍能看到结果或取消。"
+      }
+    },
+    {
+      "name": "终态来自服务端：页面显示\"已取消\"，结果区是 cancelled 记录",
+      "result": "PASS",
+      "detail": {
+        "status": "已取消：进程已结束（服务端确认）",
+        "result": "本次目标 symbol:src/slow.js:64:183 · 分析 0beea66f69e7实际输入：[4000000000]观测结果 cancelled · 1400 ms · 退出码 无观测边界：coverage=not_sampled · unknown_paths=not_observed。只有入口调用的返",
+        "cancelHidden": true,
+        "runButton": "运行这组输入"
+      }
+    },
+    {
+      "name": "取消后受控子进程确实消失",
+      "result": "PASS",
+      "detail": {
+        "processes": "0"
+      }
+    },
+    {
+      "name": "离开运行页后结果与状态仍在内存里（离页不影响任务）",
+      "result": "PASS",
+      "detail": {
+        "page": "explore",
+        "hasResult": true,
+        "busy": false
+      }
+    }
+  ],
+  "exit_code": 0
+}

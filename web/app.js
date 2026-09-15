@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id);
-const state = {token:'',nodes:[],edges:[],nodePage:null,edgePage:null,selected:null,focus:null,focusIn:null,focusOut:null,request:0,exportUrl:null,execProfile:null,report:null,selection:null,pendingSelection:null,annotations:[],patches:[],execRender:0,ancestorChain:null,contract:null,level:'file',hierarchy:null,levelView:null,index:null,focusLayout:null,focusLayoutKey:null,layoutGen:0,mode:'understand',lens:'calls',history:[],recent:[],search:{query:'',items:[],total:null,nextCursor:null,loading:false,error:null},sourceRes:{status:'idle',error:null},reachRes:{status:'idle',error:null,errors:[]},execDrafts:{},execRecords:[],execRecordsError:null,execResult:null,pendingPanel:null};
+const state = {token:'',nodes:[],edges:[],nodePage:null,edgePage:null,selected:null,focus:null,focusIn:null,focusOut:null,request:0,exportUrl:null,execProfile:null,report:null,selection:null,pendingSelection:null,annotations:[],patches:[],execRender:0,ancestorChain:null,contract:null,level:'file',hierarchy:null,levelView:null,index:null,focusLayout:null,focusLayoutKey:null,layoutGen:0,page:'explore',lens:'calls',history:[],recent:[],projectName:'',agentGoal:'',currentRun:null,execBusy:false,search:{query:'',items:[],total:null,nextCursor:null,loading:false,error:null},sourceRes:{status:'idle',error:null},reachRes:{status:'idle',error:null,errors:[]},execDrafts:{},execRecords:[],execRecordsError:null,execResult:null,pendingPanel:null,execTab:'result',execResultMeta:null,reviewSelected:null,reviewFile:null,tasks:[],tasksError:null,tasksTimer:null,projects:[],projectsError:null,openOp:null,openState:null,settingsBusy:false};
 const ns='http://www.w3.org/2000/svg';
 function svg(tag, attrs={}, text) {const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));if(text!==undefined)e.textContent=text;return e;}
 function text(tag,value,cls) {const e=document.createElement(tag);e.textContent=value;if(cls)e.className=cls;return e;}
@@ -27,8 +27,8 @@ async function api(name, params={}, method='GET') {
 // can start a process, and the server does not trust this body for the process
 // boundary: the Node binary, the environment and the fs/child/network
 // permissions stay server-side.
-async function apiJson(name, body) {
-  const r=await fetch(`/api/${name}`,{method:'POST',headers:{Authorization:`Bearer ${state.token}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
+async function apiJson(name, body, method='POST') {
+  const r=await fetch(`/api/${name}`,{method,headers:{Authorization:`Bearer ${state.token}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
   const parsed=await r.json().catch(()=>null);
   if(!r.ok){const e=new Error(errorText(r.status,parsed));e.status=r.status;e.body=parsed;throw e;}
   return parsed;
@@ -36,11 +36,11 @@ async function apiJson(name, body) {
 function status(message){$('status').textContent=message;}
 // The behavioural harness runs app.js against a minimal DOM that has
 // getElementById but no querySelectorAll; tab/lens wiring degrades to nothing
-// there and the tests drive setMode/setLens directly.
+// there and the tests drive setPage/setLens directly.
 function qsa(selector){
   return typeof document.querySelectorAll==='function'?document.querySelectorAll(selector):[];
 }
-function clearContext(){if(state.exportUrl)URL.revokeObjectURL(state.exportUrl);state.exportUrl=null;$('context-panel').hidden=true;$('context-json').value='';$('context-download').removeAttribute('href');}
+function clearContext(){if(state.exportUrl)URL.revokeObjectURL(state.exportUrl);state.exportUrl=null;const dialog=$('context-dialog');if(dialog&&dialog.open&&dialog.close)dialog.close();const area=$('context-json');if(area)area.value='';const link=$('context-download');if(link)link.removeAttribute('href');}
 // A selection is the unit the two projections share: an entity plus the
 // analysis version it was chosen in. It travels in the fragment (never in an
 // HTTP request, never to a server log) and is written back on every selection
@@ -52,11 +52,11 @@ function projectionHref(){
   const params=new URLSearchParams();
   if(state.selection){params.set('selection',state.selection.entity_id);params.set('analysis',state.selection.analysis_id);}
   if(state.token)params.set('token',state.token);
-  if(state.selection){params.set('mode',state.mode);if(state.mode==='understand')params.set('lens',state.lens);}
+  if(state.selection){params.set('page',state.page);if(state.page==='explore')params.set('lens',state.lens);}
   return `/city3d#${params.toString()}`;
 }
 function refreshProjectionLink(){
-  const link=$('open-3d');
+  const link=$('city-open');
   if(link)link.setAttribute('href',projectionHref());
 }
 function parseFragment(){
@@ -71,13 +71,15 @@ function publishSelection(node){
     else{inspector.removeAttribute('data-selection-entity');inspector.removeAttribute('data-analysis-id');}
   }
   refreshProjectionLink();
+  scheduleSaveUiState();
   if(typeof history!=='undefined'){
     // 选区更新保留同一 fragment 里的视图状态(mode/lens),不整体覆盖。
     const params=new URLSearchParams(location.hash.slice(1));
     if(node){params.set('selection',node.id);params.set('analysis',state.report?.id||'');}
     else{params.delete('selection');params.delete('analysis');}
     // 镜头只在"理解代码"里有意义,其他页签不把过期的 lens 留在链接里。
-    if(params.get('mode')&&params.get('mode')!=='understand')params.delete('lens');
+    // 镜头只在探索页有意义，其他页面不把过期的 lens 留在链接里。
+    if(params.get('page')&&params.get('page')!=='explore')params.delete('lens');
     const query=params.toString();
     history.replaceState(null,'',location.pathname+(query?`#${query}`:''));
   }
@@ -166,8 +168,17 @@ async function runCompare(proposalId,proposal){
   const request=state.request;
   // 与单次运行一致:画像要求的授权按需转发(例如读取 Math.round 之类外部名)。
   const allow_effects=profile?profile.required_grants.filter(name=>name==='unknown_calls'):[];
+  // this/globals 是运行页签已经支持并声明过的输入。对照必须把它们一起带到两
+  // 侧,否则对着一个读取 this 或全局的函数,基线侧会因缺输入被拒而补丁侧不
+  // 被拒——那样的"差异"来自输入,不来自这次修改。
+  let declared={};
+  try{declared=draftDeclaredInputs(profile);}
+  catch(e){
+    if(resultBox)resultBox.replaceChildren(flowNode('flow-unknown',`对照未完成：声明的输入不是合法 JSON（${e.message}）。请先在「运行」页签填好 this/globals。`));
+    return;
+  }
   try{
-    const compare=await apiJson('exec-compare',{entity:selected.id,args,proposal_id:proposalId,allow_effects});
+    const compare=await apiJson('exec-compare',{entity:selected.id,args,proposal_id:proposalId,allow_effects,...declared});
     if(request!==state.request)return;
     renderCompareResult(resultBox,compare);
     status('对照完成：两侧都是真实隔离运行。');
@@ -196,110 +207,359 @@ function compareSide(name,side){
   wrap.append(flowNode('flow-line',`版本 ${String(record.analysis_id||'').slice(0,12)} · snapshot ${String(record.snapshot_id||'').slice(0,12)}`));
   return wrap;
 }
+// 对照的声明输入必须完整可见：args、this、globals 都是这一次运行真正发出的
+// 内容（服务端回显），少传一个就不是"同一输入下的前后对照"。
+function declaredInputsLine(compare){
+  const d=compare.declared_inputs||{};
+  const parts=[`args ${JSON.stringify(d.args??[])}`];
+  if(d.this_arg!==undefined&&d.this_arg!==null)parts.push(`this ${JSON.stringify(d.this_arg)}`);
+  const globals=d.globals&&Object.keys(d.globals).length?JSON.stringify(d.globals):null;
+  if(globals)parts.push(`globals ${globals}`);
+  return parts.join(' · ');
+}
 function renderCompareResult(box,compare){
   if(!box)return;
   box.replaceChildren();
-  box.append(flowNode('flow-head',`同一输入：${JSON.stringify(compare.args)}`));
+  box.append(flowNode('flow-head',`两侧同一输入：${declaredInputsLine(compare)}`));
   box.append(compareSide('基线（当前工作台版本）',compare.base));
   box.append(compareSide('补丁（验证派生的候选版本）',compare.patched));
   box.append(flowNode('flow-line',`版本固定：基线 ${String(compare.base_analysis_id||'').slice(0,12)} · 补丁 ${String(compare.patched_analysis_id||'').slice(0,12)}。两侧都是入口调用的真实结果，没有行级采样。`));
 }
+// --- 修改审阅：提案列表 → 集中差异 → 验证证据 → 写入行动 ---------------------
+// 三栏各答一个问题：改哪份提案？差异长什么样？证据与操作是什么？选择状态
+// 保留在 state.reviewSelected，Agent 页与比较入口都落到同一份提案上。
+function proposalStateLabel(proposalState){
+  const label={proposed:'已登记',verified:'已验证',applied:'已应用',rejected:'校验未通过',reverted:'已撤销'}[proposalState]||proposalState;
+  return `${label}（${proposalState}）`;
+}
+// 统一 diff → 按文件的分段。文件头（--- / +++）与 hunk 头决定归属；解析不了
+// 的内容整体放进"完整 diff"，不吞掉。
+function splitDiffFiles(diffText){
+  const lines=String(diffText).split('\n');
+  const files=[];let current=null;
+  for(const line of lines){
+    if(line.startsWith('--- ')||line.startsWith('+++ '))continue;
+    if(line.startsWith('@@')){
+      if(!current)current={name:'（未命名文件）',lines:[]};
+      current.lines.push(line);
+      continue;
+    }
+    if(!current&&line.trim())current={name:'（未命名文件）',lines:[]};
+    if(current)current.lines.push(line);
+  }
+  if(current&&current.lines.some(l=>l.trim()))files.push(current);
+  return files;
+}
+// 从 Agent 页（或任何入口）带着提案 id 进入审阅页：同一份提案被选中，
+// 差异/证据/行动都围绕它展开。
+function locateProposal(proposalId){
+  state.reviewSelected=proposalId;
+  setPage('review');
+  renderPatches(state.patches);
+  status(`已定位到提案 ${String(proposalId||'').slice(0,12)}。`);
+}
 function renderPatches(proposals){
   const panel=$('patch-panel'),body=$('patch-body');if(!panel||!body)return;
   if(!state.selected){panel.hidden=true;body.replaceChildren();return;}
-  panel.hidden=false;body.replaceChildren();
-  body.append(flowNode('flow-line','提案是 Intent：它还没有写进任何检出目录，也没有改变已发布的分析。'));
+  panel.hidden=false;
+  if(!proposals.length)state.reviewSelected=null;
+  // 选择合法性：记录的提案不在本次列表里就回到第一份（列表为空则清空）。
+  if(state.reviewSelected&&!proposals.some(p=>p.id===state.reviewSelected))state.reviewSelected=null;
+  const selected=state.reviewSelected
+    ?proposals.find(p=>p.id===state.reviewSelected)
+    :(proposals[0]||null);
+  if(selected)state.reviewSelected=selected.id;
+  // --- C2 提案列表（静态输入面板被带回来，未提交的 diff 不丢） ---------------
+  const side=flowNode('review-side','');
+  const count=$('review-count');
+  if(count)count.textContent=proposals.length?`${proposals.length} 份`:'';
   if(!proposals.length){
-    body.append(flowNode('flow-line',state.patchesError?`提案查询失败：${state.patchesError}`:'当前选区还没有提案。'));
-    return;
+    side.append(flowNode('flow-line',state.patchesError?`提案查询失败：${state.patchesError}`:'当前选区还没有提案。粘贴一份统一 diff 登记，或让外部 Agent 通过接口提交。'));
   }
-  for(const proposal of proposals.slice(0,8)){
+  for(const proposal of proposals.slice(0,12)){
     const inner=proposal.proposal||{};
+    const crossVersion=state.report&&proposal.analysis_id&&proposal.analysis_id!==state.report.id;
+    const row=flowNode(`review-proposal${selected&&proposal.id===selected.id?' on':''}`,'');
+    row.setAttribute('role','button');
+    row.setAttribute('tabindex','0');
+    row.setAttribute('aria-pressed',String(selected&&proposal.id===selected.id));
+    row.append(flowNode('review-proposal-id',`${proposal.id.slice(0,12)} · ${proposalStateLabel(proposal.state)}`));
+    row.append(flowNode('review-proposal-sub',`${proposal.proposed_by}${inner.summary?` · ${inner.summary}`:''}`));
+    if(crossVersion)row.append(flowNode('flow-line',`提案固定在项目之前的分析上（${String(proposal.analysis_id||'').slice(0,8)}）；差异与撤销仍然可查。`));
     const validation=inner.validation||{};
-    body.append(flowNode('flow-head',`提案 ${proposal.id.slice(0,12)} · ${proposal.state} · ${proposal.proposed_by}${inner.summary?` · ${inner.summary}`:''}`));
+    if(!validation.ok&&validation.reason)row.append(flowNode('flow-unknown',`对固定快照校验未通过：${validation.reason}`));
+    const choose=()=>{state.reviewSelected=proposal.id;renderPatches(state.patches);};
+    row.onclick=choose;
+    row.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose();}};
+    side.append(row);
+  }
+  const inputPanel=$('patch-input-panel');
+  if(inputPanel)side.append(inputPanel);
+  // --- C3 集中差异 -----------------------------------------------------------
+  const center=flowNode('review-center-inner','');
+  center.id='review-center-inner';
+  if(!selected){
+    center.append(flowNode('flow-line','选择一份提案，或粘贴 diff 登记新的提案。差异与验证证据会显示在这里。'));
+  }else{
+    const inner=selected.proposal||{};
+    const validation=inner.validation||{};
+    center.append(flowNode('flow-head',`提案 ${selected.id.slice(0,12)} · ${proposalStateLabel(selected.state)} · ${selected.proposed_by}`));
+    center.append(flowNode('flow-line','提案是 Intent：它还没有写进任何检出目录，也没有改变已发布的分析。'));
     if(validation.ok){
       const forms=validation.forms||[];
       const formText=forms.map(entry=>`${entry.form==='create'?'新建':(entry.form==='delete'?'删除':'修改')} ${entry.path}`).join(' · ');
-      body.append(flowNode('flow-line',`对固定快照校验通过：${validation.hunks} 个 hunk · ${formText||(validation.patched_paths||[]).join(', ')}`));
-      if(forms.some(entry=>entry.form==='create'))body.append(flowNode('flow-line',`这份提案会新建文件（target_exists=${inner.target_exists===false?'false':'true'}）：apply 会创建它，revert 会删除它（只在文件仍是 apply 写下的字节时）。`));
-      if(forms.some(entry=>entry.form==='delete'))body.append(flowNode('flow-line','这份提案会删除文件：apply 只在磁盘上仍是提案所依据的字节时删除，revert 会按固定快照的字节恢复。'));
-      if((validation.deleted_paths||[]).length)body.append(flowNode('flow-line',`删除路径：${validation.deleted_paths.join(', ')}`));
+      center.append(flowNode('flow-line',`对固定快照校验通过：${validation.hunks} 个 hunk · ${formText||(validation.patched_paths||[]).join(', ')}`));
+      if(forms.some(entry=>entry.form==='create')){
+        center.append(flowNode('flow-line',`这份提案会新建文件（target_exists=${inner.target_exists===false?'false':'true'}）：apply 会创建它，revert 会删除它（只在文件仍是 apply 写下的字节时）。`));
+      }
+      if(forms.some(entry=>entry.form==='delete')){
+        center.append(flowNode('flow-line','这份提案会删除文件：apply 只在磁盘上仍是提案所依据的字节时删除，revert 会按固定快照的字节恢复。'));
+      }
+      if((validation.deleted_paths||[]).length)center.append(flowNode('flow-line',`删除路径：${validation.deleted_paths.join(', ')}`));
     }else{
-      body.append(flowNode('flow-unknown',`对固定快照校验未通过，因此它不可验证：${validation.reason||'未知原因'}`));
+      center.append(flowNode('flow-unknown',`对固定快照校验未通过，因此它不可验证：${validation.reason||'未知原因'}`));
     }
-    body.append(renderDiffView(inner.diff||''));
-    const verification=proposal.verification;
+    const files=splitDiffFiles(inner.diff||'');
+    if(files.length>1){
+      const tabs=flowNode('diff-file-tabs','');
+      if(state.reviewFile===null||state.reviewFile>=files.length)state.reviewFile=0;
+      files.forEach((file,index)=>{
+        const tab=flowNode(`diff-file-tab${index===state.reviewFile?' on':''}`,file.name);
+        tab.setAttribute('role','button');
+        tab.setAttribute('tabindex','0');
+        tab.onclick=()=>{state.reviewFile=index;renderPatches(state.patches);};
+        tab.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();state.reviewFile=index;renderPatches(state.patches);}};
+        tabs.append(tab);
+      });
+      center.append(tabs);
+      center.append(renderDiffView(files[state.reviewFile].lines.join('\n')));
+    }else{
+      center.append(renderDiffView(inner.diff||''));
+    }
+    const fullDiff=document.createElement('details');
+    fullDiff.className='wb-details';
+    fullDiff.append(text('summary','完整 diff（可选择复制）'));
+    fullDiff.append(renderDiffView(inner.diff||''));
+    center.append(fullDiff);
+    const verification=selected.verification;
     if(verification){
       const graph=verification.graph_diff||{};
       const counts=graph.counts||{};
-      body.append(flowNode('flow-line',`静态：补丁树派生为新分析 ${String(verification.patched_analysis_id||'').slice(0,12)} · 变更节点 ${graph.nodes?.changed_count??'?'} · 新增 ${graph.nodes?.added_count??'?'} · 删除 ${graph.nodes?.removed_count??'?'}`));
-      if(counts.unresolved_calls)body.append(flowNode('flow-line',`未解析调用 前 ${counts.unresolved_calls.before} → 后 ${counts.unresolved_calls.after}`));
-      body.append(renderGraphDiffObjects(graph));
+      const impact=flowNode('review-impact','');
+      impact.append(flowNode('flow-head','静态影响（从补丁树派生的候选分析，不是运行结果）'));
+      impact.append(flowNode('flow-line',`静态：补丁树派生为新分析 ${String(verification.patched_analysis_id||'').slice(0,12)} · 变更节点 ${graph.nodes?.changed_count??'?'} · 新增 ${graph.nodes?.added_count??'?'} · 删除 ${graph.nodes?.removed_count??'?'}`));
+      if(counts.unresolved_calls)impact.append(flowNode('flow-line',`未解析调用 前 ${counts.unresolved_calls.before} → 后 ${counts.unresolved_calls.after}`));
+      impact.append(renderGraphDiffObjects(graph));
+      center.append(impact);
+    }
+    const seeGraph=text('button','在关系图中查看同一对象','wb-retry');
+    seeGraph.onclick=()=>setPage('explore');
+    center.append(seeGraph);
+  }
+  // --- C4/C5 验证证据与写入行动 ---------------------------------------------
+  const evidence=flowNode('review-evidence-inner','');
+  evidence.id='review-evidence-inner';
+  if(selected){
+    const inner=selected.proposal||{};
+    const validation=inner.validation||{};
+    const verification=selected.verification;
+    const crossVersion=state.report&&selected.analysis_id&&selected.analysis_id!==state.report.id;
+    evidence.append(flowNode('flow-head','验证证据'));
+    if(crossVersion)evidence.append(flowNode('flow-line',`这份提案固定在项目之前的分析（${String(selected.analysis_id||'').slice(0,8)}）上；它的验证与对照结果属于那个版本。撤销与应用不受影响（由磁盘字节核对保护）。`));
+    if(verification){
       const test=verification.test||{};
       if(test.ran){
-        body.append(flowNode(test.passed?'flow-line':'flow-unknown',`观测：测试命令 ${JSON.stringify(test.argv)} 退出码 ${test.exit_code}${test.timed_out?'（超时，不算通过）':''}`));
+        // 通过、失败、超时、没启动必须是四个不同的句子。把"没跑"显示成通过
+        // 是这条链上最危险的呈现错误。
+        const verdict=test.timed_out?'超时（按进程组杀死，不算通过）'
+          :(test.error?`没有产生退出码：${test.error}`
+          :(test.passed?'通过（退出码 0）':'失败（退出码非 0）'));
+        evidence.append(flowNode(test.passed&&!test.timed_out?'flow-line':'flow-unknown',
+          `观测：测试命令 ${JSON.stringify(test.argv)} · ${verdict}${test.exit_code===null||test.exit_code===undefined?'':` · 退出码 ${test.exit_code}`}${test.duration_ms!==undefined?` · ${test.duration_ms} ms`:''}`));
+        const out=String(test.stdout||''),err=String(test.stderr||'');
+        if(out.trim()||err.trim()){
+          const details=document.createElement('details');details.className='wb-details';
+          details.append(text('summary','查看输出（隔离副本内的真实 stdout/stderr）'));
+          if(out.trim())details.append(flowNode('flow-line',`stdout：\n${out.slice(0,4000)}`));
+          if(err.trim())details.append(flowNode('flow-line',`stderr：\n${err.slice(0,4000)}`));
+          evidence.append(details);
+        }
       }else{
-        body.append(flowNode('flow-unknown','观测：没有跑任何测试。这不是通过。'));
+        evidence.append(flowNode('flow-unknown',`观测：${test.note||'没有跑任何测试'}${test.error?`（${test.error}）`:''}这不是通过。`));
       }
-    }else if(validation.ok){
-      body.append(flowNode('flow-line','还没有验证：没有派生补丁树，也没有跑测试。'));
-    }
-    // 前后对照:同一输入在基线与补丁两个分析上真实运行。只对已验证的提案
-    // 提供(补丁分析来自验证);默认带入运行页签最近一次的实参草稿。
-    if(proposal.state==='verified'){
-      const key=proposal.id.slice(0,8);
-      const draft=execDraft(state.selected?.id);
-      const section=flowNode('compare-section','');
-      const label=flowNode('flow-head','前后对照（同一输入,两侧真实隔离运行）');
-      section.append(label);
-      const argsRow=document.createElement('div');argsRow.className='context-actions';
-      const argsInput=document.createElement('textarea');
-      argsInput.id=`compare-args-${key}`;argsInput.rows=1;argsInput.spellcheck=false;
-      argsInput.value=draft.raw&&draft.raw!=='[]'?draft.raw:'[]';
-      argsInput.setAttribute('aria-label','对照运行的实参 JSON 数组');
-      const runBtn=document.createElement('button');
-      runBtn.textContent='以相同输入运行两侧';
-      runBtn.className='wb-retry';
-      runBtn.onclick=()=>runCompare(proposal.id,proposal);
-      argsRow.append(text('span','实参','subtle'),argsInput,runBtn);
-      section.append(argsRow);
-      const result=document.createElement('div');
-      result.id=`compare-result-${key}`;
-      section.append(result);
-      body.append(section);
-    }
-    if(proposal.state==='applied'){
-      body.append(flowNode('flow-line',`已应用到 ${proposal.target}。当前工作台仍读提出提案时的那份固定分析；重新索引该项目后，工作台会指向新版本（选区会尝试重定位）。`));
-    }
-    // 页面可以触发验证（服务端按自己的参数跑同一 patch_verify 路径）；
-    // 应用/撤销仍受 --allow-writes 边界约束。
-    if(proposal.state==='proposed'&&validation.ok){
+      if(selected.state==='applied'&&selected.target)evidence.append(flowNode('flow-line',`已应用到 ${selected.target}。当前工作台仍读提出提案时的那份固定分析；「打开新版本」会重新索引并切换。`));
+    }else if(validation.ok&&!crossVersion&&selected.state==='proposed'){
+      evidence.append(flowNode('flow-line','还没有验证：没有派生补丁树，也没有跑测试。'));
       const actions=document.createElement('div');actions.className='context-actions';
       const verify=document.createElement('button');
-      verify.textContent=verifyPolls[proposal.id]?'验证中…':'验证（隔离副本重新派生分析）';
-      verify.disabled=Boolean(verifyPolls[proposal.id]);
-      verify.onclick=()=>startVerify(proposal.id);
+      verify.textContent=verifyPolls[selected.id]?'验证中…':'验证（隔离副本重新派生分析）';
+      verify.disabled=Boolean(verifyPolls[selected.id]);
+      verify.onclick=()=>startVerify(selected.id);
       actions.append(verify);
-      body.append(flowNode('flow-line','验证会从不可变快照物化隔离副本并重新派生分析；未声明测试时如实写"没有跑任何测试"。'));
-      body.append(actions);
+      evidence.append(actions);
+      const vcfg=state.contract&&state.contract.verification;
+      if(vcfg){
+        const argv=vcfg.test_argv&&vcfg.test_argv.length?JSON.stringify(vcfg.test_argv):null;
+        evidence.append(flowNode(argv?'flow-line':'flow-unknown',
+          argv?`验证配置：将在隔离副本内执行 ${argv}，超时 ${vcfg.test_timeout_ms} ms（本机操作者在项目设置里声明，可更新）。`
+              :'验证配置：没有声明测试命令，因此验证会如实写"没有跑任何测试，这不是通过"。在项目页的「项目设置」里声明，或用 --test-argv 启动。'));
+      }
+      evidence.append(flowNode('flow-line','验证会从不可变快照物化隔离副本并重新派生分析；未声明测试时如实写"没有跑任何测试"。'));
     }
+    // 前后对照:同一输入,基线与补丁两个分析各自真实隔离运行。只对当前分析的
+    // 已验证提案提供(跨版本提案的对照属于它自己那一份分析)。
+    if(!crossVersion&&(selected.state==='verified'||selected.state==='applied')){
+      evidence.append(renderCompareSection(selected));
+    }
+    // C5 写入行动：先确认（真实目录、文件集合、状态），再写。
     const writes=state.contract&&state.contract.writes;
+    const actions=document.createElement('div');actions.className='context-actions';
     if(writes&&writes.enabled){
-      const actions=document.createElement('div');actions.className='context-actions';
       const apply=document.createElement('button');
-      apply.textContent='应用（写入 '+writes.root+'）';
-      apply.disabled=proposal.state!=='verified';
-      apply.onclick=()=>writePatch('patch/apply',proposal.id,writes.root);
+      apply.textContent='检查并应用';
+      apply.className='wb-primary';
+      apply.disabled=selected.state!=='verified';
+      apply.onclick=()=>openWriteDialog('patch/apply',selected,writes.root);
       const revert=document.createElement('button');
       revert.textContent='一键撤销';
-      revert.disabled=proposal.state!=='applied';
-      revert.onclick=()=>writePatch('patch/revert',proposal.id,writes.root);
+      revert.disabled=selected.state!=='applied';
+      revert.onclick=()=>openWriteDialog('patch/revert',selected,writes.root);
       actions.append(apply,revert);
-      body.append(actions);
-      body.append(flowNode('flow-line',`写路径由启动参数 --allow-writes 指定：${writes.root}。页面不能指定目录，只能在请求里回显它；服务端逐字比对，不一致就拒绝且不写任何文件。`));
+      evidence.append(actions);
+      evidence.append(flowNode('flow-line',`写路径由启动参数 --allow-writes 指定：${writes.root}。页面不能指定目录，只能在请求里回显它；服务端逐字比对，不一致就拒绝且不写任何文件。`));
+      if(selected.state==='applied'){
+        const newVersion=document.createElement('button');
+        newVersion.textContent=reindexState.op?'正在重新索引…':'打开新版本（重新索引并切换）';
+        newVersion.disabled=Boolean(reindexState.op);
+        newVersion.onclick=()=>startReindex();
+        evidence.append(newVersion);
+        evidence.append(flowNode('flow-line','重新索引当前项目目录：完成后服务切换到新发布的分析，选区会按身份重定位，源码即更新后的字节。'));
+      }
+      if(selected.state==='reverted')evidence.append(flowNode('flow-line','这份提案已撤销：磁盘恢复为提案前的字节。'));
+    }else if(state.contract&&state.contract.writes&&state.contract.writes.capable){
+      evidence.append(flowNode('flow-unknown','当前项目没有写授权：应用与撤销不可用。到项目页重新打开它并勾选「以可写方式打开」，授权只落在这个目录。'));
     }else{
-      body.append(flowNode('flow-unknown','应用与撤销只能在本机 CLI 上做：atlas patch apply / revert。这个服务启动时没有 --allow-writes，因此 HTTP 没有写路径；验证可以在页面上触发。'));
+      evidence.append(flowNode('flow-unknown','应用与撤销只能在本机 CLI 上做：atlas patch apply / revert。这个服务启动时没有 --allow-writes，因此 HTTP 没有写路径；验证可以在页面上触发。'));
     }
+  }else{
+    evidence.append(flowNode('flow-line','没有选中的提案；验证与应用都从选择一份提案开始。'));
+  }
+  body.replaceChildren(side,center,evidence);
+}
+// 前后对照区（审阅页证据列）。输入框按提案保存，面板刷新不吞已改的值。
+function renderCompareSection(proposal){
+  const key=proposal.id.slice(0,8);
+  const draft=execDraft(state.selected?.id);
+  const section=flowNode('compare-section','');
+  section.append(flowNode('flow-head','前后对照（同一输入,两侧真实隔离运行）'));
+  const argsRow=document.createElement('div');argsRow.className='context-actions';
+  const argsInput=document.createElement('textarea');
+  argsInput.id=`compare-args-${key}`;argsInput.rows=1;argsInput.spellcheck=false;
+  let initial='[]';
+  try{
+    if(state.execProfile){
+      const declared=execFormValue(state.execProfile);
+      if(Array.isArray(declared.args)&&declared.args.length)initial=JSON.stringify(declared.args);
+    }
+  }catch{/* 运行表单还没填完就保持 []，不替用户猜 */}
+  if(draft.raw&&draft.raw!=='[]')initial=draft.raw;
+  const previous=document.getElementById(`compare-args-${key}`);
+  const typed=previous&&previous.value!==undefined?previous.value:null;
+  argsInput.value=(typed!==null&&typed!==initial)?typed:initial;
+  argsInput.setAttribute('aria-label','对照运行的实参 JSON 数组');
+  const runBtn=document.createElement('button');
+  runBtn.textContent='以相同输入运行两侧';
+  runBtn.className='wb-retry';
+  runBtn.onclick=()=>runCompare(proposal.id,proposal);
+  argsRow.append(text('span','实参','subtle'),argsInput,runBtn);
+  section.append(argsRow);
+  try{
+    const declared=draftDeclaredInputs(state.execProfile);
+    const parts=[`实参 ${argsInput.value}`];
+    if(declared.this_arg!==undefined)parts.push(`this ${JSON.stringify(declared.this_arg)}`);
+    if(declared.globals)parts.push(`globals ${JSON.stringify(declared.globals)}`);
+    section.append(flowNode('flow-line',`两侧使用同一份声明输入：${parts.join(' · ')}`));
+  }catch{
+    section.append(flowNode('flow-unknown','「运行」页签里的 this/globals 还不是合法 JSON，对照前请先在那一页修正。'));
+  }
+  const result=document.createElement('div');
+  result.id=`compare-result-${key}`;
+  section.append(result);
+  return section;
+}
+// 写入确认：确认层展示真实目录、文件集合、基线与验证状态；首击不写文件。
+let pendingWrite=null;
+function openWriteDialog(endpoint,proposal,root){
+  const inner=proposal.proposal||{};
+  const validation=inner.validation||{};
+  const paths=(validation.patched_paths||[]).concat(validation.deleted_paths||[]);
+  pendingWrite={endpoint,id:proposal.id,root};
+  const title=$('write-dialog-title');
+  if(title)title.textContent=endpoint==='patch/apply'?'确认应用这份提案':'确认撤销这份提案';
+  const body=$('write-dialog-body');
+  if(body){
+    body.replaceChildren();
+    body.append(flowNode('flow-line',`写入目录（启动时授权的唯一目录）：${root}`));
+    body.append(flowNode('flow-line',`涉及文件：${paths.length?paths.join(', '):'（提案没有列出路径）'}`));
+    body.append(flowNode('flow-line',`提案 ${proposal.id.slice(0,12)} · 状态 ${proposalStateLabel(proposal.state)} · ${inner.summary||'（没有摘要）'}`));
+    const verification=proposal.verification;
+    if(verification){
+      const test=verification.test||{};
+      body.append(flowNode(test.ran?(test.passed&&!test.timed_out?'flow-line':'flow-unknown'):'flow-unknown',
+        test.ran?(test.timed_out?'测试：超时（不算通过）':(test.passed?'测试：通过':'测试：失败')):'测试：没有运行（这不是通过）'));
+      body.append(flowNode('flow-line',`派生分析 ${String(verification.patched_analysis_id||'').slice(0,12)}`));
+    }
+    if(endpoint==='patch/apply')body.append(flowNode('flow-line','应用只在磁盘仍是提案所依据的字节时进行；有漂移会被拒绝，不会覆盖别的编辑。'));
+    else body.append(flowNode('flow-line','撤销会恢复提案应用前的字节；文件漂移时会被拒绝并指出具体文件。'));
+  }
+  const confirm=$('write-dialog-confirm');
+  if(confirm)confirm.textContent=endpoint==='patch/apply'?'确认应用':'确认撤销';
+  openDialog('write-dialog');
+}
+// 应用后的"打开新版本"：重新索引项目目录，服务切换到新分析。
+const reindexState={op:null};
+async function startReindex(){
+  if(reindexState.op)return;
+  try{
+    const started=await apiJson('project/reindex',{});
+    reindexState.op=started.op_id;
+    status('正在重新索引项目目录；完成后切换到新分析。');
+    pollReindex();
+  }catch(e){status(`重新索引未开始：${e.message}`);}
+}
+const REINDEX_POLL_MS=1200,REINDEX_POLL_MAX=300;
+async function pollReindex(attempt=0){
+  const op=reindexState.op;
+  if(!op)return;
+  if(attempt>REINDEX_POLL_MAX){
+    reindexState.op=null;
+    status('重新索引查询超时：作业仍在服务端；稍后可再打开新版本。');
+    renderPatches(state.patches);
+    return;
+  }
+  try{
+    const answer=await api('project/open',{id:op});
+    if(answer.state==='switched'){
+      reindexState.op=null;
+      status(`已切换到新分析 ${String(answer.analysis_id||'').slice(0,12)}。正在恢复任务与选区。`);
+      await connect();
+      setPage('explore');
+      loadProjects();
+      status('新版本已加载：探索、运行、审阅都指向这份新分析。');
+      return;
+    }
+    if(answer.state==='failed'||answer.state==='cancelled'){
+      reindexState.op=null;
+      status(`重新索引未完成：${answer.state}${answer.error?`（${answer.error}）`:''}`);
+      renderPatches(state.patches);
+      return;
+    }
+    const note=$('run-open-note');
+    setTimeout(()=>pollReindex(attempt+1),REINDEX_POLL_MS);
+  }catch(e){
+    reindexState.op=null;
+    status(`重新索引状态查询失败：${e.message}`);
+    renderPatches(state.patches);
   }
 }
 // 触发验证并按提案轮询。轮询跟踪的是服务端作业,与当前选区解耦:切换函数
@@ -367,8 +627,25 @@ async function loadPatches(node){
     state.patches=[];state.patchesError=e.message;renderPatches([]);return;
   }
   if(request!==state.request||state.selected?.id!==node.id)return;
-  state.patches=page.proposals||[];
+  let proposals=page.proposals||[];
+  // 应用过的提案固定在它被提出时的分析上；"打开新版本"之后服务已切到新分析，
+  // 按实体查不到它们。补一次按应用目录的查询（服务端只认自己的 write_root），
+  // 让撤销入口在版本切换后仍然可达。
+  const writes=state.contract&&state.contract.writes;
+  if(writes&&writes.enabled){
+    try{
+      const appliedPage=await api('patches',{target:'here',limit:20});
+      if(request!==state.request||state.selected?.id!==node.id)return;
+      const known=new Set(proposals.map(p=>p.id));
+      for(const proposal of (appliedPage.proposals||[])){
+        if(!known.has(proposal.id))proposals=[...proposals,proposal];
+      }
+    }catch{/* 没有写路径或查询失败就只显示按实体查到的那份；不伪造。 */}
+  }
+  state.patches=proposals;
   renderPatches(state.patches);
+  renderNavState();
+  if(state.page==='agent')renderAgentProposals();
 }
 async function proposePatch(){
   const selected=state.selected;
@@ -379,6 +656,9 @@ async function proposePatch(){
   try{
     const result=await apiJson('patch/propose',{entity:selected.id,diff});
     $('patch-input').value='';
+    // 登记成功就选中新提案：差异、验证与写入行动立刻围绕它展开。
+    const proposalId=result&&result.proposal&&result.proposal.id;
+    if(proposalId)state.reviewSelected=proposalId;
     await loadPatches(selected);
     status(result.outcome==='proposed'?'提案已登记（未应用，也未验证）':'这份提案已经登记过');
     return result;
@@ -430,6 +710,24 @@ function installBridge(){
     openProjection(view){const target=view==='3d'?($('open-3d')?.getAttribute('href')||'/city3d'):'/';if(typeof location!=='undefined')location.href=target;return target;},
     runControlled(){return runControlled();},
   };
+  // 项目地图页只有实体引用与固定版本。带着同一个对象进入运行/审阅/Agent 页
+  // 走的是这里：按身份解析 → app.js 自己的 select() → setPage()，不另开一条
+  // 捷径，因此运行、对照、提案与应用/撤销仍是同一条已验收的路径。
+  globalThis.atlasUi={
+    currentAnalysis(){return state.report?state.report.id:'';},
+    currentProject(){return state.projectName||'';},
+    async openInPage(page,reference){
+      if(!PAGES.includes(page))return {ok:false,error:'unknown_page'};
+      if(!reference)return {ok:false,error:'reference_required'};
+      if(!state.token)return {ok:false,error:'not_connected'};
+      let node=null;
+      try{node=await resolveEntity(reference);}catch(e){return {ok:false,error:String((e&&e.message)||e)};}
+      if(!node)return {ok:false,error:'entity_not_found'};
+      await select(node);
+      setPage(page);
+      return {ok:true,entity_id:node.id,page};
+    },
+  };
 }
 // 按身份取一个实体。
 async function resolveEntity(reference){
@@ -463,10 +761,48 @@ async function connect(){
     resetDetail();state.nodes=[];state.edges=[];state.nodePage=null;state.edgePage=null;state.report=report;
     try{state.contract=await api('contract');}catch{state.contract=null;}
     await loadNodes();await loadEdges();
-    $('revision').textContent=`分析版本 ${report.id.slice(0,12)}`;$('revision').title=report.id;
+    $('revision').textContent=`当前代码 ${report.id.slice(0,8)}`;$('revision').title=report.id;
+    // 顶栏与左导航显示真实项目身份：写权限目录就是本服务打开的那个项目目录。
+    const contract=state.contract||{};
+    const root=contract.writes&&contract.writes.root;
+    const project=contract.project||{};
+    state.projectName=String(project.name||(root?String(root).split('/').filter(Boolean).pop():'')||'');
+    const projectName=$('project-name');if(projectName)projectName.textContent=state.projectName||'本机项目';
+    const navProject=$('nav-project-button');if(navProject)navProject.textContent=state.projectName||'本机项目';
+    renderNavState();
+    // 项目地图页是另一个模块（只在浏览器里存在）：它按服务端的项目键恢复
+    // 自己的工作区，所以项目或版本在这里换了之后要让它重新对齐。
+    if(typeof window!=='undefined'&&window.atlasExplore&&typeof window.atlasExplore.connect==='function'){
+      try{window.atlasExplore.connect();}catch{}
+    }
     $('token').value='';status('已连接 · 固定版本 · 本地只读查询');
     runSearch();
+    loadProjects();
+    loadTasks();
+    // 重启恢复：真正停止服务再启动后，浏览器是一个新 origin，localStorage 里
+    // 的东西取不到。服务端这份按分析身份保存，因此这里能接上上次的任务。
+    const saved=await restoreUiState();
+    state.savedUi=saved||null;
+    if(saved){
+      if(PAGES.includes(saved.page))state.page=saved.page;
+      if(LENSES.includes(saved.lens))state.lens=saved.lens;
+      try{if(Array.isArray(LEVELS)&&LEVELS.includes(saved.level))state.level=saved.level;}catch{}
+      // 整表替换，不与上一个项目的草稿合并：这里的存档按项目键保存在服务端，
+      // 换项目（或换版本）时只有重定位明确迁移过的草稿才跟过来。
+      state.execDrafts=(saved.execDrafts&&typeof saved.execDrafts==='object')
+        ?JSON.parse(JSON.stringify(saved.execDrafts))
+        :{};
+      renderTabs();
+    }
+    let restored=null;
+    if(!state.pendingSelection&&saved&&saved.selection&&saved.selection.entity_id){
+      state.pendingSelection={entity_id:saved.selection.entity_id,analysis:saved.selection.analysis_id||report.id};
+      restored=saved.selected||null;
+    }
     const pending=state.pendingSelection;
+    // 重定位的具体结论（依据、字节是否变化、为什么拒绝）比"恢复了上次任务"
+    // 更有信息量，因此它一旦产生就不再被后面那句覆盖。
+    let restoredNote=null;
     if(pending&&pending.entity_id){
       if(pending.analysis&&pending.analysis!==report.id){
         try{
@@ -476,27 +812,50 @@ async function connect(){
             const node=await resolveEntity(relocated.selection.entity_id);
             if(node){
               await select(node);
-              status(`已从版本 ${String(pending.analysis).slice(0,8)} 重定位到当前版本：依据 ${summary.matched_by}${summary.bytes_changed?'，源码字节已变化':'，源码字节相同'}。`);
+              // 明确的重定位才迁移草稿：同一对象在新版本下继承旧版本的输入。
+              const oldKey=`${pending.analysis}|${pending.entity_id}`;
+              const newKey=`${state.report?.id||''}|${node.id}`;
+              if(state.execDrafts[oldKey]&&!state.execDrafts[newKey]){
+                state.execDrafts[newKey]=state.execDrafts[oldKey];
+                delete state.execDrafts[oldKey];
+                persistDrafts();
+                if(state.execProfile&&state.execProfile.symbol===node.id)renderExecForm(state.execProfile);
+              }
+              restoredNote=`已从版本 ${String(pending.analysis).slice(0,8)} 重定位到当前版本：依据 ${summary.matched_by}${summary.bytes_changed?'，源码字节已变化':'，源码字节相同'}。页签 ${state.page} 与输入草稿一并恢复。`;
             }else{
-              status('重定位找到了对应对象，但它不在当前已加载的节点里，未自动选中。');
+              restoredNote='重定位找到了对应对象，但它不在当前已加载的节点里，未自动选中。';
             }
           }else{
-            status(`该选区固定在另一个分析版本上，重定位被拒绝（${summary.refusal||'unknown'}）：${relocated.detail?.note||''}`);
+            restoredNote=`该选区固定在另一个分析版本上，重定位被拒绝（${summary.refusal||'unknown'}）：${relocated.detail?.note||''}`;
           }
         }catch(e){
-          status(`该选区固定在另一个分析版本上，且重定位查询失败：${e.message}。请在这里重新选择。`);
+          restoredNote=`该选区固定在另一个分析版本上，且重定位查询失败：${e.message}。请在这里重新选择。`;
         }
       }else{
         const node=await resolveEntity(pending.entity_id);
         if(node)await select(node);
-        else status('选区指向的对象不在当前已加载的节点里，未自动选中。');
+        else restoredNote='选区指向的对象不在当前已加载的节点里，未自动选中。';
       }
+    }
+    if(restored){
+      if(!restoredNote)restoredNote=state.selected
+        ?`已恢复上次任务：${state.selected.name||state.selected.id} · 页签 ${state.page}${Object.keys(state.execDrafts).length?' · 输入草稿已回填':''}`
+        :`上次选中的对象（${restored.name||restored.id||'未知'}）不在当前这一份分析里，未自动选中。`;
+      status(restoredNote);
+    }else if(restoredNote){
+      status(restoredNote);
     }
   }catch(e){
     if(!typed){
       state.token='';
       try{localStorage.removeItem('atlas.session.v1');}catch{}
     }
+    // A dead session must stop the shell from claiming it is connected. Clearing
+    // the token disables 「打开并分析」, and a header still reading 已连接 next to
+    // a button that does nothing is the one failure a reader cannot act on:
+    // nothing on screen says the session is gone. Re-render both, then speak.
+    renderNavState();
+    renderPageContent(state.page);
     status(`${e.message} · ${typed?'请检查令牌':'会话已失效，请重新粘贴令牌'}`);
   }
 }
@@ -609,32 +968,37 @@ function navBack(){
     try{
       const node=await resolveEntity(previous.id);
       if(!node){status(`返回失败：${previous.id} 不在这一份分析里`);renderRecent();return;}
-      if(previous.mode&&previous.mode!==state.mode)setMode(previous.mode);
+      if(previous.page&&previous.page!==state.page)setPage(previous.page,{save:false});
       if(previous.lens&&previous.lens!==state.lens)setLens(previous.lens);
       await select(node,{push:false});
     }catch(e){status(`返回失败：${String((e&&e.message)||e)}`);renderRecent();}
   })();
 }
-// --- 任务页签与理解镜头 ------------------------------------------------------
-const MODES=['structure','understand','run','review'];
+// --- 页面路由与理解镜头 ------------------------------------------------------
+const PAGES=['home','explore','city','run','review','agent'];
+const PAGE_TITLES={home:'项目',explore:'探索代码',city:'3D 地图',run:'运行验证',review:'修改审阅',agent:'Agent 协作'};
+// 旧链接里 mode 的取值对应到新页面，避免收藏的地址落到不存在的页。
+const LEGACY_PAGES={structure:'city',understand:'explore'};
 const LENSES=['calls','values','unknowns'];
-// 页签与镜头写进 URL fragment:关闭再打开(或 3D 往返)后,用户还在同一个
+// 页面与镜头写进 URL fragment:关闭再打开(或 3D 往返)后,用户还在同一个
 // 任务里。fragment 不进 HTTP 请求,也不承载输入内容——那是草稿的事。
 function updateViewFragment(){
   if(typeof history==='undefined')return;
   const params=new URLSearchParams(location.hash.slice(1));
-  params.set('mode',state.mode);
-  if(state.mode==='understand')params.set('lens',state.lens);else params.delete('lens');
+  params.set('page',state.page);
+  if(state.page==='explore')params.set('lens',state.lens);else params.delete('lens');
   const rest=location.hash.slice(1)?`#${params.toString()}`:'';
   history.replaceState(null,'',location.pathname+rest);
 }
-function setMode(mode){
-  if(!MODES.includes(mode)){status(`未知任务 ${mode}`);return false;}
-  state.mode=mode;
-  for(const b of qsa('.wb-tabs [data-mode]'))b.setAttribute('aria-pressed',String(b.dataset.mode===mode));
-  renderTask();
+function setPage(page,opts={}){
+  if(!PAGES.includes(page)){status(`未知页面 ${page}`);return false;}
+  const previous=state.page;
+  state.page=page;
+  renderTabs();
   updateViewFragment();
   refreshProjectionLink();
+  if(opts.save!==false)scheduleSaveUiState();
+  if(page!==previous&&typeof renderPageContent==='function')renderPageContent(page);
   return true;
 }
 function setLens(lens){
@@ -643,35 +1007,47 @@ function setLens(lens){
   renderTask();
   updateViewFragment();
   refreshProjectionLink();
+  scheduleSaveUiState();
   return true;
 }
 function renderTabs(){
-  for(const b of qsa('.wb-tabs [data-mode]'))b.setAttribute('aria-pressed',String(b.dataset.mode===state.mode));
+  for(const b of qsa('.nav-button[data-go]'))b.setAttribute('aria-pressed',String(b.dataset.go===state.page));
+  for(const b of qsa('[data-lens]'))b.setAttribute('aria-pressed',String(b.dataset.lens===state.lens));
+  const title=$('page-title');if(title)title.textContent=PAGE_TITLES[state.page]||state.page;
   renderTask();
 }
+// 页面切换只做一件事：让当前页可见，并让它依赖的真实状态（有无选区）
+// 决定内部是内容还是空态。数据归各页自己的渲染函数，这里不造任何假内容。
 function renderTask(){
-  const structure=$('task-structure'),understand=$('task-understand'),run=$('task-run'),review=$('task-review');
-  const canvas=$('canvas-host');
+  for(const section of qsa('.wb-page[data-page]'))section.hidden=section.dataset.page!==state.page;
   const show=(el,on)=>{if(el)el.hidden=!on;};
-  show(structure,state.mode==='structure');
-  show(understand,state.mode==='understand');
-  show(run,state.mode==='run'&&Boolean(state.selected));
-  show(review,state.mode==='review'&&Boolean(state.selected));
-  const fnSelected=state.selected&&state.selected.kind==='function';
-  let canvasOn=false,lens='calls';
-  if(state.mode==='structure')canvasOn=true;
-  else if(state.mode==='understand'){
-    for(const b of qsa('[data-lens]'))b.setAttribute('aria-pressed',String(b.dataset.lens===state.lens));
-    lens=state.lens;
-    canvasOn=!fnSelected||lens==='calls';
-    show($('flow-panel'),fnSelected&&lens==='values'&&Boolean(state.flow||state.flowError));
-    show($('unknown-panel'),lens==='unknowns'&&Boolean(state.unknownHasContent));
+  const fnSelected=Boolean(state.selected&&state.selected.kind==='function');
+  show($('exec-panel'),fnSelected);
+  show($('exec-empty'),!fnSelected);
+  show($('patch-panel'),Boolean(state.selected));
+  show($('patch-empty'),!state.selected);
+  const execEmpty=$('exec-empty-body');
+  if(execEmpty&&!fnSelected&&!execEmpty._filled){
+    execEmpty._filled=true;
+    execEmpty.append(flowNode('flow-line','先在探索里选一个函数：搜索或点关系图定位对象，然后「准备输入并运行」。运行记录、取消与后台任务都以选中的函数为目标。'));
   }
-  if(state.mode==='run'||state.mode==='review'){
-    for(const b of qsa('[data-lens]'))b.setAttribute('aria-pressed','false');
+  const patchEmpty=$('patch-empty-body');
+  if(patchEmpty&&!state.selected&&!patchEmpty._filled){
+    patchEmpty._filled=true;
+    patchEmpty.append(flowNode('flow-line','先在探索里选一个对象：修改审阅按对象列出提案、差异与验证证据。'));
   }
-  show(canvas,canvasOn);
+  const lensCalls=state.lens==='calls';
+  show($('canvas-host'),!fnSelected||lensCalls);
+  show($('overview-tools'),!fnSelected||lensCalls);
+  show($('flow-panel'),fnSelected&&state.lens==='values'&&Boolean(state.flow||state.flowError));
+  show($('unknown-panel'),state.lens==='unknowns'&&Boolean(state.unknownHasContent));
+  renderRunBanner();
+  if(state.page==='run')renderRunCompare();
+  const runBack=$('run-back');if(runBack)runBack.disabled=!state.selected;
+  const exploreBack=$('explore-back');if(exploreBack)exploreBack.disabled=!state.history.length;
+  renderContextActions();
 }
+
 function renderHeading(){
   const node=state.selected;
   const crumb=$('selection-path'),title=$('selection-name');
@@ -700,7 +1076,7 @@ function renderGraph(){
   defs.append(marker);graph.append(defs);
   const byId=new Map(state.nodes.map(n=>[n.id,n]));for(const n of state.focus?.nodes||[])byId.set(n.id,n);
   const selected=state.selected&&state.selected.kind==='function'?state.selected:null;
-  const wantFocus=selected&&state.mode==='understand'&&state.lens==='calls';
+  const wantFocus=selected&&state.page==='explore'&&state.lens==='calls';
   // viewBox 用布局的真实宽度:硬编码 800 会把右列邻居裁出画布,用户看到的图
   // 缺一列却以为完整。
   const size=wantFocus?renderFocusGraph(graph,byId,selected):renderOverviewGraph(graph,byId);
@@ -1064,6 +1440,21 @@ async function loadRelations(node,request){
   $('export').disabled=false;
   render();
 }
+// 一个文件的数据流可能是被"整体撤下"的：那不是查询失败，而是这一份分析里明确登记过
+// 的取舍（工程预算挡下了一个机器生成的巨型函数）。诊断就在当前报告里，所以这里如实
+// 转述文件、数字与区间，而不是把一个已声明的未知报成一次故障。
+function withheldFlowFor(node){
+  return ((state.report&&state.report.diagnostics)||[])
+    .find(d=>d.code==='flow_withheld_over_budget'&&d.path===(node&&node.path))||null;
+}
+function withheldFlowText(diagnostic){
+  return `这个文件没有发布数据流：${diagnostic.detail}。它的符号、调用与源码照常列出，只是没有做数据流求值。`;
+}
+function flowLoadMessage(error,node){
+  const withheld=withheldFlowFor(node);
+  if(withheld)return withheldFlowText(withheld);
+  return `值事实加载失败：${error.message}`;
+}
 async function loadFlow(node,request){
   try{
     const flow=await api('flow',{entity:node.id});
@@ -1074,7 +1465,7 @@ async function loadFlow(node,request){
     if(request!==state.request||state.selected?.id!==node.id)return;
     state.flow=null;state.flowError=e.message;
     renderFlow(null);
-    const body=$('flow-body');if(body)body.replaceChildren(flowNode('flow-unknown',`值事实加载失败：${e.message}`));
+    const body=$('flow-body');if(body)body.replaceChildren(flowNode('flow-unknown',flowLoadMessage(e,node)));
   }
 }
 async function loadProfile(node,request){
@@ -1083,20 +1474,36 @@ async function loadProfile(node,request){
     if(request!==state.request||state.selected?.id!==node.id)return;
     state.execProfile=profile;
     renderExecution(profile,null);
+    // 提案面板的对照区要沿用画像里的参数与草稿，而它可能在画像到达之前就
+    // 已经渲染过一次（提案列表比画像先到）。画像到达后补一次，否则对照的
+    // 默认输入会停留在"还没有参数"的空数组上。
+    if(state.patches.length)renderPatches(state.patches);
   }catch(e){
     if(request!==state.request||state.selected?.id!==node.id)return;
     state.execProfile=null;
     renderExecution(null,null);
+    // 局部失败只说这一块：运行按钮保持禁用，已经填好的输入不动，重试只重试画像。
+    const body=$('exec-body');
+    if(body){
+      body.replaceChildren();
+      body.append(flowNode('flow-unknown',`执行画像加载失败：${resourceError(e)}。运行按钮保持禁用；已保存的输入不会被清空。`));
+      const retry=text('button','重试画像','wb-retry');
+      retry.onclick=()=>loadProfile(node,state.request);
+      body.append(retry);
+    }
   }
 }
 async function select(node,opts={}){
   const request=++state.request;
   const push=opts.push!==false;
   if(push&&state.selected&&state.selected.id!==node.id){
-    state.history.push({id:state.selected.id,mode:state.mode,lens:state.lens});
+    state.history.push({id:state.selected.id,page:state.page,lens:state.lens});
     if(state.history.length>50)state.history.shift();
   }
   state.selected=node;state.focus=null;state.focusIn=null;state.focusOut=null;state.execProfile=null;state.flow=null;state.flowError=null;
+  // 旧对象的结果卡不跟到新对象名下：结果以它自己的运行记录为准。
+  state.execResult=null;state.execResultMeta=null;
+  renderExecResult();
   state.sourceRes={status:'loading',error:null};state.reachRes={status:'loading',error:null,errors:[]};
   $('export').disabled=true;clearContext();
   if(node.id&&push){
@@ -1330,9 +1737,12 @@ function renderUnknowns(){
   state.unknownHasContent=false;
   const flowReasons=(state.flow&&state.flow.unknown_reasons)||[];
   const diag=(state.report&&state.report.diagnostics)||[];
+  // 被整体撤下数据的文件不是"事实加载失败"：原因就写在这一份分析的诊断里。
+  const withheldFlow=withheldFlowFor(state.selected);
   if(!flowReasons.length&&!diag.length){
     if(state.selected&&state.selected.kind==='function'&&!state.flowError)
       body.append(flowNode('flow-line','这一份分析没有报告当前函数或项目级的显式未知区域。','matrix-note'));
+    else if(withheldFlow)body.append(flowNode('flow-unknown',withheldFlowText(withheldFlow)));
     else if(state.flowError)body.append(flowNode('flow-unknown',`未知清单不可用：${state.flowError}`));
     return;
   }
@@ -1351,7 +1761,8 @@ function renderUnknowns(){
       body.append(row);
     }
   }
-  if(state.flowError)body.append(flowNode('flow-unknown',`flow 事实加载失败，函数级未知不完整：${state.flowError}`));
+  if(withheldFlow)body.append(flowNode('flow-unknown',withheldFlowText(withheldFlow)));
+  else if(state.flowError)body.append(flowNode('flow-unknown',`flow 事实加载失败，函数级未知不完整：${state.flowError}`));
   state.unknownHasContent=body.childElementCount>0||body._children?.length>0||Boolean(flowReasons.length||diag.length);
   if(diag.length){
     body.append(flowNode('h3',`项目诊断中的未知区域 · 共 ${diag.length} 处`,'wb-panel-title'));
@@ -1419,12 +1830,20 @@ function renderExecution(profile,record){
   const runnable=Boolean(profile.runnable);
   body.append(flowNode('flow-head',`执行画像 ${profile.classification} · ${profile.runnable?'可运行':'不可运行'} · 参数 ${profile.arity===null?'未知':profile.arity} · flow ${profile.flow_status}`));
   body.append(flowNode('exec-note','这是静态充分性分类，不是执行结果，也不是「已经跑过」的证据。'));
-  for(const reason of profile.reasons.slice(0,8))body.append(flowNode('flow-unknown',`理由 · ${reason.code} — ${reason.detail}（证据：${reason.evidence}）`));
-  if(!profile.reasons.length)body.append(flowNode('flow-line','没有降级理由：已发布事实中没有任何 unknown 分量。'));
   if(profile.required_grants.length)body.append(flowNode('flow-line',`需要显式授权：${profile.required_grants.join(', ')}`));
   const context=profile.required_context||[];
-  if(context.length)body.append(flowNode('flow-unknown',`需要调用者声明的输入：${context.join(', ')}${(profile.required_globals||[]).length?`（全局：${profile.required_globals.join(', ')}）`:''}。Atlas 不发明这些值，页面也没有为它们提供输入框；请在 CLI 上用 --this / --global 声明。`));
+  if(context.length)body.append(flowNode('flow-unknown',`需要调用者声明的输入：${context.join(', ')}${(profile.required_globals||[]).length?`（全局：${profile.required_globals.join(', ')}）`:''}。Atlas 不发明这些值；请在下方按字段填写（CLI 对应 --this / --global）。`));
   if((profile.unsatisfiable_context||[]).length)body.append(flowNode('flow-unknown',`Atlas 无法用数据声明：${profile.unsatisfiable_context.join(', ')}，因此该函数不可直接运行。`));
+  // 分类依据与画像备注属于技术细节：收进 details，输入和运行按钮保持醒目。
+  if(profile.reasons.length||profile.notes.length){
+    const evidenceBox=document.createElement('details');
+    evidenceBox.className='wb-details exec-evidence';
+    evidenceBox.append(text('summary',`画像依据（${profile.reasons.length} 条理由 · ${profile.notes.length} 条备注）`));
+    for(const reason of profile.reasons.slice(0,8))evidenceBox.append(flowNode('flow-unknown',`理由 · ${reason.code} — ${reason.detail}（证据：${reason.evidence}）`));
+    if(!profile.reasons.length)evidenceBox.append(flowNode('flow-line','没有降级理由：已发布事实中没有任何 unknown 分量。'));
+    for(const note of profile.notes.slice(0,4))evidenceBox.append(flowNode('flow-line',note));
+    body.append(evidenceBox);
+  }
   const enclosing=profile.enclosing_symbol||null;
   const viaRow=$('exec-via-row');
   if(viaRow){
@@ -1453,7 +1872,6 @@ function renderExecution(profile,record){
     }
   }
   body.append(flowNode('flow-line',`参数：${profile.params.map(p=>`${p.index}:${p.name}`).join(', ')||'无'}`));
-  for(const note of profile.notes.slice(0,4))body.append(flowNode('flow-line',note));
   renderExecForm(profile);
   renderExecResult();
   const viaWanted=Boolean(enclosing&&$('exec-via-enable')?.checked);
@@ -1473,6 +1891,7 @@ function persistDrafts(){
   try{
     if(typeof localStorage!=='undefined')localStorage.setItem('atlas.execDrafts.v1',JSON.stringify(state.execDrafts));
   }catch{/* 私有模式等场景下持久化失败不影响使用,只是重开不恢复 */}
+  scheduleSaveUiState();
 }
 function restoreDrafts(){
   try{
@@ -1481,8 +1900,67 @@ function restoreDrafts(){
     if(raw){const parsed=JSON.parse(raw);if(parsed&&typeof parsed==='object')state.execDrafts=parsed;}
   }catch{/* 损坏的持久化数据当作没有 */}
 }
+// --- 重启恢复：同一份状态也存到服务端 ----------------------------------------
+// localStorage 属于 origin（协议+主机+端口），而端口每次启动都换，所以"停止
+// 服务再启动"就是一个新 origin：选区、页签、草稿全部丢失。这里把任务状态
+// 同时写到服务端，键由服务端按当前分析钉定（页面只能给 name，换不了项目），
+// 因此重启后能按项目和分析身份读回；两个项目里的同名函数不会串状态，因为它
+// 们的 analysis id 不同。localStorage 仍然写：同一 origin 内刷新更快。
+const UI_STATE_NAME='workbench';
+let uiSaveTimer=null;
+function collectUiState(){
+  const drafts={};
+  for(const [id,draft] of Object.entries(state.execDrafts||{})){
+    if(!draft||typeof draft!=='object')continue;
+    const used=(draft.raw&&draft.raw!=='[]')||Object.keys(draft.fields||{}).length>0
+      ||String(draft.receiver||'').trim()!==''||Object.keys(draft.globals||{}).length>0;
+    if(used)drafts[id]=draft;
+  }
+  return {
+    schema:'atlas.ui-state.v1',
+    page:state.page,lens:state.lens,level:state.level,
+    selection:state.selection||null,
+    selected:{id:state.selected?state.selected.id:null,path:state.selected?state.selected.path||'':'',name:state.selected?state.selected.name||'':''},
+    execDrafts:drafts,
+  };
+}
+function scheduleSaveUiState(){
+  if(!state.token)return;
+  if(uiSaveTimer)clearTimeout(uiSaveTimer);
+  uiSaveTimer=setTimeout(()=>{uiSaveTimer=null;saveUiState();},600);
+}
+// 关页面时补一次保存：只靠 600ms 去抖，用户切完页签立刻关闭就会丢掉最后一次
+// 变更（独立复审 R3 复现过）。keepalive 让请求在页面卸载后仍能发出。
+function saveUiStateNow(){
+  if(uiSaveTimer){clearTimeout(uiSaveTimer);uiSaveTimer=null;}
+  if(!state.token)return;
+  try{
+    localStorage.setItem('atlas.uiState.v1',JSON.stringify(collectUiState()));
+  }catch{}
+  try{
+    fetch('/api/ui-state',{method:'PUT',keepalive:true,headers:{Authorization:`Bearer ${state.token}`,'Content-Type':'application/json'},body:JSON.stringify({name:UI_STATE_NAME,state:collectUiState()})}).catch(()=>{});
+  }catch{}
+}
+async function saveUiState(){
+  if(!state.token)return;
+  try{await apiJson('ui-state',{name:UI_STATE_NAME,state:collectUiState()},'PUT');}
+  catch{/* 暂存失败不影响使用；只意味着下次重启不恢复 */}
+}
+// 返回服务端记住的任务状态；没有就是 null，不伪造一个"恢复成功"。
+async function restoreUiState(){
+  try{
+    const answer=await api('ui-state',{name:UI_STATE_NAME});
+    return answer&&answer.state&&typeof answer.state==='object'?answer.state:null;
+  }catch{return null;}
+}
+// 草稿按 项目|版本|对象 归属：analysis id 唯一对应一个项目的一个版本，因此
+// 同名同位置的同名函数在不同项目里不会共享输入。跨版本恢复只能经明确的
+// 重定位迁移（见 connect），跨项目永不复用。
+function draftKey(entityId){
+  return `${state.report?.id||''}|${entityId||(state.selected&&state.selected.id)||''}`;
+}
 function execDraft(entityId){
-  const id=entityId||(state.selected&&state.selected.id);
+  const id=draftKey(entityId);
   if(!state.execDrafts[id]){
     state.execDrafts[id]={fields:{},raw:'[]',advanced:false,receiver:'',globals:{},viaArgs:'',viaChain:''};
   }
@@ -1595,6 +2073,22 @@ function execFormValue(profile){
   if(Object.keys(globals).length)out.globals=globals;
   return out;
 }
+// 运行草稿里已经声明的 this/globals。前后对照复用同一份声明，不重新问一遍，
+// 也不静默丢掉：留空表示"没有声明"，而不是"用默认值"。
+function draftDeclaredInputs(profile){
+  const out={};
+  if(!profile)return out;
+  const draft=execDraft(profile.symbol);
+  const receiver=String(draft.receiver||'').trim();
+  if(receiver!=='')out.this_arg=JSON.parse(receiver);
+  const globals={};
+  for(const [name,valueText] of Object.entries(draft.globals||{})){
+    if(String(valueText).trim()==='')continue;
+    globals[name]=JSON.parse(valueText);
+  }
+  if(Object.keys(globals).length)out.globals=globals;
+  return out;
+}
 function loadExecRecords(node){
   const target=node||(state.selected);
   const request=state.request;
@@ -1648,15 +2142,101 @@ function refillFromRecord(record){
   persistDrafts();
   status('已按该记录重填输入；检查后手动运行。');
 }
+// 运行观测的信息层级：最上面是"这组输入得到了什么"（终态与值），其次是
+// 本次输入与输出日志，全部技术依据收进「执行依据与边界」。终态只来自服务端
+// 记录；拒绝不是失败，取消以服务端确认为准。
+const EXEC_TABS=[['result','结果'],['inputs','本次输入'],['logs','输出日志']];
+function execVerdictHero(record){
+  const value=record.value!==null&&record.value!==undefined?decodeEncoded(record.value):null;
+  if(record.verdict==='refused')return {cls:'run-hero refused',label:'拒绝执行',big:record.refusal?.code||'未知原因'};
+  if(record.verdict==='cancelled')return {cls:'run-hero cancelled',label:'已取消',big:'服务端已确认进程结束'};
+  if(record.verdict==='failed')return {cls:'run-hero failed',label:'执行失败',big:String(record.error||'runner 报告失败')};
+  if(record.thrown)return {cls:'run-hero failed',label:`抛出 ${record.thrown.name}`,big:`${record.thrown.name}: ${record.thrown.message}`};
+  if(record.value!==null&&record.value!==undefined){
+    const shown=typeof value==='string'?value:JSON.stringify(value);
+    return {cls:'run-hero returned',label:'返回值',big:shown.length>120?`${shown.slice(0,120)}…`:shown};
+  }
+  return {cls:'run-hero',label:'完成',big:'（无返回值）'};
+}
 function renderExecResult(){
   const box=$('exec-result');if(!box)return;
   box.replaceChildren();
   const result=state.execResult;
-  if(!result||!result.record)return;
-  const head=flowNode('flow-head',`本次目标 ${result.symbol} · 分析 ${String(state.report?.id||'').slice(0,12)}`);
-  box.append(head);
-  box.append(flowNode('flow-line',`实际输入：${JSON.stringify(result.args)}${result.via?` · 经由 ${result.via.symbol} ${JSON.stringify(result.via.args)}`:''}`));
-  renderExecRecord(box,result.record);
+  if(!result||!result.record){
+    box.append(flowNode('flow-line','还没有运行：填好左侧输入，点「运行这组输入」。结果会显示在这里，离开页面也不会丢。'));
+    return;
+  }
+  const record=result.record;
+  const hero=execVerdictHero(record);
+  const heroNode=flowNode(hero.cls,'');
+  heroNode.append(flowNode('run-hero-label',hero.label));
+  heroNode.append(flowNode('run-hero-value',hero.big));
+  // 版本标注以记录自身为准：跨版本/跨项目的记录不冒充当前工作台版本的观测。
+  const recordAnalysis=String(record.analysis_id||'').slice(0,12);
+  const crossVersion=record.analysis_id&&state.report&&record.analysis_id!==state.report.id;
+  const meta=[`观测结果 ${record.verdict}`,`${record.duration_ms} ms`,`退出码 ${record.exit_code===null?'无':record.exit_code}`,`分析 ${recordAnalysis}`];
+  if(state.execResultMeta&&state.execResultMeta.runId)meta.push(`run ${String(state.execResultMeta.runId).slice(0,8)}`);
+  heroNode.append(flowNode('run-hero-meta',meta.join(' · ')));
+  if(crossVersion)heroNode.append(flowNode('flow-unknown',`这条结果属于分析 ${recordAnalysis}，不是当前版本 ${String(state.report?.id||'').slice(0,12)} 的观测；只作历史记录查看。`));
+  box.append(heroNode);
+  // 页签：结果 / 本次输入 / 输出日志。tab 内容独立重绘，不重建 hero。
+  const tabs=flowNode('run-tabs','');
+  tabs.setAttribute('role','tablist');
+  for(const [tab,label] of EXEC_TABS){
+    const btn=flowNode('run-tab'+(state.execTab===tab?' on':''),label);
+    btn.setAttribute('role','tab');
+    btn.setAttribute('aria-pressed',String(state.execTab===tab));
+    btn.onclick=()=>{state.execTab=tab;renderExecResult();};
+    tabs.append(btn);
+  }
+  box.append(tabs);
+  const body=flowNode('run-tab-body','');
+  if(state.execTab==='inputs'){
+    body.append(flowNode('flow-line',`实参 args ${JSON.stringify(result.args??[])}`));
+    const declared=state.execResultMeta?state.execResultMeta.declared:{};
+    if(declared&&declared.this_arg!==undefined)body.append(flowNode('flow-line',`this ${JSON.stringify(declared.this_arg)}`));
+    if(declared&&declared.globals&&Object.keys(declared.globals).length)body.append(flowNode('flow-line',`globals ${JSON.stringify(declared.globals)}`));
+    if(result.via)body.append(flowNode('flow-line',`经由 ${result.via.symbol} 实参 ${JSON.stringify(result.via.args||[])}${result.via_chain&&result.via_chain.length?` · 祖先链 ${result.via_chain.length} 级`:''}`));
+    body.append(flowNode('flow-line','这是这一次请求真正发出的完整声明输入；左侧草稿后续的编辑不会改变它。'));
+  }else if(state.execTab==='logs'){
+    const stdout=String(record.console?.stdout||''),stderr=String(record.console?.stderr||'');
+    const harness=record.console?.harness_lines||[];
+    if(!stdout.trim()&&!stderr.trim()&&!harness.length)body.append(flowNode('flow-line','没有控制台输出。'));
+    if(stdout.trim())body.append(flowNode('flow-line',`stdout：\n${stdout.slice(0,4000)}${(record.console?.truncated)?'\n（输出按预算截断）':''}`));
+    if(stderr.trim())body.append(flowNode('flow-line',`stderr：\n${stderr.slice(0,4000)}`));
+    if(harness.length)body.append(flowNode('flow-line',`console（受预算限制）${harness.slice(0,4).join(' | ')}`));
+  }else{
+    let shown=false;
+    if(record.thrown){
+      shown=true;
+      body.append(flowNode('flow-unknown',`抛出 ${record.thrown.name}: ${record.thrown.message}${record.thrown.code?`（${record.thrown.code}）`:''}`));
+      const events=record.trace?.events||[];const last=events[events.length-1];
+      if(last&&last.source_location)body.append(flowNode('flow-line',`观测位置 ${last.source_location.path}:${last.source_location.line}:${last.source_location.column} — ${last.source_location.line_text}`));
+    }
+    if(record.verdict==='refused'){
+      shown=true;
+      body.append(flowNode('flow-line','没有进程被启动；这不是一次失败的执行。按拒绝原因调整输入或授权后可重试。'));
+      if(record.refusal?.evidence)body.append(flowNode('flow-line',`依据：${record.refusal.evidence}`));
+    }
+    if(result.via&&record.via){
+      shown=true;
+      const stage=record.via.stage_report||{};
+      const stages=stage.stages||[stage];
+      body.append(flowNode('flow-line',`经由包含函数：${stages.length} 级；每级的返回与源码同一性核对在「执行依据与边界」里。`));
+    }
+    if(record.isolation&&record.isolation.mocks){
+      shown=true;
+      body.append(flowNode('flow-unknown',`本次运行声明使用了 mock/fixture：${record.isolation.fixture_note||'未注明'}；结果不得当作真实环境观测。`));
+    }
+    if(!shown)body.append(flowNode('flow-line','这次运行正常返回：终态与返回值就是上面的绿色结果卡；来源快照与观测方式见「执行依据与边界」。'));
+  }
+  box.append(body);
+  // 全部技术依据收进一个 details：展开才占版面，但永远是 exec-result 的一部分。
+  const evidence=document.createElement('details');
+  evidence.className='wb-details exec-evidence';
+  evidence.append(text('summary','执行依据与边界（隔离、授予、绑定、观测方式）'));
+  renderExecRecord(evidence,record);
+  box.append(evidence);
 }
 function renderExecRecord(body,record){
   const verdict=record.verdict;
@@ -1750,28 +2330,267 @@ async function runControlled(){
       via_chain=chainArgs.map(entry=>({symbol:entry.symbol,args:Array.isArray(entry.args)?entry.args:[]}));
     }
   }
-  const request=state.request;$('exec-run').disabled=true;status(via?'先调用包含函数取得闭包实例，再在隔离副本中执行…':'在隔离副本中执行…');
+  const request=state.request;
+  // 后台执行：请求立刻拿到 run id，进程在服务端继续。离开这一页不会停它，
+  // 取消要等服务端确认进程结束——断开 HTTP 不再被当成"进程已停止"。
+  setRunBusy(true);
+  status(via?'先调用包含函数取得闭包实例，再在隔离副本中执行…':'在隔离副本中执行…');
+  let started;
   try{
-    const record=await apiJson('exec',{symbol:selected.id,args,allow_effects,via,via_chain,this_arg:parsed.this_arg,globals:parsed.globals});
-    if(request!==state.request)return;
-    state.execResult={record,args,via,symbol:selected.id};
-    renderExecResult();
-    status(`受控运行结束：${record.verdict}`);
-    await loadExecRecords();
+    started=await apiJson('exec',{symbol:selected.id,args,allow_effects,via,via_chain,this_arg:parsed.this_arg,globals:parsed.globals,background:true});
   }catch(e){
-    if(request!==state.request)return;
+    setRunBusy(false);
     // 预检拒绝也带着 record：没有进程被启动，输入保留原样可修正。
     if(e.body&&e.body.refusal){
-      state.execResult={record:e.body.refusal,args,via};
+      state.execResultMeta={runId:null,declared:{this_arg:parsed.this_arg,globals:parsed.globals}};
+      state.execResult={record:e.body.refusal,args,via,symbol:selected.id};
+      state.execTab='result';
       renderExecResult();
     }
     status(`受控运行未开始或失败：${e.message}`);
-  }finally{if(request===state.request&&state.execProfile){const wanted=Boolean(state.execProfile.enclosing_symbol&&$('exec-via-enable')?.checked);$('exec-run').disabled=!(((state.execProfile.runnable)||wanted)&&state.execProfile.arity!==null);}}
+    return;
+  }
+  state.currentRun={id:started.run_id,args,via,symbol:selected.id,analysis:state.report?.id||''};
+  state.execResultMeta={runId:started.run_id,declared:{this_arg:parsed.this_arg,globals:parsed.globals}};
+  renderRunBanner();
+  loadTasks();
+  status(`已在服务端开始执行（run ${String(started.run_id).slice(0,8)}）；离开页面不会停止它。`);
+  return pollRun(started.run_id,request);
+}
+// 轮询服务端记录的终态。只有 runner 发布的终态才算数：running 期间不伪造进度。
+const RUN_POLL_MS=700;
+async function pollRun(runId,request){
+  for(let attempt=0;;attempt++){
+    // 第一次立刻问一次：短执行不必先等一个轮询间隔才被看见。
+    if(attempt>0)await new Promise(r=>setTimeout(r,RUN_POLL_MS));
+    let answer;
+    try{answer=await api('exec/run',{id:runId});}
+    catch(e){
+      if(e.status===404){
+        if(state.currentRun&&state.currentRun.id===runId)state.currentRun=null;
+        setRunBusy(false);renderRunBanner();
+        status('这次执行已不在服务端（服务可能重启过）；请按已发布的运行记录核对结果。');
+        return;
+      }
+      continue;
+    }
+    if(answer.state==='running')continue;
+    const run=state.currentRun&&state.currentRun.id===runId?state.currentRun:null;
+    if(state.currentRun&&state.currentRun.id===runId)state.currentRun=null;
+    setRunBusy(false);renderRunBanner();loadTasks();
+    // 迟到的终态只落在它自己的对象上：读者已经切走时不覆盖新选区。
+    if(request!==state.request||!state.selected||state.selected.id!==(run&&run.symbol)){status(`上一次执行结束：${answer.state}`);await loadExecRecords();return;}
+    state.execResultMeta={runId,declared:state.execResultMeta&&state.execResultMeta.runId===runId?state.execResultMeta.declared:{}};
+    state.execResult={record:answer.record,args:run.args,via:run.via,symbol:run.symbol};
+    state.execTab='result';
+    renderExecResult();
+    status(answer.state==='cancelled'?'已取消：进程已结束（服务端确认）':`受控运行结束：${answer.record&&answer.record.verdict||answer.state}`);
+    await loadExecRecords();
+    return;
+  }
+}
+// 运行按钮原位变成取消：busy 期间不允许重复派发，也不隐藏已经存在的记录。
+function setRunBusy(busy){
+  state.execBusy=Boolean(busy);
+  const run=$('exec-run'),cancel=$('exec-cancel');
+  if(run){run.disabled=Boolean(busy);run.textContent=busy?'运行中…':'运行这组输入';}
+  if(cancel)cancel.hidden=!busy;
+  if(!busy&&state.execProfile){
+    const wanted=Boolean(state.execProfile.enclosing_symbol&&$('exec-via-enable')?.checked);
+    if(run)run.disabled=!(((state.execProfile.runnable)||wanted)&&state.execProfile.arity!==null);
+  }
+  const note=$('exec-run-note');
+  if(note)note.textContent=busy?'执行在服务端进行；可以离开这一页，回来仍能看到结果或取消。':'在隔离副本中以目标 Node 的权限模型执行一次固定调用';
+}
+// --- 后台任务：离页之后的执行仍然找得到 --------------------------------------
+// 清单来自服务端句柄（exec/runs）；取消发信号并等服务端终态；「查看结果」把
+// 读者带回运行页并选中同一个对象，结果按 run id 落在它自己的目标上。
+const TASK_POLL_MS=2500;
+async function loadTasks(){
+  if(!state.token)return;
+  try{
+    const answer=await api('exec/runs');
+    state.tasks=Array.isArray(answer.runs)?answer.runs:[];
+    state.tasksError=null;
+  }catch(e){
+    state.tasksError=resourceError(e);
+  }
+  renderTasks();
+}
+const TASK_STATE_LABEL={running:'运行中',completed:'已完成',failed:'失败',cancelled:'已取消',cancelling:'取消中'};
+function taskTargetLabel(task){
+  const node=state.nodes.find(n=>n.id===task.symbol);
+  if(node)return `${node.name||node.id} · ${node.path||''}`;
+  return task.symbol;
+}
+function renderTasks(){
+  const count=$('nav-task-count');
+  if(count){
+    const running=state.tasks.filter(t=>t.state==='running').length;
+    count.hidden=running===0;
+    count.textContent=running?String(running):'';
+  }
+  const body=$('tasks-body');if(!body)return;
+  body.replaceChildren();
+  if(!state.token){body.append(flowNode('flow-unknown','还没有连接本机服务。'));return;}
+  if(state.tasksError){body.append(flowNode('flow-unknown',`任务清单查询失败：${state.tasksError}`));const retry=text('button','重试','wb-retry');retry.onclick=()=>loadTasks();body.append(retry);return;}
+  if(!state.tasks.length){body.append(flowNode('flow-line','当前没有后台任务。运行一个函数或重新索引项目后，这里会列出它们。'));return;}
+  for(const task of state.tasks.slice(0,12)){
+    const row=flowNode('task-row','');
+    row.append(flowNode(`task-state task-${task.state}`,TASK_STATE_LABEL[task.state]||task.state));
+    row.append(flowNode('task-target',taskTargetLabel(task)));
+    const foreign=task.analysis_id&&state.report&&task.analysis_id!==state.report.id;
+    row.append(flowNode('flow-line',`run ${String(task.run_id||'').slice(0,8)} · ${task.state==='running'?'进行中（离页不停）':'终态：'+(task.verdict||task.state)}${foreign?` · 属于分析 ${String(task.analysis_id).slice(0,8)}（另一项目/版本）`:''}`));
+    const actions=document.createElement('div');actions.className='context-actions';
+    if(task.state==='running'){
+      const cancel=text('button','取消','wb-retry');
+      cancel.onclick=()=>cancelTaskRun(task.run_id);
+      actions.append(cancel);
+    }else{
+      const open=text('button','查看结果','wb-retry');
+      open.onclick=()=>openTaskResult(task);
+      actions.append(open);
+    }
+    row.append(actions);
+    body.append(row);
+  }
+}
+function cancelCurrentRunNote(){
+  const note=$('exec-run-note');
+  if(note)note.textContent='已从后台任务发出取消；等进程被结束并发布记录后才算已取消。';
+}
+// 从任务面板取消一次运行：发信号并等服务端终态；这个函数与运行页上的
+// 取消按钮走同一个服务端入口。
+async function cancelTaskRun(runId){
+  try{
+    await apiJson('exec/cancel',{id:runId});
+    status('已发出取消信号；等服务端确认进程结束后显示已取消。');
+    if(state.currentRun&&state.currentRun.id===runId)cancelCurrentRunNote();
+  }catch(e){status(`取消失败：${e.message}`);}
+  loadTasks();
+}
+async function openTaskResult(task){
+  const dialog=$('tasks-dialog');
+  if(dialog&&dialog.close)dialog.close();
+  // 任务固定在它自己的分析上：不是当前项目/版本的结果就不打开，不冒充当前对象。
+  const served=state.report?.id||'';
+  if(task.analysis_id&&served&&task.analysis_id!==served){
+    status(`这条任务属于分析 ${String(task.analysis_id).slice(0,12)}，不是当前项目/版本的结果；切回它的项目后再查看。`);
+    return;
+  }
+  try{
+    const node=await resolveEntity(task.symbol);
+    if(!node){status(`结果属于 ${task.symbol}，它不在当前分析里`);return;}
+    if(node.id!==state.selected?.id)await select(node);
+    setPage('run');
+    if(node.kind==='function'&&state.selected?.id===node.id){
+      const answer=await api('exec/run',{id:task.run_id});
+      if(answer.record){
+        state.execResultMeta={runId:task.run_id,declared:{}};
+        state.execResult={record:answer.record,args:(answer.record.spec&&answer.record.spec.args)||[],via:null,symbol:node.id};
+        state.execTab='result';
+        renderExecResult();
+        status(`已显示 run ${String(task.run_id).slice(0,8)} 的终态记录。`);
+      }
+    }
+  }catch(e){status(`打开结果失败：${String((e&&e.message)||e)}`);}
+}
+function openTasksDialog(){
+  openDialog('tasks-dialog');
+  loadTasks();
+  if(!state.tasksTimer)state.tasksTimer=setInterval(()=>{loadTasks();},TASK_POLL_MS);
+}
+function stopTasksTimer(){
+  if(state.tasksTimer){clearInterval(state.tasksTimer);state.tasksTimer=null;}
+}
+// 运行页的"比较修改前后"：只在真的有已验证提案时才提供，两侧使用同一份
+// 声明输入、各自保留自己的分析版本。没有提案时说清楚下一步去哪里。
+function renderRunCompare(){
+  const box=$('run-compare-body');if(!box)return;
+  box.replaceChildren();
+  if(!state.selected||state.selected.kind!=='function'){
+    box.append(flowNode('flow-line','先选一个函数，再比较修改前后的行为。'));
+    return;
+  }
+  const verified=state.patches.filter(p=>p.state==='verified'||p.state==='applied');
+  if(!verified.length){
+    box.append(flowNode('flow-line','这个选区还没有已验证的提案。先到修改审阅登记并验证一份提案，再回来比较行为。'));
+    const go=text('button','去修改审阅','wb-retry');
+    go.onclick=()=>setPage('review');
+    box.append(go);
+    return;
+  }
+  const row=document.createElement('div');row.className='row-actions';
+  const select=document.createElement('select');
+  select.id='run-compare-select';
+  select.setAttribute('aria-label','选择要比较的已验证提案');
+  for(const proposal of verified){
+    const option=document.createElement('option');
+    option.value=proposal.id;
+    option.textContent=`${proposal.id.slice(0,12)} · ${proposal.state} · ${String(proposal.verification&&proposal.verification.patched_analysis_id||'').slice(0,8)}`;
+    select.append(option);
+  }
+  const button=text('button','以相同输入比较','wb-primary');
+  button.onclick=()=>runCompareFromRunPage(select.value);
+  row.append(select,button);
+  box.append(flowNode('flow-line','两侧使用同一份声明输入（args / this / globals），各自保留自己的分析版本；任一侧拒绝或异常都按它自己的终态呈现。'),row);
+  const result=document.createElement('div');result.id='run-compare-result';
+  box.append(result);
+}
+async function runCompareFromRunPage(proposalId){
+  const node=state.selected;
+  if(!node||node.kind!=='function'){status('先选一个函数');return;}
+  let inputs;
+  try{inputs=execFormValue(state.execProfile);}
+  catch(e){status(`输入还不是合法的 JSON：${e.message}`);return;}
+  const box=$('run-compare-result');
+  if(box)box.replaceChildren(flowNode('flow-line','对照运行中（两个隔离副本各执行一次）…'));
+  const allow_effects=(state.execProfile.required_grants||[]).filter(name=>name==='unknown_calls');
+  try{
+    const compare=await apiJson('exec-compare',{
+      entity:node.id,args:inputs.args,proposal_id:proposalId,allow_effects,
+      this_arg:inputs.this_arg,globals:inputs.globals,
+    });
+    if(box)renderCompareResult(box,compare);
+    status('对照完成：两侧都是真实隔离运行。');
+  }catch(e){
+    if(box)box.replaceChildren(flowNode('flow-unknown',`对照未完成：${e.message}`));
+  }
+}
+// R1 横幅：这次运行回答的是"谁、在哪个版本、什么签名"。签名来自画像的
+// 真实参数名；没有画像时只有路径与名字，不猜参数。
+function renderRunBanner(){
+  const box=$('run-banner');if(!box)return;
+  box.replaceChildren();
+  if(!state.selected||state.selected.kind!=='function'){
+    box.append(flowNode('flow-line','先在探索里选一个函数，再回到这里填输入。'));
+    return;
+  }
+  const node=state.selected;
+  const profile=state.execProfile;
+  const params=profile&&Array.isArray(profile.params)?profile.params.map(p=>p.name||`参数${p.index}`):null;
+  const signature=params?`${node.name||node.id}(${params.join(', ')})`:`${node.name||node.id}(…)`;
+  box.append(flowNode('run-target',signature));
+  box.append(flowNode('flow-line',`${node.path||''} · 固定分析版本 ${String(state.report?.id||'').slice(0,12)}`));
+  if(state.currentRun)box.append(flowNode('flow-unknown',`一次执行仍在服务端进行（run ${String(state.currentRun.id).slice(0,8)}）。离开这一页不会停它；可在「后台任务」里管理。`));
 }
 
 // --- 事件接线 ----------------------------------------------------------------
 $('patch-propose').onclick=()=>proposePatch();
 $('exec-run').onclick=()=>runControlled();
+$('exec-cancel').onclick=()=>cancelCurrentRun();
+// 取消是请求，不是结果：发信号后仍然等 runner 发布 cancelled 记录。
+async function cancelCurrentRun(){
+  if(!state.currentRun)return false;
+  const id=state.currentRun.id;
+  status('取消中：已发出取消信号，等待服务端结束进程…');
+  try{
+    await apiJson('exec/cancel',{id});
+    const note=$('exec-run-note');
+    if(note)note.textContent='已发出取消信号；等进程被结束并发布记录后才算已取消。';
+    return true;
+  }catch(e){status(`取消失败：${e.message}`);return false;}
+}
 $('exec-mode').onclick=()=>{
   const profile=state.execProfile;if(!profile)return;
   const draft=execDraft(profile.symbol);
@@ -1795,16 +2614,10 @@ $('fn-search').oninput=()=>scheduleSearch();
 $('fn-more').onclick=()=>runSearch(true);
 $('connect-button').onclick=connect;
 $('token').onkeydown=e=>{if(e.key==='Enter')connect();};
-$('nav-back').onclick=()=>navBack();
-$('run-shortcut').onclick=()=>{if(state.selected&&state.selected.kind==='function')setMode('run');};
-$('source-toggle').onclick=()=>toggleSource();
-$('source-close').onclick=()=>toggleSource();
-function toggleSource(){
-  const aside=$('inspector');
-  if(!aside)return;
-  const off=aside.classList.toggle('wb-source-off');
-  $('source-toggle').textContent=off?'显示源码':'收起源码';
-}
+const exploreBackBtn=$('explore-back');if(exploreBackBtn)exploreBackBtn.onclick=()=>navBack();
+$('run-shortcut').onclick=()=>{if(state.selected&&state.selected.kind==='function')setPage('run');};
+const runBackBtn=$('run-back');if(runBackBtn)runBackBtn.onclick=()=>setPage('explore');
+const sourceCloseBtn=$('source-close');if(sourceCloseBtn)sourceCloseBtn.onclick=()=>{const aside=$('inspector');if(aside)aside.hidden=!aside.hidden;};
 for(const name of LEVELS){const b=$(`level-${name}`);if(b)b.onclick=()=>setLevel(name);}
 function setLevel(level){
   if(!LEVELS.includes(level)){status(`未知层级 ${level}`);return false;}
@@ -1815,10 +2628,10 @@ function setLevel(level){
   return true;
 }
 for(const b of qsa('[data-lens]'))b.onclick=()=>setLens(b.dataset.lens);
-for(const b of qsa('.wb-tabs [data-mode]'))b.onclick=()=>setMode(b.dataset.mode);
+for(const b of qsa('.nav-button[data-go]'))b.onclick=()=>setPage(b.dataset.go);
 const graphEl=$('graph');
 if(graphEl&&graphEl.addEventListener)graphEl.addEventListener('click',e=>{
-  const focusOn=state.selected&&state.selected.kind==='function'&&state.mode==='understand'&&state.lens==='calls';
+  const focusOn=state.selected&&state.selected.kind==='function'&&state.page==='explore'&&state.lens==='calls';
   if(focusOn)return;
   const box=e.target&&e.target.getBoundingClientRect?e.target.getBoundingClientRect():{left:0,top:0,width:800,height:600};
   const x=(e.clientX-box.left)*(800/Math.max(box.width,1)),y=(e.clientY-box.top)*(600/Math.max(box.height,1));
@@ -1828,15 +2641,533 @@ if($('exec-via-enable'))$('exec-via-enable').onchange=()=>{const profile=state.e
 
 
 $('reset').onclick=()=>{if(state.selected)select(state.selected,{push:false});else resetDetail();};
-$('export').onclick=async()=>{try{const selected=state.selected,request=state.request;if(!selected)return;const context=await api('context',{entity:selected.id},'POST');if(request!==state.request)return;clearContext();const json=JSON.stringify(context,null,2);state.exportUrl=URL.createObjectURL(new Blob([json],{type:'application/json'}));$('context-json').value=json;$('context-download').href=state.exportUrl;$('context-download').download=`atlas-context-${context.selection_id.slice(0,12)}.json`;$('context-panel').hidden=false;$('context-panel').open=true;status('选区上下文已在本地生成，可复制或下载；未发送给 LLM');}catch(e){status(e.message);}};
+$('export').onclick=async()=>{try{const selected=state.selected,request=state.request;if(!selected)return;const context=await api('context',{entity:selected.id},'POST');if(request!==state.request)return;clearContext();const json=JSON.stringify(context,null,2);state.exportUrl=URL.createObjectURL(new Blob([json],{type:'application/json'}));$('context-json').value=json;$('context-download').href=state.exportUrl;$('context-download').download=`atlas-context-${context.selection_id.slice(0,12)}.json`;openDialog('context-dialog');status('选区上下文已在本地生成，可复制或下载；未发送给 LLM');}catch(e){status(e.message);}};
 $('context-copy').onclick=async()=>{try{await navigator.clipboard.writeText($('context-json').value);status('上下文已复制；未发送给 LLM');}catch{status('浏览器未允许剪贴板写入，可在 JSON 文本框中手动复制');}};
+
+// --- 顶栏、导航与对话框 ------------------------------------------------------
+// 弹层用原生 dialog：Esc 关闭、焦点进入与返回由浏览器负责，长内容在内部滚动。
+// 任何弹层都不发起隐藏的写操作，也不把令牌写进可复制的交接文本。
+function openDialog(id){
+  const dialog=$(id);
+  if(!dialog||typeof dialog.showModal!=='function')return false;
+  if(!dialog.open)dialog.showModal();
+  return true;
+}
+function focusFirstField(dialog){
+  const field=dialog&&dialog.querySelector?dialog.querySelector('input,textarea,button'):null;
+  if(field&&field.focus)field.focus();
+}
+const helpOpen=$('help-open');if(helpOpen)helpOpen.onclick=()=>openDialog('help-dialog');
+const navCommand=$('nav-command');if(navCommand)navCommand.onclick=()=>openCommandPalette();
+const revisionBtn=$('revision');if(revisionBtn)revisionBtn.onclick=()=>openVersionDialog();
+// 后台任务与项目设置都是真实入口：任务弹层列出服务端在途/终态；设置落在项目页。
+const navTasksBtn=$('nav-tasks');if(navTasksBtn)navTasksBtn.onclick=()=>openTasksDialog();
+const navSettingsBtn=$('nav-settings');if(navSettingsBtn)navSettingsBtn.onclick=()=>{
+  setPage('home');renderPageContent('home');
+  status('项目设置在项目页：声明的测试命令会真实用于之后的每一次验证。');
+};
+const tasksRefresh=$('tasks-refresh');if(tasksRefresh)tasksRefresh.onclick=()=>{loadTasks();return undefined;};
+const tasksDialog=$('tasks-dialog');if(tasksDialog&&tasksDialog.addEventListener)tasksDialog.addEventListener('close',()=>{stopTasksTimer();});
+// 写入确认：确认层关闭时才执行；取消或 Esc 不发任何写请求。
+const writeDialog=$('write-dialog');if(writeDialog&&writeDialog.addEventListener)writeDialog.addEventListener('close',()=>{
+  const action=writeDialog.returnValue;
+  if(action!=='confirm'||!pendingWrite)return;
+  const {endpoint,id,root}=pendingWrite;pendingWrite=null;
+  writePatch(endpoint,id,root);
+});
+const runViewSource=$('run-view-source');if(runViewSource)runViewSource.onclick=()=>setPage('explore');
+const homeOpenButton=$('home-open-button');if(homeOpenButton)homeOpenButton.onclick=()=>openProjectByPath();
+const homeOpenPath=$('home-open-path');if(homeOpenPath)homeOpenPath.onkeydown=e=>{if(e.key==='Enter')openProjectByPath();};
+const cityOpenBtn=$('city-open');if(cityOpenBtn)cityOpenBtn.onclick=()=>{window.location.href=projectionHref();};
+const patchProposeBtn=$('patch-propose-open');if(patchProposeBtn)patchProposeBtn.onclick=()=>{
+  setPage('review');
+  const box=$('patch-input-panel');if(box)box.open=true;
+  const area=$('patch-input');if(area&&area.focus)area.focus();
+};
+const reviewAgentBtn=$('review-agent');if(reviewAgentBtn)reviewAgentBtn.onclick=()=>setPage('agent');
+const sourceAgentBtn=$('source-agent');if(sourceAgentBtn)sourceAgentBtn.onclick=()=>setPage('agent');
+const sourceReviewBtn=$('source-review');if(sourceReviewBtn)sourceReviewBtn.onclick=()=>setPage('review');
+const execClearBtn=$('exec-clear');if(execClearBtn)execClearBtn.onclick=()=>{
+  const profile=state.execProfile;if(!profile)return;
+  state.execDrafts[profile.symbol]={fields:{},raw:'[]',advanced:false,receiver:'',globals:{},viaArgs:'',viaChain:''};
+  persistDrafts();renderExecForm(profile);
+  status('已清空这组输入；下一次运行会在字段旁提示缺失的必填项。');
+};
+const agentConnection=$('agent-connection');if(agentConnection)agentConnection.onclick=()=>openDialog('agent-connection-dialog');
+const agentPreview=$('agent-preview');if(agentPreview)agentPreview.onclick=()=>previewHandoff();
+const agentExportBtn=$('agent-export');if(agentExportBtn)agentExportBtn.onclick=()=>exportAgentContext();
+const agentOpenExplore=$('agent-open-explore');if(agentOpenExplore)agentOpenExplore.onclick=()=>setPage('explore');
+if($('agent-goal'))$('agent-goal').oninput=()=>{state.agentGoal=$('agent-goal').value;scheduleSaveUiState();};
+if($('command-input'))$('command-input').oninput=e=>renderCommandResults(e.target.value.trim());
+const agentConnectionCopy=$('agent-connection-copy');if(agentConnectionCopy)agentConnectionCopy.onclick=()=>{
+  const text=`Atlas 本机服务：${location.origin}/\n令牌：右上角「连接会话」或启动命令输出的 session_file 里的 token\n接口清单：GET /api/contract\n接入说明：docs/AGENT_ONBOARDING.md`;
+  try{navigator.clipboard.writeText(text);status('连接信息已复制（令牌不写入任何日志或交接文本）');}
+  catch{status('浏览器未允许剪贴板写入，请手动复制');}
+};
+if(agentConnection)agentConnection.onclick=()=>{
+  const body=$('agent-connection-body');
+  if(body){
+    body.replaceChildren();
+    body.append(flowNode('flow-line',`服务地址（回环）：${location.origin}/`));
+    body.append(flowNode('flow-line',state.token?'令牌：已在本会话中；它只经 URL fragment 传入，不进入 HTTP 请求与日志。':'令牌：从启动命令输出的 session_file 里读取，填到右上角「连接会话」。'));
+    body.append(flowNode('flow-line','接口清单：GET /api/contract（逐条列出保证与限制）。'));
+  }
+  openDialog('agent-connection-dialog');
+};
+if(document.addEventListener)document.addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&String(e.key).toLowerCase()==='k'){e.preventDefault();openCommandPalette();return;}
+  if((e.metaKey||e.ctrlKey)&&/^[1-6]$/.test(e.key)){e.preventDefault();setPage(PAGES[Number(e.key)-1]);}
+});
+if(typeof window!=='undefined'&&window.addEventListener){window.addEventListener('beforeunload',()=>{saveUiStateNow();});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveUiStateNow();});
+  window.addEventListener('pagehide',()=>{saveUiStateNow();});}
+
+// --- 页面内容：按需渲染，未接线的部分给明确状态，不放原型假数据 ----------------
+function renderContextActions(){
+  const has=Boolean(state.selected);
+  for(const id of ['export','source-agent','source-review']){const b=$(id);if(b)b.disabled=!has;}
+}
+function renderPageContent(page){
+  if(page==='home')renderHome();
+  else if(page==='city')renderCity();
+  else if(page==='agent')renderAgent();
+}
+function renderNavState(){
+  const text=$('nav-connection-text'),dot=$('nav-connection');
+  if(text)text.textContent=state.token?(state.report?`已连接 · ${String(state.report.id).slice(0,8)}`:'已连接'):'未连接';
+  if(dot&&dot.setAttribute)dot.setAttribute('data-connected',state.token?'yes':'no');
+  const stateText=$('connection-state');
+  if(stateText)stateText.textContent=state.token?(state.report?`本机服务已连接 · 分析 ${String(state.report.id).slice(0,12)}`:'本机服务已连接'):'本机服务未连接';
+  const reviewCount=$('nav-review-count');
+  if(reviewCount){
+    const n=state.patches.length;
+    reviewCount.hidden=n===0;
+    reviewCount.textContent=n?String(n):'';
+  }
+}
+// 项目页：真实的项目入口。打开目录（索引并切换服务）、继续最近项目、声明
+// 测试设置——这些操作都落在服务端编排上，不是页面里的假表单。
+function renderHome(){
+  const body=$('home-open-body');if(!body)return;
+  body.replaceChildren();
+  if(!state.token){
+    body.append(flowNode('flow-unknown','还没有连接本机服务。先用启动命令打开一个项目：它会索引目录并打印带令牌的地址，把令牌填到右上角「连接会话」。之后就能在这个页面里打开、切换其他项目。'));
+    // 服务重启会换令牌,而"打开那条带令牌的地址"只是换 fragment、不会重新加载页面:
+    // 这一句既说明按钮为什么点不动,也说明恢复办法不只有手工粘贴。
+    body.append(flowNode('flow-line','服务每次启动都会换一个新令牌。重启服务之后，重新打开它打印的那条带令牌地址：页面会就地接上新令牌（不用刷新页面），也可以把新令牌填到右上角「连接会话」。'));
+    body.append(flowNode('flow-line','代码留在本机；建立索引不会运行你的项目。'));
+  }else{
+    const project=(state.contract&&state.contract.project)||{};
+    body.append(flowNode('flow-line',state.report?`当前服务打开的是：${state.projectName||'（未命名项目）'} · 分析 ${String(state.report.id).slice(0,12)}`:'已连接，但还没有读取到分析版本'));
+    if(project.key&&!project.is_analysis_id)body.append(flowNode('flow-line',`项目目录：${project.key}`));
+    if(state.report){
+      const actions=document.createElement('div');actions.className='row-actions';
+      const goExplore=text('button','去探索代码','wb-primary');goExplore.onclick=()=>setPage('explore');
+      const goRun=text('button','运行一个函数');goRun.onclick=()=>setPage('run');
+      actions.append(goExplore,goRun);
+      body.append(actions);
+    }
+  }
+  renderHomeOpenForm();
+  renderHomeRecent();
+  renderHomeSettings();
+  const facts=$('home-facts-body');
+  if(facts){
+    facts.replaceChildren();
+    const report=state.report;
+    if(!report){facts.append(flowNode('flow-line','连接后显示源文件、函数与未知边界的真实计数。'));}
+    else{
+      const coverage=report.coverage||{};
+      for(const [label,value] of [
+        ['源文件',coverage.parsed_source_files??report.file_count??'—'],
+        ['函数',report.function_count??'—'],
+        ['未知区域',coverage.flow_unknown_regions??'—'],
+        ['调用候选边',report.edge_count??'—'],
+      ]){
+        const cell=document.createElement('div');cell.className='fact';
+        cell.append(text('b',String(value)),text('span',label,'subtle'));
+        facts.append(cell);
+      }
+      facts.append(flowNode('flow-line','计数来自这一份已发布分析；不是首屏的节点页。'));
+    }
+  }
+}
+// H1 打开：本机绝对路径 → 服务索引（有界、可取消）→ 完成后切换并刷新。
+function renderHomeOpenForm(){
+  const progress=$('home-open-progress');if(!progress)return;
+  progress.replaceChildren();
+  const openButton=$('home-open-button');
+  if(openButton)openButton.disabled=!state.token||Boolean(state.openOp);
+  // 可写授权是明确的本机操作者决定：勾选后打开的项目才能被应用/撤销写入。
+  const writeOption=$('home-open-write');
+  if(writeOption){
+    const capable=Boolean(state.contract&&state.contract.writes&&state.contract.writes.capable);
+    writeOption.disabled=!capable||!state.token||Boolean(state.openOp);
+    if(!capable)writeOption.checked=false;
+  }
+  if(!state.openOp)return;
+  const cancel=text('button','取消这次索引','wb-retry');
+  cancel.onclick=async()=>{
+    try{
+      await apiJson('project/open/cancel',{id:state.openOp});
+      status('已发出取消信号；索引在检查点停下后作业才是 cancelled。');
+    }catch(e){status(`取消失败：${e.message}`);}
+  };
+  progress.append(flowNode('flow-line','正在索引（有界：超时与文件预算由服务端执行参数决定）。已用 '+openElapsedText()+'。'),cancel);
+}
+function openElapsedText(){
+  return state.openStartedAt?`${Math.max(1,Math.round((Date.now()-state.openStartedAt)/1000))} 秒`:'刚开 始';
+}
+async function openProjectByPath(){
+  if(!state.token){status('先连接本机服务');return;}
+  const input=$('home-open-path');
+  const path=(input&&input.value||'').trim();
+  if(!path){status('先输入要打开的本机目录（绝对路径）');return;}
+  const button=$('home-open-button');if(button)button.disabled=true;
+  const writeChecked=Boolean($('home-open-write')&&$('home-open-write').checked);
+  try{
+    const started=await apiJson('project/open',{path,allow_writes:writeChecked});
+    if(started.outcome==='indexing'){
+      state.openOp=started.op_id;
+      state.openStartedAt=Date.now();
+      status(`正在索引 ${path}；完成后自动切换到新分析。`);
+      renderHomeOpenForm();
+      pollProjectOpen();
+    }
+  }catch(e){
+    status(`打开失败：${e.message}`);
+    if(button)button.disabled=false;
+  }
+}
+const OPEN_POLL_MS=1200,OPEN_POLL_MAX=600;
+async function pollProjectOpen(attempt=0){
+  const op=state.openOp;
+  if(!op)return;
+  if(attempt>OPEN_POLL_MAX){
+    state.openOp=null;renderHomeOpenForm();
+    status('打开作业查询超时：索引仍在服务端有界进行；稍后在「最近项目」里确认。');
+    return;
+  }
+  try{
+    const answer=await api('project/open',{id:op});
+    if(answer.state==='switched'){
+      state.openOp=null;
+      const path=$('home-open-path');if(path)path.value='';
+      status(`已切换到 ${String(answer.analysis_id||'').slice(0,12)}：${state.projectName||'新项目'}。正在加载新项目的数据。`);
+      await connect();
+      setPage('explore');
+      loadProjects();
+      status('新项目已加载：探索、运行、审阅都指向这份新分析。');
+      return;
+    }
+    if(answer.state==='failed'||answer.state==='cancelled'){
+      state.openOp=null;
+      status(`打开未完成：${answer.state}${answer.error?`（${answer.error}）`:''}`);
+      renderHomeOpenForm();
+      return;
+    }
+    renderHomeOpenForm();
+    setTimeout(()=>pollProjectOpen(attempt+1),OPEN_POLL_MS);
+  }catch(e){
+    state.openOp=null;renderHomeOpenForm();
+    status(`打开作业状态查询失败：${e.message}`);
+  }
+}
+// H2 最近项目：本机 store 里的打开历史；点击按已发布分析直接切换。
+async function loadProjects(){
+  if(!state.token){state.projects=[];renderHomeRecent();return;}
+  try{
+    const answer=await api('projects');
+    state.projects=Array.isArray(answer.projects)?answer.projects:[];
+    state.projectsError=null;
+  }catch(e){state.projectsError=resourceError(e);state.projects=[];}
+  renderHomeRecent();
+}
+function renderHomeRecent(){
+  const recent=$('home-recent-body');if(!recent)return;
+  recent.replaceChildren();
+  if(!state.token){recent.append(flowNode('flow-line','连接后显示本机打开过的项目。'));return;}
+  if(state.projectsError){recent.append(flowNode('flow-unknown',`最近项目读取失败：${state.projectsError}`));return;}
+  if(!state.projects.length){recent.append(flowNode('flow-line','本机还没有打开过其他项目。在上面输入目录打开第一个。'));}
+  for(const project of state.projects.slice(0,8)){
+    const row=flowNode('project-row','');
+    row.append(flowNode('project-row-name',`${project.name}${project.current?' · 当前':''}${project.write?' · 可写':''}`));
+    row.append(flowNode('flow-line',`${project.path||''} · 分析 ${String(project.analysis_id||'').slice(0,12)}`));
+    if(!project.current){
+      const open=text('button','继续这个项目','wb-retry');
+      open.onclick=async()=>{
+        open.disabled=true;
+        try{
+          await apiJson('project/open',{analysis:project.analysis_id});
+          await connect();
+          loadProjects();
+          status(`已切换到 ${project.name}：探索、运行、审阅都指向这个项目。`);
+        }catch(e){status(`切换失败：${e.message}`);open.disabled=false;}
+      };
+      row.append(open);
+    }
+    recent.append(row);
+  }
+  if(state.selected&&state.selected.kind==='function'){
+    const row=text('button',`继续 ${state.selected.name||state.selected.id} →`,'nav-link');
+    row.onclick=()=>setPage('explore');
+    recent.append(row);
+  }
+}
+// 项目设置：声明的测试命令与超时。保存即生效（服务端验证用它），并随 store
+// 保留——重启服务后仍然是这份声明。页面不能替外部提案改命令。
+function renderHomeSettings(){
+  const body=$('home-settings-body');if(!body)return;
+  body.replaceChildren();
+  if(!state.token){body.append(flowNode('flow-line','连接后显示并更新测试设置。'));return;}
+  const verification=(state.contract&&state.contract.verification)||{};
+  const writes=(state.contract&&state.contract.writes)||{};
+  const argvText=JSON.stringify(verification.test_argv&&verification.test_argv.length?verification.test_argv:[]);
+  const wrap=flowNode('stack','');
+  const label=flowNode('flow-line','测试命令（JSON argv 数组；空数组表示不运行测试）');
+  wrap.append(label);
+  const input=document.createElement('textarea');
+  input.id='settings-test-argv';input.rows=2;input.spellcheck=false;input.value=argvText;
+  input.setAttribute('aria-label','测试命令 argv JSON 数组');
+  wrap.append(input);
+  const timeoutRow=document.createElement('div');timeoutRow.className='context-actions';
+  const timeoutLabel=text('span','测试超时（ms）','subtle');
+  const timeoutInput=document.createElement('input');
+  timeoutInput.id='settings-test-timeout';timeoutInput.type='number';timeoutInput.min='1000';timeoutInput.max='600000';
+  timeoutInput.value=String(verification.test_timeout_ms??120000);
+  timeoutInput.setAttribute('aria-label','测试超时毫秒');
+  timeoutRow.append(timeoutLabel,timeoutInput);
+  wrap.append(timeoutRow);
+  const save=text('button','保存并生效','wb-primary');
+  save.disabled=state.settingsBusy;
+  save.onclick=async()=>{
+    let argvParsed;
+    try{argvParsed=JSON.parse(input.value||'[]');}catch(e){status(`测试命令不是合法 JSON：${e.message}`);return;}
+    if(argvParsed&&!Array.isArray(argvParsed)){status('测试命令需要是 JSON 数组，例如 ["node","--test"]');return;}
+    state.settingsBusy=true;save.disabled=true;
+    try{
+      const answer=await apiJson('project/settings',{test_argv:argvParsed.length?argvParsed:null,test_timeout_ms:Number(timeoutInput.value)||undefined},'PUT');
+      if(state.contract&&state.contract.verification){
+        state.contract.verification.test_argv=answer.test_argv;
+        state.contract.verification.test_timeout_ms=answer.test_timeout_ms;
+      }
+      status('设置已生效：之后的验证按这份声明执行。');
+      renderHomeSettings();renderPatches(state.patches);
+    }catch(e){status(`设置未保存：${e.message}`);}
+    state.settingsBusy=false;
+    const again=$('home-settings-save');if(again)again.disabled=false;
+  };
+  save.id='home-settings-save';
+  wrap.append(save);
+  wrap.append(flowNode('flow-line',`当前生效（仅本项目）：${verification.test_argv&&verification.test_argv.length?JSON.stringify(verification.test_argv):'不运行测试'} · 超时 ${verification.test_timeout_ms??'—'} ms。切换项目时各自使用自己的声明。${writes.enabled?`写路径：${writes.root}（应用/撤销只写当前项目）。`:(writes.capable?'当前项目未以可写方式打开。':'本服务没有 --allow-writes：HTTP 不能应用或撤销补丁。')}`));
+  body.append(wrap);
+}
+// 3D 页：真实说明当前选区与三维视图的关系，列出所选文件的函数成员，并提供
+// 带同一选区的入口。3D 是真实 WebGL2 投影（/city3d），不是这里的示意。
+function renderCity(){
+  const body=$('city-body');if(!body)return;
+  body.replaceChildren();
+  body.append(flowNode('flow-line','三维视图读的是同一份分析和同一个选区：在探索里选中的函数，进入 3D 后落在它所属的文件上；从 3D 打开一个成员，回到工作台的仍是同一个对象。'));
+  const link=$('city-open');
+  if(link)link.disabled=!state.token;
+  renderCityMembers();
+}
+// D2 文件成员：当前选区所在文件的真实函数成员（来自这一份分析），点击进入
+// 工作台选中同一对象。搜索是服务端职责，这里不做本地过滤的假"全量"。
+async function renderCityMembers(){
+  const members=$('city-members');if(!members)return;
+  const node=state.selected;
+  const path=node?node.path:null;
+  if(!path){members.replaceChildren(flowNode('flow-line','先在探索里选一个函数或文件，这里会列出它所在文件的成员。'));return;}
+  members.replaceChildren(flowNode('flow-line','正在查询这个文件的成员…'));
+  try{
+    const answer=await api('search',{q:path,kind:'function',limit:50});
+    if(state.selected?.id!==node.id)return; // 选区已切换，迟到的成员列表作废
+    const hits=(answer.items||[]).filter(item=>item.path===path);
+    members.replaceChildren();
+    members.append(flowNode('flow-head',`${path} · ${hits.length} 个函数成员`));
+    if(!hits.length){members.append(flowNode('flow-line','这一份分析没有给出这个文件的函数成员。'));return;}
+    for(const member of hits){
+      const row=text('button',`${member.name}（${member.kind}）`,'fn-hit');
+      row.title=`进入工作台并选中 ${member.id}`;
+      row.onclick=async()=>{try{const target=await resolveEntity(member.id);if(target)await select(target);}catch(e){status(`打开失败：${e.message}`);}};
+      members.append(row);
+    }
+    if(answer.total&&answer.total>hits.length)members.append(flowNode('flow-line',`（显示前 ${hits.length} 个；这是当前分析的成员清单。）`));
+  }catch(e){
+    members.replaceChildren(flowNode('flow-unknown',`成员查询失败：${resourceError(e)}`));
+  }
+}
+// Agent 页：真实交接草稿 + 真实提案与证据引用。没有内置模型，也不假派单。
+function renderAgent(){
+  const target=$('agent-target');if(!target)return;
+  target.replaceChildren();
+  if(!state.selected){
+    target.append(flowNode('flow-unknown','还没有选中的函数。先在探索里选一个函数，再把它的上下文交接出去。'));
+  }else{
+    const node=state.selected;
+    target.append(flowNode('flow-head',`${node.path||''} · ${node.name||node.id}`));
+    target.append(flowNode('flow-line',`版本 ${String(state.report?.id||'').slice(0,12)} · 实体 ${node.id}`));
+  }
+  const goal=$('agent-goal');if(goal&&document.activeElement!==goal&&state.agentGoal!==undefined)goal.value=state.agentGoal;
+  renderAgentProposals();
+}
+function renderAgentProposals(){
+  const box=$('agent-proposals');if(!box)return;
+  box.replaceChildren();
+  if(!state.patches.length){box.append(flowNode('flow-line','当前选区还没有收到提案。提案以 Atlas 的记录为准，不推测外部 Agent 的过程。'));}
+  else{
+    for(const proposal of state.patches.slice(0,8)){
+      const inner=proposal.proposal||{};
+      const row=flowNode('agent-proposal','');
+      row.append(flowNode('flow-head',`${proposal.id.slice(0,12)} · ${proposalStateLabel(proposal.state)} · ${proposal.proposed_by}`));
+      if(inner.summary)row.append(flowNode('flow-line',inner.summary));
+      const actions=document.createElement('div');actions.className='context-actions';
+      const review=text('button','审阅这份提案','wb-retry');
+      review.onclick=()=>locateProposal(proposal.id);
+      actions.append(review);
+      row.append(actions);
+      // 证据引用：真实记录的身份与状态，可核对；没有的字段明说尚未产生。
+      const refs=flowNode('agent-refs','');
+      refs.append(flowNode('flow-line',`登记时间 ${proposal.created_at?new Date(proposal.created_at*1000).toLocaleString():'（记录未提供）'} · 来源 ${proposal.proposed_by}（会话/操作者自我声明，未认证）`));
+      const verification=proposal.verification;
+      if(verification){
+        refs.append(flowNode('flow-line',`验证：派生分析 ${String(verification.patched_analysis_id||'').slice(0,12)}`));
+        const test=verification.test||{};
+        refs.append(flowNode(test.ran&&test.passed&&!test.timed_out?'flow-line':'flow-unknown',
+          test.ran?`测试 ${JSON.stringify(test.argv)} · ${test.timed_out?'超时':(test.passed?'通过':'失败')}`:'测试：没有运行（这不是通过）'));
+      }else{
+        refs.append(flowNode('flow-line','验证：尚未产生（还没有派生分析与测试记录）。'));
+      }
+      if(proposal.state==='applied'&&proposal.target)refs.append(flowNode('flow-line',`应用：已写入 ${proposal.target}。`));
+      row.append(refs);
+      box.append(row);
+    }
+  }
+  const activity=$('agent-activity');if(!activity)return;
+  activity.replaceChildren();
+  activity.append(flowNode('flow-line','记录：提案由服务端按会话写入作者；CLI 的 proposed_by 是本机操作者的自我声明，未认证。'));
+  activity.append(flowNode('flow-line',`当前选区收到的提案 ${state.patches.length} 份。每份提案的状态（登记/验证/应用/撤销）以修改审阅页的同一记录为准。`));
+  if(state.agentGoal&&state.agentGoal.trim())activity.append(flowNode('flow-line',`交接目标草稿：「${state.agentGoal.trim()}」（保存在本机与服务端任务状态里，尚未发送给任何 Agent）。`));
+  const counts={};
+  for(const proposal of state.patches)counts[proposal.state]=(counts[proposal.state]||0)+1;
+  if(state.patches.length){
+    activity.append(flowNode('flow-line','状态分布：'+Object.entries(counts).map(([k,v])=>`${proposalStateLabel(k)} ${v}`).join(' · ')));
+  }
+  const refresh=text('button','刷新提案与证据','wb-retry');
+  refresh.onclick=async()=>{if(state.selected)await loadPatches(state.selected);status('已按 Atlas 记录刷新；这不是 Agent 运行进度。');};
+  activity.append(refresh);
+}
+// 交接文本是本地生成的纯文本：说明目标、实体、版本与接口读法。
+// 复制不等于发送；页面不声称 Agent 已经开始工作。
+function handoffText(){
+  const node=state.selected;
+  const lines=[];
+  lines.push('# Atlas 交接');
+  lines.push('');
+  lines.push(`目标：${(state.agentGoal||'').trim()||'（还没写目标）'}`);
+  lines.push('');
+  if(node)lines.push(`实体：${node.id}`, `位置：${node.path||''} · ${node.name||node.id}`);
+  lines.push(`分析版本：${state.report?.id||'（未连接）'}`);
+  lines.push('');
+  lines.push('接入：读 docs/AGENT_ONBOARDING.md；接口清单用 GET /api/contract。');
+  lines.push(`查询：GET /api/node?entity=<引用> · GET /api/reach?entity=<引用>&direction=in|out · GET /api/source?entity=<引用> · POST /api/context`);
+  lines.push(`提案：POST /api/patch/propose → POST /api/patch/verify（轮询 GET /api/patch/verify?id=）`);
+  lines.push('注意：测试没跑不等于通过；应用补丁由人决定，不要自行写入。');
+  return lines.join('\n');
+}
+function previewHandoff(){
+  const area=$('agent-text');
+  if(area)area.value=handoffText();
+  const note=$('agent-dialog-note');
+  if(note)note.textContent='这是本地生成的文本。复制不等于发送，Atlas 不会替你联系任何 Agent。';
+  openDialog('agent-dialog');
+}
+async function exportAgentContext(){
+  const node=state.selected;
+  if(!node){status('先在探索里选一个函数');return;}
+  try{
+    const context=await api('context',{entity:node.id},'POST');
+    const json=JSON.stringify(context,null,2);
+    $('context-json').value=json;
+    const url=URL.createObjectURL(new Blob([json],{type:'application/json'}));
+    const link=$('context-download');
+    if(link){link.href=url;link.download=`atlas-context-${String(context.selection_id||'').slice(0,12)}.json`;}
+    openDialog('context-dialog');
+    status('上下文已导出（本地生成）；未发送给任何模型');
+  }catch(e){status(`导出失败：${e.message}`);}
+}
+async function openCommandPalette(){
+  const dialog=$('command-dialog');
+  if(!dialog||typeof dialog.showModal!=='function'){setPage('explore');const f=$('fn-search');if(f&&f.focus)f.focus();return;}
+  if(!dialog.open)dialog.showModal();
+  const input=$('command-input');if(input&&input.focus)input.focus();
+  renderCommandResults('');
+}
+let commandSeq=0;
+async function renderCommandResults(query){
+  const box=$('command-results');if(!box)return;
+  const mine=++commandSeq;
+  const actions=[['探索代码','explore'],['3D 地图','city'],['运行验证','run'],['修改审阅','review'],['Agent 协作','agent'],['项目','home']]
+    .filter(([label])=>!query||label.includes(query));
+  box.replaceChildren();
+  for(const [label,page] of actions){
+    const row=text('button',`前往 · ${label}`,'nav-link');
+    row.onclick=()=>{const d=$('command-dialog');if(d&&d.close)d.close();setPage(page);};
+    box.append(row);
+  }
+  if(!query){box.append(flowNode('flow-line','输入函数名或路径可搜索代码。'));return;}
+  if(!state.token){box.append(flowNode('flow-unknown','还没有连接本机服务。'));return;}
+  try{
+    const answer=await api('search',{q:query,kind:'function',limit:20});
+    if(mine!==commandSeq)return;
+    const items=answer.items||[];
+    if(!items.length){box.append(flowNode('flow-line','没有匹配的函数。'));return;}
+    for(const node of items){
+      const row=text('button',`${node.name} · ${node.path||''}`,'nav-link');
+      row.onclick=async()=>{const d=$('command-dialog');if(d&&d.close)d.close();await openEntity(node.id);};
+      box.append(row);
+    }
+    box.append(flowNode('flow-line',`匹配 ${answer.total??items.length} 个；这里显示前 ${items.length} 个。`));
+  }catch(e){
+    if(mine!==commandSeq)return;
+    box.append(flowNode('flow-unknown',`搜索失败：${e.message}`));
+  }
+}
+async function openEntity(reference){
+  try{
+    const node=await resolveEntity(reference);
+    if(!node){status(`找不到 ${reference}`);return;}
+    setPage('explore');
+    await select(node);
+  }catch(e){status(String((e&&e.message)||e));}
+}
+function openVersionDialog(){
+  const body=$('version-dialog-body');if(!body)return;
+  body.replaceChildren();
+  if(!state.token){body.append(flowNode('flow-unknown','还没有连接本机服务。'));}
+  else if(!state.report){body.append(flowNode('flow-line','已连接，但还没读到分析版本。'));}
+  else{
+    body.append(flowNode('flow-head',`当前服务提供的分析（基线）：${state.report.id}`));
+    body.append(flowNode('flow-line','分析一旦发布就不可变。要换到另一个项目或新版本：项目页里「打开你的项目」（重新索引并切换）或「最近项目」（直接切换）。'));
+    const candidates=state.patches.filter(p=>p.state==='verified'||p.state==='applied');
+    for(const proposal of candidates.slice(0,6)){
+      const derived=proposal.verification&&proposal.verification.patched_analysis_id;
+      if(!derived)continue;
+      body.append(flowNode('flow-line',`候选：${String(derived).slice(0,12)} ← 提案 ${proposal.id.slice(0,12)}（${proposal.state}）· 应用后用「打开新版本」切换过去`));
+    }
+    if(!candidates.length)body.append(flowNode('flow-line','还没有候选版本（先验证一份提案）。'));
+  }
+  openDialog('version-dialog');
+}
 restoreDrafts();
 // A fragment never travels in an HTTP request. It carries the token and,
 // optionally, the selection another projection was looking at.
 {const fragment=parseFragment();
  if(fragment.selection||fragment.analysis){state.pendingSelection={entity_id:fragment.selection||'',analysis:fragment.analysis||''};}
- if(MODES.includes(fragment.mode)){state.mode=fragment.mode;
-   for(const b of qsa('.wb-tabs [data-mode]'))b.setAttribute('aria-pressed',String(b.dataset.mode===fragment.mode));}
+ // fragment 里的页面优先；旧链接用 mode=understand/structure，按映射落到新页面。
+ {const wanted=fragment.page||LEGACY_PAGES[fragment.mode]||fragment.mode;
+  if(PAGES.includes(wanted))state.page=wanted;}
  if(LENSES.includes(fragment.lens))state.lens=fragment.lens;
  if(fragment.token){
    state.token=fragment.token;
@@ -1846,7 +3177,29 @@ restoreDrafts();
    history.replaceState(null,'',location.pathname+(q?`#${q}`:''));
    connect();
  } else if(typeof localStorage!=='undefined'&&localStorage.getItem('atlas.session.v1')){
-   // 重开/刷新:令牌是本机会话的钥匙,存在本机 origin 里;选区与任务仍在 fragment。
-   state.token=localStorage.getItem('atlas.session.v1');
-   connect();
+  // 重开/刷新:令牌是本机会话的钥匙,存在本机 origin 里;选区与任务仍在 fragment。
+  state.token=localStorage.getItem('atlas.session.v1');
+  connect();
  }}
+// 同一份文档里只换 fragment 不会重新加载页面（浏览器的行为），而"打开那条带令牌的
+// 地址"正是这个工作台交付会话的方式：服务每次启动都换令牌，再打开一次新地址时，页面
+// 会一直用着旧令牌——界面看着"已连接"，每个请求却都是 401，唯一能点的动作是灰的。
+// 上面那段只在加载时读一次 fragment，所以这里补上运行中的那一次。
+function adoptFragmentToken(){
+  if(typeof location==='undefined')return;
+  const fragment=parseFragment();
+  if(!fragment.token||fragment.token===state.token)return;
+  state.token=fragment.token;
+  try{localStorage.setItem('atlas.session.v1',fragment.token);}catch{}
+  const rest=new URLSearchParams(fragment);rest.delete('token');
+  const q=rest.toString();
+  if(typeof history!=='undefined')history.replaceState(null,'',location.pathname+(q?`#${q}`:''));
+  connect();
+}
+if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('hashchange',adoptFragmentToken);
+// 首屏先把壳立起来：当前页面可见，其余页隐藏；各页数据由自己的渲染函数负责。
+renderTabs();
+renderNavState();
+renderPageContent(state.page);
+const projectButton=$('project-name');
+if(projectButton)projectButton.onclick=()=>{setPage('home');renderPageContent('home');};

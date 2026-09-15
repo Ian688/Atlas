@@ -35,12 +35,39 @@
 
 完整清单以 `GET /api/contract` 为准；`?transport=http|cli` 可以只看一种。当前 HTTP 面：
 
-`contract` / `report` / `nodes` / `edges` / `reach` / `flow` / `flows` / `source` / `context` /
-`profile` / `exec-records` / `exec` / `selection` / `annotations` / `annotation` /
-`agent/requests` / `agent/request` / `agent/work`。
+`contract` / `report` / `nodes` / `search` / `node` / `edges` / `reach` / `flow` / `flows` / `source` /
+`context` / `profile` / `exec-records` / `exec` / `exec-compare` / `run-markers` / `scenarios` /
+`scenario` / `relocate` / `ui-state` / `selection` / `annotations` / `annotation` /
+`agent/requests` / `agent/request` / `agent/work` /
+`patches` / `patch` / `patch/propose` / `patch/verify` / `patch/apply` / `patch/revert` /
+`exec/run` / `exec/cancel` / `exec/runs` /
+`projects` / `project/open` / `project/open/cancel` / `project/reindex` / `project/settings`。
 
-CLI 面（宿主可用子进程调用）：`index`、`job …`（含 `job work` 执行 `patch_verify`）、`patch propose|verify|apply|revert|status|list`（`verify --enqueue` 排队）、
+后台执行：`POST /api/exec` 带 `background:true` 立即返回 `run_id`；`GET /api/exec/run?id=`
+查询状态（终态以 runner 发布的记录为准），`POST /api/exec/cancel` 发送协作取消，
+`GET /api/exec/runs` 列出本会话在途与刚完成的运行（含目标对象）。句柄只保存在进程内：
+服务重启后句柄消失，已发布的执行记录仍在 store 里。
+
+项目编排：`GET /api/projects` 列出本机 store 记录的最近项目（含各自 `write` 授权标记）；
+`POST /api/project/open` 按 `path`（索引并切换，返回 `op_id` 可用 `GET ?id=` 轮询、
+`project/open/cancel` 取消）或按 `analysis`（直接切换）打开项目；`allow_writes:true` 是
+本机操作者"以可写方式打开"的明确决定——写授权跟随当前项目（任何时刻至多一个目录可写，
+`contract.writes.capable` 表示服务是否有写能力，`writes.root` 是当前项目的授权目录）；
+`POST /api/project/reindex` 重新索引**当前项目**目录（应用补丁后的"打开新版本"）；
+`GET/PUT /api/project/settings` 查看与更新**当前项目**声明的测试命令与超时（按项目
+持久化与切换；入队作业保留自己入队时的快照）。
+
+其中写入类端点受启动参数约束：`patch/apply` 与 `patch/revert` 只在服务以
+`--allow-writes <目录>` 启动时存在，且请求必须逐字回显契约里 `writes.root`；
+未启用时一律 `403 http_writes_disabled`。
+
+CLI 面（宿主可用子进程调用）：`index`、`job …`（含 `job work` 执行 `patch_verify`）、
+`patch propose|verify|apply|revert|status|list|unlock`（`verify --enqueue` 排队）、
 `profile`、`exec`、`select`、`annotate`、`annotations`、`agent …`、`serve`。
+
+补丁在**两个面上都有**：HTTP 提供 `patch/propose`（登记 Intent）与 `patch/verify`
+（隔离验证），CLI 提供同一套校验路径的完整命令。两者共用同一段校验代码，因此在页面上
+登记不了一个 CLI 会拒绝的 diff。
 
 引用形式：`flow` / `source` / `reach` / `context` / `profile` / `exec` 都接受符号 id、`path:name`
 或裸函数名，一律只在当前分析内解析；解析不到就报错，不会兜底成"其实是你给的那个字符串"。

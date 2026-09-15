@@ -1,14 +1,8 @@
 # Atlas 接手速查
 
-更新：2026-09-13。本文件只提供导航，不另设规则或任务队列。
+先读 [统一设计](PRODUCT_DESIGN.md) 理解用户任务与能力来源，配合 [Mermaid 图谱](design/product-blueprint/README.md)。先落实统一设计第 0 节的架构责任，再按当前阶段交付完整任务；实际路径暴露的基础缺陷要修复，后续能力沿同一模型接入。
+当前执行[任务书 v6 的 M1→M6](DAILY_DEVELOPMENT_WORK_ORDER.md)，详细要求见[项目地图开发提示词](design/atlas-explore-next/DEVELOPMENT_PROMPT.md)。先按 AGENTS.md 读取 README、ARCHITECTURE、HANDOFF。
 
-1. [执行任务书](DAILY_DEVELOPMENT_WORK_ORDER.md)：当前 T1–T3、验收步骤、代码入口、诊断与验证方法。
-2. [产品目标](USE-CASES.md)：最终用户拿到什么；视觉方案是可迭代实现，不固定每轮屏数。
-3. [交接状态](HANDOFF.md) 与 [进度](implementation/progress.json)：从哪里核对断点，不把历史报告当当前证明。
-4. [架构](ARCHITECTURE.md)：数据身份与现有接缝；按需查源码及完整规格。
+实际打开[最新探索页原型](design/atlas-explore-next/index.html)，对照[功能设计](design/atlas-explore-next/DESIGN.md)与截图实现：递归项目地图、节点 i/菜单、解析与批注、多展示区多标签、节点运行/审阅/Agent 交接。
 
-默认直接做：找到 T1 第一个真实失败步骤，改生产路径，跑相关检查，实际点通，再进入下一步。普通重构和实现选择无需确认。详细技术历史通过 Git 与原 evidence 查询，不必开工通读。
-
-容易漏的两点：页面第一页不是全项目；切换选区后的旧异步结果不能覆盖新对象。语义变化要检查生产者/算法版本与分析身份，布局或渲染变化不要改变事实。其余限制以当前任务书为准。
-
-前端开工：[实现提示词](START_FRONTEND_AGENT.md) → [原型](design/workbench-preview.html) → [主设计](FRONTEND_DESIGN.md) / [接线表](FRONTEND_API_CONTRACT.md)。F1 从真实查找/选择/源码关系开始，禁止把设计样例当作已接线数据。
+复用已实现的产品与 R1–R4 修复，保留他人的工作树修改。旧 v5 与旧 mindmap 草稿是历史参考；当前不重复从 U1/S1/D0 开始。模型、执行和写入样例必须换成真实能力，未验证条件如实报告。

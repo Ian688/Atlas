@@ -1,0 +1,14 @@
+flowchart LR
+  request["自然语言需求 / 节点 / 失败步骤"] --> task["创建任务"]
+  task --> card["可编辑验收卡\n位置与用户 / 输入输出\n空态失败 / 成功判据"]
+  card --> scenario["确认预期 → 保存场景"]
+  task --> context["确认候选代码与上下文"]
+  context --> proposal["Agent 提案或导入变更"]
+  proposal --> diff["源码差异 / 结构接口差异"]
+  scenario --> compare["基线与补丁断言矩阵"]
+  proposal --> compare
+  diff --> review["任务 Review\n缺陷 / 风险 / 建议\n证据与未验证问题"]
+  compare --> review
+  review --> decision["采用或返工"]
+  decision -->|返工| proposal
+  proposal -. "新版本使旧结果需复核" .-> review

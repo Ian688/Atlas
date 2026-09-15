@@ -1,0 +1,58 @@
+{
+  "scope": "R4 服务重启恢复",
+  "checks": [
+    {
+      "name": "重启后 alpha 设置恢复",
+      "result": "PASS",
+      "detail": {
+        "applies_to": "当前项目的之后每一次验证（隔离副本内的测试）；切换项目时服务换读该项目的声明；已在队列里的作业用它入队时保存的快照",
+        "schema": "atlas.project-settings.v1",
+        "test_argv": [
+          "node",
+          "--test"
+        ],
+        "test_timeout_ms": 60000,
+        "updated_note": "按项目保存，由本机操作者更新；页面不能替外部提案改测试命令",
+        "worker_heap_mb": 1024
+      }
+    },
+    {
+      "name": "重启后 alpha 写授权恢复",
+      "result": "PASS",
+      "detail": {
+        "capable": true,
+        "enabled": true,
+        "how_to_enable": "atlas --store S serve <analysis> --allow-writes <目录>；页内切换项目时勾选「以可写方式打开」",
+        "root": "/private/tmp/atlas-fix/alpha",
+        "scope": "只有 patch/apply 与 patch/revert，且只写当前项目目录；提案固定在别的项目/版本上时由字节核对与服务端归属检查拒绝"
+      }
+    },
+    {
+      "name": "切换到 beta：读 beta 自己的声明",
+      "result": "PASS",
+      "detail": {
+        "applies_to": "当前项目的之后每一次验证（隔离副本内的测试）；切换项目时服务换读该项目的声明；已在队列里的作业用它入队时保存的快照",
+        "schema": "atlas.project-settings.v1",
+        "test_argv": [
+          "node",
+          "-e",
+          "console.log('BETA-TEST-RAN');process.exit(0)"
+        ],
+        "test_timeout_ms": 45000,
+        "updated_note": "按项目保存，由本机操作者更新；页面不能替外部提案改测试命令",
+        "worker_heap_mb": 1024
+      }
+    },
+    {
+      "name": "切换到 beta：写授权跟随 beta",
+      "result": "PASS",
+      "detail": {
+        "capable": true,
+        "enabled": true,
+        "how_to_enable": "atlas --store S serve <analysis> --allow-writes <目录>；页内切换项目时勾选「以可写方式打开」",
+        "root": "/private/tmp/atlas-fix/beta",
+        "scope": "只有 patch/apply 与 patch/revert，且只写当前项目目录；提案固定在别的项目/版本上时由字节核对与服务端归属检查拒绝"
+      }
+    }
+  ]
+}

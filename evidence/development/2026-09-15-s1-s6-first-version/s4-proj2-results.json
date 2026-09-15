@@ -1,0 +1,63 @@
+{
+  "scope": "最终分发包 + 真实 Chrome；多层目录、跨目录 import 链的临时项目",
+  "checks": [
+    {
+      "name": "多层目录项目里选中中间层函数",
+      "result": "PASS",
+      "detail": "lib/core/engine.js"
+    },
+    {
+      "name": "跨目录关系可点击（start 的邻居）",
+      "result": "PASS",
+      "detail": {
+        "neighbour": "<anonymous@94>",
+        "path": "app/main.js"
+      }
+    },
+    {
+      "name": "跨目录导入的函数可以真实运行",
+      "result": "PASS",
+      "detail": [
+        "本次目标 symbol:lib/util/format.js:0:125 · 分析 7f2b8f041d53",
+        "实际输入：[0.1234,2]",
+        "观测结果 returned · 116 ms · 退出码 0",
+        "返回值 12.34"
+      ]
+    },
+    {
+      "name": "不同结构项目的隔离验证跑通声明测试",
+      "result": "PASS",
+      "detail": [
+        "观测：测试命令 [\"node\",\"--test\"] · 通过（退出码 0） · 退出码 0 · 274 ms"
+      ]
+    },
+    {
+      "name": "不同结构项目的前后对照两侧都真实运行（12.34 / 123.4）",
+      "result": "PASS",
+      "detail": {
+        "rendered": "两侧同一输入：args [0.1234,2]基线（当前工作台版本）verdict returned · 122 ms · 退出码 0返回值/异常：12.34版本 7f2b8f041d53 · snapshot d10494c21f71补丁（验证派生的候选版本）verdict returned · 124 ms · 退出码 0返回值/异常：123.4版本 c693c61c47aa · snapshot 534eaaead7ec版本固定：基线 7f2b8f041d53 · 补丁 c693c61c47aa。两侧都是入口调用的真实结果，没有行级采样。",
+        "raw": {
+          "base": null,
+          "patched": null
+        }
+      }
+    },
+    {
+      "name": "不同结构项目停止服务重开后任务接得上",
+      "result": "PASS",
+      "detail": {
+        "before": {
+          "selection": "percent",
+          "mode": "review",
+          "drafts": 3
+        },
+        "after": {
+          "selection": "percent",
+          "mode": "review",
+          "drafts": 1
+        }
+      }
+    }
+  ],
+  "exit_code": 0
+}

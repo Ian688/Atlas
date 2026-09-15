@@ -1,0 +1,143 @@
+{
+  "scope": "independent temporary two-project real Chrome review of copied final package",
+  "checks": [
+    {
+      "name": "final package exploration and real run",
+      "result": "PASS",
+      "detail": {
+        "result": 15,
+        "analysis": "5ea2403fca04ebbf6e65be1941a56d9f500c744d1637a75eecd76f08f6e29442",
+        "run": "f44a35d42ef94e8493a593098eac67ce"
+      }
+    },
+    {
+      "name": "UI background cancellation after leaving function",
+      "result": "PASS",
+      "detail": {
+        "cancelled": true
+      }
+    },
+    {
+      "name": "settings then actual isolated verification",
+      "result": "PASS",
+      "detail": {
+        "proposal": "b33855ee4fc2059d23833f034dff144c6027af635712fce17fe5ee5127975a0e",
+        "test": "node --test",
+        "layout": "grid"
+      }
+    },
+    {
+      "name": "same input compare baseline 15 vs patch 23",
+      "result": "PASS",
+      "detail": "两侧同一输入：args [19,4]\n基线（当前工作台版本）\nverdict returned · 111 ms · 退出码 0\n返回值/异常：15\n版本 5ea2403fca04 · snapshot e208f0328d7a\n补丁（验证派生的候选版本）\nverdict returned · 100 ms · 退出码 0\n返回值/异常：23\n版本 b17ed9061af2 · snapshot 8e7c0790544c\n版本固定：基线 5ea2403fca04 · 补丁 b17ed9061af2。两侧都是入口调用的真实结果，没有行级采样。"
+    },
+    {
+      "name": "apply new analysis and cross-version revert actual bytes",
+      "result": "PASS",
+      "detail": {
+        "applied_and_reverted": true
+      }
+    },
+    {
+      "name": "second project opens with independent functions",
+      "result": "PASS",
+      "detail": {
+        "betaAnalysis": "689e3f0810e313c1e25d162c492452921d5128bb3c9092f74489c1f45037f939"
+      }
+    },
+    {
+      "name": "same-name function input draft isolation",
+      "result": "PASS",
+      "detail": {
+        "a": "",
+        "b": ""
+      }
+    },
+    {
+      "name": "project settings isolated on switch",
+      "result": "PASS",
+      "detail": {
+        "current": "[]"
+      }
+    },
+    {
+      "name": "foreign task rejected without showing old result",
+      "result": "PASS",
+      "detail": {
+        "label": "已完成\ncheckout · math.js\nrun f44a35d4 · 终态：returned · 属于分析 5ea2403f（另一项目/版本）\n查看结果",
+        "status": "这条任务属于分析 5ea2403fca04，不是当前项目/版本的结果；切回它的项目后再查看。"
+      }
+    },
+    {
+      "name": "second project apply cannot write first project",
+      "result": "PASS",
+      "detail": {
+        "target": "beta"
+      }
+    },
+    {
+      "name": "open new version stays in second project",
+      "result": "PASS",
+      "detail": {
+        "project": "beta"
+      }
+    },
+    {
+      "name": "beta cross-version revert and both project bytes",
+      "result": "PASS",
+      "detail": {
+        "alpha_unchanged": true,
+        "beta_restored": true
+      }
+    },
+    {
+      "name": "return alpha restores own draft and settings",
+      "result": "PASS",
+      "detail": {
+        "args": [
+          "719",
+          "83"
+        ],
+        "settings": [
+          "node",
+          "--test"
+        ]
+      }
+    },
+    {
+      "name": "service restart retains settings and write authorization for both projects",
+      "result": "PASS",
+      "detail": {
+        "alpha": [
+          "node",
+          "--test"
+        ],
+        "beta": [
+          "node",
+          "-e",
+          "console.log(\"BETA-INDEPENDENT\")"
+        ],
+        "writes": "correct for both"
+      }
+    },
+    {
+      "name": "read-only opening rejects write request",
+      "result": "PASS",
+      "detail": {
+        "status": 403,
+        "writes": {
+          "capable": true,
+          "enabled": false,
+          "how_to_enable": "atlas --store S serve <analysis> --allow-writes <目录>；页内切换项目时勾选「以可写方式打开」",
+          "root": null,
+          "scope": "只有 patch/apply 与 patch/revert，且只写当前项目目录；提案固定在别的项目/版本上时由字节核对与服务端归属检查拒绝"
+        }
+      }
+    },
+    {
+      "name": "browser JS errors",
+      "result": "PASS",
+      "detail": []
+    }
+  ]
+}

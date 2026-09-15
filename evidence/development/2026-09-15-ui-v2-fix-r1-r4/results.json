@@ -1,0 +1,208 @@
+{
+  "scope": "R1-R4 整改复验：仓库外最终包，双项目（同名同字节 math.js），每次写入后记录两项目字节",
+  "checks": [
+    {
+      "name": "R2 前置：alpha checkout 填 719/83",
+      "result": "PASS",
+      "detail": {
+        "a": "719",
+        "b": "83"
+      }
+    },
+    {
+      "name": "R4 前置：alpha 设置 node --test",
+      "result": "PASS",
+      "detail": {
+        "applies_to": "当前项目的之后每一次验证（隔离副本内的测试）；切换项目时服务换读该项目的声明；已在队列里的作业用它入队时保存的快照",
+        "schema": "atlas.project-settings.v1",
+        "test_argv": [
+          "node",
+          "--test"
+        ],
+        "test_timeout_ms": 60000,
+        "updated_note": "按项目保存，由本机操作者更新；页面不能替外部提案改测试命令",
+        "worker_heap_mb": 1024
+      }
+    },
+    {
+      "name": "R3 前置：alpha checkout(19,4) 返回 15 并留下任务",
+      "result": "PASS",
+      "detail": {
+        "value": 15,
+        "analysis": "a18ee8511973"
+      }
+    },
+    {
+      "name": "R1 以可写方式打开 beta",
+      "result": "PASS",
+      "detail": {
+        "project": "beta",
+        "writes": "/private/tmp/atlas-fix/beta"
+      }
+    },
+    {
+      "name": "R2 beta 同名同路径函数不得继承 alpha 草稿",
+      "result": "PASS",
+      "detail": {
+        "a": "",
+        "b": ""
+      }
+    },
+    {
+      "name": "R3 beta 不残留 alpha 的结果卡；旧任务被拒绝冒充",
+      "result": "PASS",
+      "detail": {
+        "labeled": true,
+        "refused": true
+      }
+    },
+    {
+      "name": "R4 beta 声明自己的测试命令",
+      "result": "PASS",
+      "detail": {
+        "applies_to": "当前项目的之后每一次验证（隔离副本内的测试）；切换项目时服务换读该项目的声明；已在队列里的作业用它入队时保存的快照",
+        "schema": "atlas.project-settings.v1",
+        "test_argv": [
+          "node",
+          "-e",
+          "console.log('BETA-TEST-RAN');process.exit(0)"
+        ],
+        "test_timeout_ms": 45000,
+        "updated_note": "按项目保存，由本机操作者更新；页面不能替外部提案改测试命令",
+        "worker_heap_mb": 1024
+      }
+    },
+    {
+      "name": "R1 外部 Agent 对 beta 的 checkout 提案",
+      "result": "PASS",
+      "detail": {
+        "proposal": "fd597242ac0b"
+      }
+    },
+    {
+      "name": "R1 beta 验证运行 beta 自己声明的命令",
+      "result": "PASS",
+      "detail": {
+        "test": "beta -e command ran"
+      }
+    },
+    {
+      "name": "R1 beta 应用：只改 beta，alpha 字节不动",
+      "result": "PASS",
+      "detail": {
+        "alpha_unchanged": true,
+        "beta_changed": true
+      }
+    },
+    {
+      "name": "R1 打开新版本：留在 beta，源码更新",
+      "result": "PASS",
+      "detail": {
+        "project": "beta"
+      }
+    },
+    {
+      "name": "R1 beta 跨版本撤销：beta 恢复，alpha 仍不动",
+      "result": "PASS",
+      "detail": {
+        "beta_restored": true,
+        "alpha_unchanged": true
+      }
+    },
+    {
+      "name": "R2/R4 切回 alpha：草稿 719/83 与设置各自保持",
+      "result": "PASS",
+      "detail": {
+        "draft": {
+          "a": "19",
+          "b": "4"
+        },
+        "settings": [
+          "node",
+          "--test"
+        ],
+        "writes": "/private/tmp/atlas-fix/alpha"
+      }
+    },
+    {
+      "name": "R1 收尾：两项目最终字节均为基线",
+      "result": "PASS",
+      "detail": {
+        "bytesLog": [
+          {
+            "tag": "启动（基线）",
+            "alpha": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, -b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n",
+            "beta": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, -b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n"
+          },
+          {
+            "tag": "beta 应用前",
+            "alpha": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, -b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n",
+            "beta": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, -b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n"
+          },
+          {
+            "tag": "beta 应用后",
+            "alpha": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, -b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n",
+            "beta": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n"
+          },
+          {
+            "tag": "beta 撤销前",
+            "alpha": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, -b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n",
+            "beta": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n"
+          },
+          {
+            "tag": "beta 撤销后",
+            "alpha": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, -b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n",
+            "beta": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, -b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n"
+          },
+          {
+            "tag": "结束（都应等于基线）",
+            "alpha": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, -b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n",
+            "beta": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, -b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n"
+          }
+        ]
+      }
+    },
+    {
+      "name": "R4 重启由外层脚本核对",
+      "result": "PASS",
+      "detail": "见 restart-check 段"
+    },
+    {
+      "name": "browser JS errors",
+      "result": "PASS",
+      "detail": []
+    }
+  ],
+  "bytesLog": [
+    {
+      "tag": "启动（基线）",
+      "alpha": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, -b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n",
+      "beta": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, -b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n"
+    },
+    {
+      "tag": "beta 应用前",
+      "alpha": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, -b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n",
+      "beta": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, -b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n"
+    },
+    {
+      "tag": "beta 应用后",
+      "alpha": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, -b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n",
+      "beta": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n"
+    },
+    {
+      "tag": "beta 撤销前",
+      "alpha": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, -b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n",
+      "beta": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n"
+    },
+    {
+      "tag": "beta 撤销后",
+      "alpha": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, -b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n",
+      "beta": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, -b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n"
+    },
+    {
+      "tag": "结束（都应等于基线）",
+      "alpha": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, -b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n",
+      "beta": "export function add(a, b) { return a + b; }\nexport function checkout(a, b) { return add(a, -b); }\nexport function spin(n) { let x = 0; while (x < n) { x = x + 1; } return x; }\n"
+    }
+  ]
+}
